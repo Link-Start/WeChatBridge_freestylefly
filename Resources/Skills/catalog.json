@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "skills": [
+    {
+      "id": "wechatbridge.wechat-article-extract",
+      "name": "公众号文章提取",
+      "summary": "从微信聊天记录中识别公众号文章，并提取正文、图片和原文链接。",
+      "version": "1.0.0",
+      "package": null,
+      "supported_agents": [
+        "chatGPTCodex",
+        "claude",
+        "doubao",
+        "qwenWork",
+        "workBuddy"
+      ]
+    },
+    {
+      "id": "wechatbridge.video-information-reading",
+      "name": "视频信息读取",
+      "summary": "读取视频链接或文件，整理逐字稿、摘要和关键时间点。",
+      "version": "1.0.0",
+      "package": null,
+      "supported_agents": [
+        "chatGPTCodex",
+        "claude",
+        "doubao",
+        "qwenWork",
+        "workBuddy"
+      ]
+    }
+  ]
+}

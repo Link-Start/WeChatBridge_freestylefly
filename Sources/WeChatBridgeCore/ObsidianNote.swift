@@ -1,0 +1,145 @@
+import Foundation
+import UniformTypeIdentifiers
+
+/// Turns one verified WeChat archive into a self-contained Markdown note.
+public enum ObsidianNote {
+    /// A readable note title for Obsidian. The name captured from WeChat's title
+    /// bar wins, matching the 群名 shown in 记录; transcript participants are
+    /// only a fallback when OCR found nothing.
+    public static func title(
+        chatName: String?,
+        transcript: WeChatNativeArchive.Transcript?,
+        archiveName: String
+    ) -> String {
+        if let chatName = usable(chatName) {
+            return chatName.hasSuffix("的聊天") ? chatName : "\(chatName)的聊天"
+        }
+        let participants = orderedParticipants(in: transcript)
+        switch participants.count {
+        case 0:
+            break
+        case 1:
+            return "\(participants[0])的聊天"
+        case 2:
+            return "\(participants[0])与\(participants[1])的聊天"
+        default:
+            return "\(participants[0])等\(participants.count)人的聊天"
+        }
+        return (archiveName as NSString).deletingPathExtension
+    }
+
+    public static func render(
+        title: String,
+        chatName: String?,
+        sceneName: String?,
+        createdAt: Date,
+        transcript: WeChatNativeArchive.Transcript?,
+        archiveName: String,
+        attachments: [String: String] = [:],
+        timeZone: TimeZone = .current
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+
+        var yaml: [String] = [
+            "---",
+            "title: \(quoted(title))",
+            "source: WeChat",
+        ]
+        if let chatName, !chatName.isEmpty { yaml.append("chat: \(quoted(chatName))") }
+        if let sceneName, !sceneName.isEmpty { yaml.append("scene: \(quoted(sceneName))") }
+        yaml.append("exported: \(formatter.string(from: createdAt))")
+        if let count = transcript?.records?.count { yaml.append("messages: \(count)") }
+        yaml.append("archive: \(quoted("附件/\(archiveName)"))")
+        yaml.append("---")
+
+        var lines = yaml
+        lines.append("")
+        lines.append("# \(title)")
+        lines.append("")
+        lines.append("> 来源：微信 · 原始归档：[[附件/\(archiveName)]]")
+
+        if let transcript {
+            lines.append("")
+            lines.append("## 聊天记录")
+            if let records = transcript.records, !records.isEmpty {
+                for record in records {
+                    lines.append("")
+                    lines.append("**\(record.sender)** · \(formatter.string(from: record.date))")
+                    lines.append("")
+                    lines.append(record.text)
+                    for attachment in referencedAttachments(in: record.text, available: attachments) {
+                        lines.append("")
+                        lines.append(attachmentLink(attachment))
+                    }
+                }
+            } else {
+                lines.append("")
+                lines.append(transcript.body)
+            }
+        } else {
+            lines.append("")
+            lines.append("未能从原始归档中解析聊天文本。原始 ZIP 已保留，可在附件中打开。")
+        }
+        lines.append("")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func referencedAttachments(
+        in text: String,
+        available: [String: String]
+    ) -> [String] {
+        var remaining = text
+        var result: [String] = []
+        for name in available.keys.sorted(by: {
+            $0.utf8.count == $1.utf8.count ? $0 < $1 : $0.utf8.count > $1.utf8.count
+        }) {
+            guard !name.isEmpty, remaining.contains(name), let saved = available[name] else { continue }
+            result.append(saved)
+            remaining = remaining.replacingOccurrences(of: name, with: "")
+        }
+        return result
+    }
+
+    private static func attachmentLink(_ name: String) -> String {
+        let path = "附件/\(name)"
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "[", with: "\\[")
+            .replacingOccurrences(of: "]", with: "\\]")
+            .replacingOccurrences(of: "#", with: "\\#")
+            .replacingOccurrences(of: "^", with: "\\^")
+            .replacingOccurrences(of: "|", with: "\\|")
+        guard let type = UTType(filenameExtension: (name as NSString).pathExtension),
+              type.conforms(to: .image) || type.conforms(to: .movie) ||
+              type.conforms(to: .audio) || type.conforms(to: .pdf) else {
+            return "[[\(path)]]"
+        }
+        return "![[\(path)]]"
+    }
+
+    private static func quoted(_ value: String) -> String {
+        "\"" + value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n") + "\""
+    }
+
+    private static func orderedParticipants(in transcript: WeChatNativeArchive.Transcript?) -> [String] {
+        var seen = Set<String>()
+        return (transcript?.records ?? []).compactMap { record in
+            let sender = record.sender.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sender.isEmpty, seen.insert(sender).inserted else { return nil }
+            return sender
+        }
+    }
+
+    private static func usable(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+}

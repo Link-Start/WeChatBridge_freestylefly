@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh-Hans</string>
+	<key>CFBundleExecutable</key>
+	<string>WeChatBridge</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.xiangming.wechatbridge</string>
+	<key>CFBundleDisplayName</key>
+	<string>微信流</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>微信流</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.13</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.xiangming.wechatbridge</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wechatbridge</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>15</string>
+	<key>DKAppGroupIdentifier</key>
+	<string>H2P566W3PA.com.xiangming.wechatbridge.shared</string>
+	<key>DKStorageMode</key>
+	<string>shared</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>微信流：本地处理微信聊天记录，不上传分享内容。基于 Dukou（渡口）二次开发。</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>用于识别微信群标题栏中的群名；截图只在内存中处理，不落盘。</string>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+</dict>
+</plist>

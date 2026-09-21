@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>H2P566W3PA.com.xiangming.wechatbridge.shared</string>
+	</array>
+	<!-- Local ad-hoc builds have no Team ID, so App Group containers are
+	     TCC-protected and prompt on every launch. The extension still runs in
+	     the sandbox and this exception grants access to the one shared inbox. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+	<array>
+		<string>/Library/Application Support/WeChatBridge/</string>
+	</array>
+</dict>
+</plist>

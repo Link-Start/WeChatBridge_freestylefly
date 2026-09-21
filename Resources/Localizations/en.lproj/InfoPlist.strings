@@ -1,0 +1,3 @@
+"CFBundleName" = "WeChatBridge";
+"NSHumanReadableCopyright" = "WeChatBridge processes WeChat chats locally and never uploads shared content. Built on the open-source Dukou project.";
+"NSScreenCaptureUsageDescription" = "Used to read group names from WeChat title bars. Screenshots are processed only in memory and are never saved.";
