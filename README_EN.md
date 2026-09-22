@@ -17,7 +17,7 @@
 </div>
 
 > [!NOTE]
-> The Developer ID-signed and Apple-notarized [WeChatBridge 0.1.13 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest) is now available.
+> The Developer ID-signed and Apple-notarized [WeChatBridge 0.1.14 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest) is now available.
 
 ## Why WeChatBridge
 

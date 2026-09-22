@@ -17,7 +17,7 @@
 </div>
 
 > [!NOTE]
-> 已发布经过 Developer ID 签名和 Apple 公证的 [WeChatBridge 0.1.13 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest)。
+> 已发布经过 Developer ID 签名和 Apple 公证的 [WeChatBridge 0.1.14 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest)。
 
 ## 为什么做微信流
 
