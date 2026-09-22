@@ -6,6 +6,7 @@
 
   <p>
     <a href="https://github.com/freestylefly/WeChatBridge/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/freestylefly/WeChatBridge/ci.yml?branch=main&style=flat-square&label=build" alt="构建状态" /></a>
+    <a href="https://github.com/freestylefly/WeChatBridge/releases/latest"><img src="https://img.shields.io/github/v/release/freestylefly/WeChatBridge?style=flat-square&label=download" alt="下载最新版本" /></a>
     <img src="https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple" alt="macOS 14+" />
     <img src="https://img.shields.io/badge/Swift-6.0-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift 6.0" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
@@ -16,7 +17,7 @@
 </div>
 
 > [!NOTE]
-> 当前仓库已开放源代码，首个公开安装包正在准备中。现阶段可按下方步骤从源码构建体验。
+> 已发布经过 Developer ID 签名和 Apple 公证的 [WeChatBridge 0.1.13 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest)。
 
 ## 为什么做微信流
 
@@ -81,6 +82,10 @@ flowchart LR
 - Xcode 16 或兼容 Swift 6 的 Command Line Tools
 - 使用自动粘贴时，需要在系统设置中授予辅助功能权限
 - 使用聊天名识别时，需要授予屏幕录制权限
+
+## 下载安装
+
+前往 [GitHub Releases](https://github.com/freestylefly/WeChatBridge/releases/latest) 下载最新 DMG，打开后将“微信流”拖入“应用程序”。安装包同时支持 Apple Silicon 和 Intel Mac。
 
 ## 从源码构建
 
@@ -152,7 +157,7 @@ Scripts/dev-preview.sh
 - [x] Obsidian 本地归档
 - [x] 场景提示词与技能管理
 - [x] Universal 2 构建、签名与公证流程
-- [ ] 首个公开 DMG Release
+- [x] 首个公开 DMG Release
 - [ ] Homebrew Cask
 - [ ] 更多社区场景和技能包
 
