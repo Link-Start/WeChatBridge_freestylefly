@@ -6,7 +6,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>H2P566W3PA.com.xiangming.wechatbridge.shared</string>
+		<string>DLKMC3ZRZQ.com.xiangming.wechatbridge.shared</string>
 	</array>
 	<!-- Local ad-hoc builds have no Team ID, so App Group containers are
 	     TCC-protected and prompt on every launch. The extension still runs in

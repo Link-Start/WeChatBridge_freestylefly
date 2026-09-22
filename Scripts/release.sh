@@ -19,7 +19,7 @@ REPOSITORY_SLUG="${REPOSITORY_SLUG:-freestylefly/WeChatBridge}"
 PAGES_URL="${PAGES_URL:-https://freestylefly.github.io/WeChatBridge}"
 # The `notarytool store-credentials` profile to submit with. Apple issues
 # notarization credentials per Apple ID and team, not per app, so one stored
-# profile covers everything team H2P566W3PA signs — this Mac keeps it under the
+# profile covers everything team DLKMC3ZRZQ signs — this Mac keeps it under the
 # name of the first app that needed it. The old default, `Dukou-Notary`, was a
 # name nothing had ever stored, so every release stopped on a missing keychain
 # item that read like lost credentials.

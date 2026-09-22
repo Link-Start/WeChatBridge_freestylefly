@@ -18,7 +18,7 @@
 	     WeChatBridgeShare.entitlements and the DKAppGroupIdentifier in both plists. -->
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>H2P566W3PA.com.xiangming.wechatbridge.shared</string>
+		<string>DLKMC3ZRZQ.com.xiangming.wechatbridge.shared</string>
 	</array>
 	<!-- Deliberately absent: no network client, no server, no user-selected
 	     file access. WeChatBridge reads what the extension handed it and hands it on. -->

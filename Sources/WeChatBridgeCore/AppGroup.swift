@@ -15,7 +15,7 @@ public enum AppGroup {
     /// Used by `swift run`, unit tests and previews, which have no bundle.
     /// Team-prefixed because macOS provisions app groups per team, and the same
     /// literal then works for both an ad-hoc local build and a Developer ID one.
-    public static let fallbackIdentifier = "H2P566W3PA.com.xiangming.wechatbridge.shared"
+    public static let fallbackIdentifier = "DLKMC3ZRZQ.com.xiangming.wechatbridge.shared"
 
     public static var identifier: String {
         let declared = Bundle.main.object(forInfoDictionaryKey: infoDictionaryKey) as? String
