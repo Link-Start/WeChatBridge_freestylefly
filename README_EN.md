@@ -157,6 +157,31 @@ Please report security issues privately through [GitHub Security Advisories](htt
 - [ ] Homebrew Cask
 - [ ] More community scenes and skill packages
 
+## Community Group
+
+Join the WeChatBridge community group to share workflows, exchange tips, and report issues with developers and other users.
+
+<div align="center">
+  <img src="Resources/Screenshots/wechat-community-group.png" width="280" alt="QR code for the WeChatBridge community group" />
+  <br />
+  <sub>Scan with WeChat to join the community group</sub>
+</div>
+
+## About Us
+
+Follow project updates, join the discussion, or contact us on WeChat by searching for “向明” or “苍何”.
+
+<table>
+  <tr>
+    <th align="center">向明</th>
+    <th align="center">苍何</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="Resources/Screenshots/wechat-xiangming.jpg" width="420" alt="WeChat QR code for 向明" /></td>
+    <td align="center"><img src="Resources/Screenshots/wechat-canghe.jpg" width="420" alt="WeChat QR code for 苍何" /></td>
+  </tr>
+</table>
+
 ## License
 
 WeChatBridge is released under the [MIT License](LICENSE).

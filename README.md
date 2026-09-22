@@ -161,6 +161,31 @@ Scripts/dev-preview.sh
 - [ ] Homebrew Cask
 - [ ] 更多社区场景和技能包
 
+## 交流群
+
+欢迎加入 WeChatBridge 交流群，与开发者和社区用户交流使用经验、反馈问题与分享工作流。
+
+<div align="center">
+  <img src="Resources/Screenshots/wechat-community-group.png" width="280" alt="WeChatBridge 微信交流群二维码" />
+  <br />
+  <sub>使用微信扫码加入交流群</sub>
+</div>
+
+## 关于我们
+
+关注项目动态、使用交流与后续更新，可通过微信搜索“向明”或“苍何”联系我们。
+
+<table>
+  <tr>
+    <th align="center">向明</th>
+    <th align="center">苍何</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="Resources/Screenshots/wechat-xiangming.jpg" width="420" alt="向明微信二维码" /></td>
+    <td align="center"><img src="Resources/Screenshots/wechat-canghe.jpg" width="420" alt="苍何微信二维码" /></td>
+  </tr>
+</table>
+
 ## 许可证
 
 WeChatBridge 使用 [MIT License](LICENSE) 发布。
