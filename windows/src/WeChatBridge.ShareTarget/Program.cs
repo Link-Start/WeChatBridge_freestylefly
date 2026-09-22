@@ -18,16 +18,24 @@ internal static class Program
     [STAThread]
     private static async Task Main(string[] args)
     {
-        WinRT.ComWrappersSupport.InitializeComWrappers();
-        var activated = AppInstance.GetCurrent().GetActivatedEventArgs();
-
-        if (activated?.Kind != ExtendedActivationKind.ShareTarget ||
-            activated.Data is not ShareTargetActivatedEventArgs shareArgs)
+        try
         {
-            return;
-        }
+            WinRT.ComWrappersSupport.InitializeComWrappers();
+            var activated = AppInstance.GetCurrent().GetActivatedEventArgs();
 
-        await HandleShareAsync(shareArgs);
+            if (activated?.Kind != ExtendedActivationKind.ShareTarget ||
+                activated.Data is not ShareTargetActivatedEventArgs shareArgs)
+            {
+                return;
+            }
+
+            await HandleShareAsync(shareArgs);
+        }
+        catch (Exception error)
+        {
+            var paths = new InboxPaths();
+            InboxLogger.Write(paths, "Share Target 激活初始化失败", error);
+        }
     }
 
     private static async Task HandleShareAsync(ShareTargetActivatedEventArgs args)
