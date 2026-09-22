@@ -16,65 +16,251 @@ enum AppVersion {
 
 struct AboutPane: View {
     @ObservedObject var updater: AppUpdater
+    @State private var showingLicenses = false
+    @State private var hoveringLicenses = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.section) {
-            HStack(spacing: 14) {
-                Image(nsImage: NSApp.applicationIconImage ?? NSImage())
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 44, height: 44)
-                    .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 0) {
+            appHeader
+            divider
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(verbatim: "微信流")
-                        .font(Typo.paneTitle)
-                        .foregroundStyle(Theme.ink)
-                    HStack(spacing: Space.s) {
-                        StatusPill(text: L10n.format("版本 %@ (%@)", AppVersion.short, AppVersion.build))
-                        Text(L10n.text("此分支未启用自动更新"))
-                            .font(Typo.paneCaption)
-                            .foregroundStyle(Theme.inkTertiary)
-                    }
-                }
-            }
-
-            SettingsSection(title: L10n.text("WeChatBridge 做什么"), systemImage: "info.circle", spacing: 10) {
+            aboutSection(title: L10n.text("WeChatBridge 做什么"), systemImage: "info.circle") {
                 paragraph(L10n.text("在微信的转发菜单里，直接把聊天记录送到你要用的地方。"))
-                paragraph(L10n.text("也是聊天记录的本地备份工具：导出只走微信自带的转发界面，不读数据库、不解密、不注入。"))
-                paragraph(L10n.text("聊天文件在本机处理，微信流不会上传聊天内容。文件会按清理设置保留，可随时在「记录」中管理。"))
             }
+            .padding(.vertical, Space.xl)
 
-            SettingsSection(title: L10n.text("链接"), systemImage: "link") {
-                SettingRow(title: L10n.text("原项目源码与问题反馈"), detail: "GitHub · qzz0518/Dukou", alignment: .center) {
-                    Button { AppLinks.open(AppLinks.github) } label: {
-                        Label(L10n.text("打开"), systemImage: "arrow.up.right")
-                    }
-                        .buttonStyle(SettingsActionButtonStyle())
-                        .accessibilityLabel(Text(L10n.text("源码与问题反馈")))
-                }
+            divider
 
-                SettingRow(title: L10n.text("作者"), detail: "X · @zerah_eth", alignment: .center) {
-                    Button { AppLinks.open(AppLinks.x) } label: {
-                        Label(L10n.text("打开"), systemImage: "arrow.up.right")
-                    }
-                        .buttonStyle(SettingsActionButtonStyle())
-                        .accessibilityLabel(Text(verbatim: "X · @zerah_eth"))
+            aboutSection(title: L10n.text("项目与支持"), systemImage: "arrow.up.right.square") {
+                paragraph(L10n.text("在 GitHub 上查看项目，访问官网，或向我们提交建议与问题。"))
+                HStack(spacing: Space.m) {
+                    linkButton(
+                        L10n.text("访问项目"),
+                        systemImage: "chevron.left.forwardslash.chevron.right",
+                        url: AppLinks.github
+                    )
+                    linkButton(
+                        L10n.text("访问官网"),
+                        systemImage: "globe",
+                        url: AppLinks.website
+                    )
+                    linkButton(
+                        L10n.text("提交反馈"),
+                        systemImage: "bubble.left",
+                        url: AppLinks.issues
+                    )
                 }
             }
+            .padding(.vertical, Space.xl)
 
-            SettingsSection(title: L10n.text("开源署名"), systemImage: "heart") {
-                paragraph(L10n.text("基于开源项目 Dukou（渡口）二次开发，感谢原作者 qzz0518。"))
-                paragraph(L10n.text("原项目采用 MIT 许可证；本分支保留其许可证和第三方声明。"))
+            divider
+
+            aboutSection(title: L10n.text("开源致谢"), systemImage: "heart") {
+                paragraph(L10n.text("基于开源项目构建，感谢原作者的贡献。"))
+                licenseButton
+            }
+            .padding(.vertical, Space.xl)
+        }
+        .sheet(isPresented: $showingLicenses) {
+            LicenseSheet()
+        }
+    }
+
+    private var appHeader: some View {
+        HStack(alignment: .top, spacing: 20) {
+            Image(nsImage: NSApp.applicationIconImage ?? NSImage())
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 76, height: 76)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(verbatim: "微信流")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                StatusPill(text: L10n.format("版本 %@ (%@)", AppVersion.short, AppVersion.build))
+                Text(L10n.text("让微信的内容，流向你需要的地方。"))
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.inkSecondary)
             }
         }
+        .padding(.bottom, Space.xl)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Theme.stroke)
+            .frame(height: Stroke.hairline)
+    }
+
+    private var licenseButton: some View {
+        Button {
+            showingLicenses = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.inkSecondary)
+                Text(L10n.text("许可证与第三方声明"))
+                    .font(Typo.paneBody)
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: Space.s)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.inkTertiary)
+            }
+            .padding(.horizontal, Space.m)
+            .padding(.vertical, 10)
+            .frame(maxWidth: 620, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                    .fill(hoveringLicenses ? Theme.hover : Color.clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        }
+        .buttonStyle(PlainPressButtonStyle(staticFeedback: true))
+        .onHover { hoveringLicenses = $0 }
+        .accessibilityIdentifier("about.licenses")
+    }
+
+    private func aboutSection<Content: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.inkSecondary)
+                    .frame(width: 26, alignment: .leading)
+                Text(title)
+                    .font(.system(size: 17.5, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                content()
+            }
+            .padding(.leading, 38)
+        }
+    }
+
+    private func linkButton(_ title: String, systemImage: String, url: String) -> some View {
+        Button {
+            AppLinks.open(url)
+        } label: {
+            Label(title, systemImage: systemImage)
+        }
+        .buttonStyle(SettingsActionButtonStyle(width: 150))
     }
 
     private func paragraph(_ text: String) -> some View {
         Text(text)
-            .font(Typo.paneBody)
+            .font(.system(size: 14))
             .foregroundStyle(Theme.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 460, alignment: .leading)
+            .frame(maxWidth: 620, alignment: .leading)
+    }
+}
+
+private struct LicenseSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let documents = LicenseDocument.load()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            HStack {
+                Text(L10n.text("许可证与第三方声明"))
+                    .font(Typo.paneTitle)
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: Space.l)
+                Button(L10n.text("完成")) { dismiss() }
+                    .buttonStyle(SettingsActionButtonStyle())
+                    .keyboardShortcut(.defaultAction)
+            }
+
+            if documents.isEmpty {
+                Text(L10n.text("当前构建未包含许可证文件。"))
+                    .font(Typo.paneBody)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.section) {
+                        ForEach(documents) { document in
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(document.title)
+                                    .font(Typo.sectionLabel)
+                                    .foregroundStyle(Theme.inkSecondary)
+
+                                Rectangle()
+                                    .fill(Theme.stroke)
+                                    .frame(height: Stroke.hairline)
+
+                                Text(document.body)
+                                    .font(Typo.paneCaption)
+                                    .foregroundStyle(Theme.inkSecondary)
+                                    .lineSpacing(2)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .padding(.trailing, Space.s)
+                }
+                .defaultScrollAnchor(.top)
+            }
+        }
+        .padding(Space.xl)
+        .frame(width: 600, height: 500, alignment: .topLeading)
+    }
+}
+
+private struct LicenseDocument: Identifiable {
+    let id: String
+    let title: String
+    let body: String
+
+    static func load() -> [LicenseDocument] {
+        [
+            document(
+                id: "application",
+                title: L10n.text("本应用许可"),
+                resource: "LICENSE"
+            ),
+            document(
+                id: "notices",
+                title: L10n.text("第三方声明"),
+                resource: "THIRD-PARTY-NOTICES",
+                fileExtension: "md"
+            ),
+            document(
+                id: "sparkle",
+                title: L10n.text("Sparkle 许可"),
+                resource: "Sparkle-LICENSE",
+                fileExtension: "txt",
+                subdirectory: "Licenses"
+            )
+        ].compactMap { $0 }
+    }
+
+    private static func document(
+        id: String,
+        title: String,
+        resource: String,
+        fileExtension: String? = nil,
+        subdirectory: String? = nil
+    ) -> LicenseDocument? {
+        guard let url = Bundle.main.url(
+            forResource: resource,
+            withExtension: fileExtension,
+            subdirectory: subdirectory
+        ),
+        let body = try? String(contentsOf: url, encoding: .utf8) else {
+            return nil
+        }
+        return LicenseDocument(id: id, title: title, body: body)
     }
 }
