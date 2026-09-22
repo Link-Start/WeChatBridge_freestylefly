@@ -30,10 +30,17 @@ public partial class MainWindow : Window
                 .OrderByDescending(batch => batch.CreatedAt)
                 .ToList();
             BatchList.ItemsSource = batches;
-            StatusText.Text = batches.Count == 0
+            var failure = Directory.EnumerateFiles(_paths.Failed, "*.json")
+                .Select(ReadFailure)
+                .Where(item => item is not null)
+                .Cast<FailureSummary>()
+                .OrderByDescending(item => item.CreatedAt)
+                .FirstOrDefault();
+            StatusText.Text = batches.Count == 0 && failure is null
                 ? "等待微信分享。"
                 : $"已发现 {batches.Count} 个已提交批次。" +
-                  (_requestedBatch is null ? string.Empty : $" 请求批次：{_requestedBatch}");
+                  (_requestedBatch is null ? string.Empty : $" 请求批次：{_requestedBatch}") +
+                  (failure is null ? string.Empty : $" 最近失败：{failure.Message}");
             InboxText.Text = $"Inbox：{_paths.Root}";
         }
         catch (Exception error)
@@ -63,8 +70,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private static FailureSummary? ReadFailure(string path)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            var createdAt = root.TryGetProperty("createdAt", out var created)
+                ? created.GetDateTimeOffset()
+                : File.GetLastWriteTimeUtc(path);
+            var message = root.TryGetProperty("message", out var error)
+                ? error.GetString() ?? "未知错误"
+                : "未知错误";
+            return new FailureSummary(createdAt.ToLocalTime(), message);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private sealed record BatchSummary(string BatchId, DateTimeOffset CreatedAt, string Files)
     {
         public string Display => $"{CreatedAt:yyyy-MM-dd HH:mm:ss}  {Files}\n{BatchId}";
     }
+
+    private sealed record FailureSummary(DateTimeOffset CreatedAt, string Message);
 }

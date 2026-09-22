@@ -75,6 +75,26 @@ public sealed class InboxWriterTests
         Assert.False(File.Exists(Path.Combine(fixture.Paths.Root, "escaped.zip")));
     }
 
+    [Fact]
+    public async Task CommitAsyncRejectsReparsePointWhenSupported()
+    {
+        using var fixture = new TempInbox();
+        var source = fixture.WriteSource("source.zip", "zip");
+        var link = Path.Combine(fixture.Root, "link.zip");
+        try
+        {
+            File.CreateSymbolicLink(link, source);
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException)
+        {
+            return;
+        }
+
+        await Assert.ThrowsAsync<InboxValidationException>(() => InboxWriter.CommitAsync(
+            fixture.Paths,
+            [new InboxSourceFile(link, "link.zip", "application/zip", 0, 0)]));
+    }
+
     private sealed class TempInbox : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "WeChatBridgeTests", Guid.NewGuid().ToString("N"));
@@ -88,6 +108,8 @@ public sealed class InboxWriterTests
         }
 
         public InboxPaths Paths { get; }
+
+        public string Root => _root;
 
         public string WriteSource(string name, string content)
         {

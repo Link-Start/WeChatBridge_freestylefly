@@ -152,6 +152,9 @@ public static class InboxWriter
             throw new InboxValidationException($"找不到分享文件：{source.DisplayName}");
         if (Directory.Exists(source.SourcePath))
             throw new InboxValidationException($"分享项不是文件：{source.DisplayName}");
+        var attributes = File.GetAttributes(source.SourcePath);
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+            throw new InboxValidationException($"不接受符号链接或重解析点：{source.DisplayName}");
         if (!source.DisplayName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             throw new InboxValidationException($"PoC 只接收 ZIP：{source.DisplayName}");
     }
