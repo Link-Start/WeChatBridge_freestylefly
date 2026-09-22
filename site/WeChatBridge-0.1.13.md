@@ -1,10 +1,26 @@
 # WeChatBridge 0.1.13
 
-- Add a built-in WeSight forward entry.
-- Add an Obsidian destination that writes Markdown notes and keeps the original archive.
-- Add global scene shortcuts for the next forward.
-- Add a Dock icon by default for quick access to the app.
-- Remove the legacy floating shelf and its history actions.
-- Remove the experimental Quick WeChat Forward and Quick Moments Forward features.
-- Build seven signed Share extensions, including WeSight and Obsidian.
-- Fix: a forward pasted into nothing when the target's input box was not focused. The input is focused before ⌘V now, which is what 「发给 WeSight」 needed.
+微信流首个公开版本，把微信原生导出的聊天记录直接送到 AI Agent、本地知识库和其他 macOS 应用。
+
+## 新功能
+
+- 提供 9 个原生分享入口：Codex、Claude、豆包、千问办公、WorkBuddy、WeSight、Obsidian、剪贴板和自定义应用。
+- Obsidian 可生成 Markdown 笔记，并保留微信导出的原始归档。
+- 支持群聊场景提示词、下一次转发快捷键和 Agent 技能管理。
+- 新增本地记录管理、失败兜底、双语界面和 Dock 快速入口。
+- 重构“关于”页面，加入项目官网、问题反馈、许可证和第三方声明。
+
+## 修复与改进
+
+- 修复首次引导内容被裁切、继续按钮不可见的问题。
+- 修复设置面板内容可能把窗口异常撑大的问题。
+- 修复目标应用输入框未聚焦时粘贴失败的问题。
+- 支持仅安装 Command Line Tools 的开发环境完成本地打包。
+
+## 隐私
+
+- 聊天内容只来自微信主动导出的文件，并保存在本机。
+- Share Extension 在 macOS 沙盒内运行且没有网络权限。
+- 应用不读取微信数据库，不解密、不注入、不修改微信进程。
+
+系统要求：macOS 14 Sonoma 或更高版本。
