@@ -62,6 +62,43 @@ flowchart LR
 | Copy to Clipboard | Keep the files ready for a manual paste |
 | Send to Custom | Route the batch to an app from your own list |
 
+## In action
+
+Pick a destination straight from WeChat's “Forward to other apps” menu, without opening the main window first:
+
+<div align="center">
+  <img src="Resources/Screenshots/usage-wechat-share-menu.png" width="380" alt="WeChatBridge entries in the WeChat forward menu" />
+</div>
+
+<table>
+  <tr>
+    <th align="center">Destination switches</th>
+    <th align="center">Scenes</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="Resources/Screenshots/usage-entries.png" width="420" alt="Entries settings pane" /></td>
+    <td align="center"><img src="Resources/Screenshots/usage-scenes.png" width="420" alt="Scene management pane" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Toggle any of the nine entries; missing apps are flagged</sub></td>
+    <td align="center"><sub>Scenes store prompts and their agents, chosen at forward time</sub></td>
+  </tr>
+  <tr>
+    <th align="center">Skill Center</th>
+    <th align="center">Saving to Obsidian</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="Resources/Screenshots/usage-skills.png" width="420" alt="Skill Center" /></td>
+    <td align="center"><img src="Resources/Screenshots/usage-obsidian-attachments.png" width="420" alt="Conversation and attachments in Obsidian" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Install capability packs so agents can read links and videos</sub></td>
+    <td align="center"><sub>Notes keep the original archive and render attachments like WeChat does</sub></td>
+  </tr>
+</table>
+
+Full steps, permissions, and troubleshooting live in the [usage guide](USAGE_EN.md).
+
 ## Privacy by design
 
 - Conversation content only comes from files explicitly exported by WeChat.

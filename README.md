@@ -62,6 +62,43 @@ flowchart LR
 | 复制到剪贴板 | 保留文件，交给用户手动粘贴 |
 | 发送到自定义 | 转发到用户维护的应用列表 |
 
+## 实际效果
+
+在微信「转发到其他应用」里直接选择目标，不需要先打开微信流主窗口：
+
+<div align="center">
+  <img src="Resources/Screenshots/usage-wechat-share-menu.png" width="380" alt="微信转发菜单中的微信流入口" />
+</div>
+
+<table>
+  <tr>
+    <th align="center">入口开关</th>
+    <th align="center">场景化</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="Resources/Screenshots/usage-entries.png" width="420" alt="入口设置页" /></td>
+    <td align="center"><img src="Resources/Screenshots/usage-scenes.png" width="420" alt="场景管理页" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>九个入口随时开关，未安装的应用直接标注</sub></td>
+    <td align="center"><sub>场景保存提示词与适用 Agent，转发时挑一个</sub></td>
+  </tr>
+  <tr>
+    <th align="center">技能中心</th>
+    <th align="center">沉淀到 Obsidian</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="Resources/Screenshots/usage-skills.png" width="420" alt="技能中心" /></td>
+    <td align="center"><img src="Resources/Screenshots/usage-obsidian-attachments.png" width="420" alt="Obsidian 中的聊天记录与附件" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>给 Agent 装上能力包，群里的链接和视频都能读</sub></td>
+    <td align="center"><sub>笔记保留原始归档，附件按微信样式渲染</sub></td>
+  </tr>
+</table>
+
+完整操作步骤、权限说明和常见问题见 [使用指南](USAGE.zh-CN.md)。
+
 ## 隐私设计
 
 微信流的处理边界保持清晰：
