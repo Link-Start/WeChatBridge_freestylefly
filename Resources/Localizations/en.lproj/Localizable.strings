@@ -166,11 +166,12 @@
 "版本 %@ (%@)" = "Version %@ (%@)";
 "WeChatBridge 做什么" = "What WeChatBridge does";
 "在微信的转发菜单里，直接把聊天记录送到你要用的地方。" = "Send chat history straight from WeChat's forward menu to wherever you need it.";
-"聊天文件在本机处理，微信流不会上传聊天内容。文件会按清理设置保留，可随时在「记录」中管理。" = "Chat files are processed on this Mac. WeChatBridge does not upload your conversations. Files follow your retention settings and can be managed in History.";
-"链接" = "Links";
-"源码与问题反馈" = "Source and issues";
-"作者" = "Author";
-"打开" = "Open";
+"让微信的内容，流向你需要的地方。" = "Send WeChat content wherever you need it.";
+"项目与支持" = "Project and support";
+"在 GitHub 上查看项目，访问官网，或向我们提交建议与问题。" = "View the project on GitHub, visit the website, or send us suggestions and issues.";
+"访问项目" = "Visit project";
+"访问官网" = "Visit website";
+"提交反馈" = "Send feedback";
 
 /* First-run guide */
 "完成" = "Done";
@@ -242,7 +243,6 @@
 "名称" = "Name";
 "说明" = "Description";
 "提示词" = "Prompt";
-"作者" = "Author";
 "适用 Agent" = "Applicable Agents";
 "仅在转发到已选择的 Agent 时使用这个提示词。" = "Use this prompt only when forwarding to a selected Agent.";
 "无" = "None";
@@ -369,11 +369,13 @@
 "屏幕录制" = "Screen Recording";
 "用于截取微信群标题栏并识别群名；图片只在内存中处理，不落盘。" = "Captures only the WeChat title bar to recognize the group name. The image stays in memory and is never written to disk.";
 "申请权限" = "Request permission";
-"此分支未启用自动更新" = "Automatic updates are disabled in this branch";
-"原项目源码与问题反馈" = "Original source and issue tracker";
-"开源署名" = "Open-source attribution";
-"基于开源项目 Dukou（渡口）二次开发，感谢原作者 qzz0518。" = "Built on the open-source Dukou project, with thanks to its original author qzz0518.";
-"原项目采用 MIT 许可证；本分支保留其许可证和第三方声明。" = "The original project uses the MIT license; this branch retains its license and third-party notices.";
+"开源致谢" = "Open-source credits";
+"基于开源项目构建，感谢原作者的贡献。" = "Built on open-source projects, with thanks to their authors.";
+"许可证与第三方声明" = "Licenses and third-party notices";
+"本应用许可" = "Application license";
+"第三方声明" = "Third-party notices";
+"Sparkle 许可" = "Sparkle license";
+"当前构建未包含许可证文件。" = "This build does not include the license files.";
 "没有找到豆包的“上传文件或图片”入口。" = "Doubao's Upload File or Image item was not found.";
 "豆包没有打开文件选择窗口。" = "Doubao did not open a file picker.";
 "无法解包“%@”。" = "Could not expand \"%@\".";
@@ -395,5 +397,4 @@
 "续聊要求：只处理 %@ 之后的新消息，不要重复上次已经总结过的内容。" = "Continuation requirement: process only messages after %@ and do not repeat what was already summarized.";
 "由旧版附加 Prompt 迁移。" = "Migrated from the legacy attached prompt.";
 "原 Prompt %d" = "Legacy Prompt %d";
-"也是聊天记录的本地备份工具：导出只走微信自带的转发界面，不读数据库、不解密、不注入。" = "It doubles as a local backup tool for your chats: exports go through WeChat's own forward menu — no database reads, no decryption, no injection.";
 "通用群聊摘要场景。" = "A general chat summary scene.";

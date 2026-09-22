@@ -5,8 +5,9 @@ import SwiftUI
 /// The links the About pane offers. Constants, because a typo in a URL is not
 /// something a user can report usefully.
 enum AppLinks {
-    static let github = "https://github.com/qzz0518/Dukou"
-    static let x = "https://x.com/zerah_eth"
+    static let github = "https://github.com/freestylefly/WeChatBridge"
+    static let issues = "https://github.com/freestylefly/WeChatBridge/issues/new"
+    static let website = "https://render.qmuse.pub/p/muse/2413870555736078"
 
     static func open(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }

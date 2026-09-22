@@ -12,6 +12,7 @@
   </p>
 
   <p>简体中文 · <a href="README_EN.md">English</a></p>
+  <p><a href="https://render.qmuse.pub/p/muse/2413870555736078">官网 · render.qmuse.pub</a></p>
 </div>
 
 > [!NOTE]
@@ -161,6 +162,7 @@ WeChatBridge 使用 [MIT License](LICENSE) 发布。
 
 ## 致谢
 
+- [Dukou（渡口）](https://github.com/qzz0518/Dukou)：微信流基于该项目二次开发。
 - [Sparkle](https://github.com/sparkle-project/Sparkle) 提供安全的 macOS 应用更新能力。
 - 感谢所有参与测试、提出建议和贡献代码的朋友。
 

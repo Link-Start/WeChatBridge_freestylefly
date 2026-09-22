@@ -12,6 +12,7 @@
   </p>
 
   <p><a href="README.md">简体中文</a> · English</p>
+  <p><a href="https://render.qmuse.pub/p/muse/2413870555736078">Website · render.qmuse.pub</a></p>
 </div>
 
 > [!NOTE]
@@ -157,6 +158,7 @@ WeChatBridge is released under the [MIT License](LICENSE).
 
 ## Acknowledgements
 
+- [Dukou (渡口)](https://github.com/qzz0518/Dukou): WeChatBridge is built on this project.
 - [Sparkle](https://github.com/sparkle-project/Sparkle) provides secure update delivery for the macOS app.
 - Thanks to everyone who tested the app, shared feedback, and contributed code.
 
