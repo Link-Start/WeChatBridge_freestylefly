@@ -33,14 +33,25 @@ if (-not $CertificateThumbprint) { throw 'Run new-dev-certificate.ps1 first.' }
 $makeAppx = Resolve-SdkTool 'makeappx.exe'
 $signTool = Resolve-SdkTool 'signtool.exe'
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-& $makeAppx pack /d $manifestDir /p $packagePath /nv
+& $makeAppx pack /d $manifestDir /p $packagePath /nv /o
 if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }
 & $signTool sign /fd SHA256 /sha1 $CertificateThumbprint $packagePath
 if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
 
+$signature = Get-AuthenticodeSignature -FilePath $packagePath
+if ($signature.Status -ne 'Valid') {
+    throw "The MSIX signature is not trusted ($($signature.Status): $($signature.StatusMessage)). Trust the development certificate in Cert:\CurrentUser\Root and retry."
+}
+
 Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue |
     Remove-AppxPackage -ErrorAction SilentlyContinue
-Add-AppxPackage -Path $packagePath -ExternalLocation $installRoot
+try {
+    Add-AppxPackage -Path $packagePath -ExternalLocation $installRoot
+}
+catch {
+    $hresult = ('0x{0:X8}' -f ($_.Exception.HResult -band 0xffffffff))
+    throw "Add-AppxPackage failed ($hresult): $($_.Exception.Message)"
+}
 $registered = Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
 if (-not $registered) { throw 'Add-AppxPackage returned but the package is not registered.' }
 Write-Output "Registered: $($registered.PackageFullName)"
