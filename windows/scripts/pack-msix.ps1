@@ -38,6 +38,20 @@ try {
     $manifest.Package.Identity.Version = $Version
     $manifest.Save($manifestPath)
 
+    # A package without a resources index registers cleanly but does not reach the share
+    # sheet, even though every name in the manifest is a literal. Ship the generated
+    # resources.pri so the shell can resolve the target the same way it resolves the
+    # packaged share targets it already lists.
+    $makePri = Resolve-SdkTool 'makepri.exe'
+    $priConfigPath = Join-Path $stageDirectory 'priconfig.xml'
+    & $makePri createconfig /cf $priConfigPath /dq lang-zh-CN /o | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "MakePri createconfig failed with exit code $LASTEXITCODE." }
+    $priPath = Join-Path $stageDirectory 'resources.pri'
+    & $makePri new /pr $stageDirectory /cf $priConfigPath /of $priPath /in $manifest.Package.Identity.Name /o | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "MakePri new failed with exit code $LASTEXITCODE." }
+    if (-not (Test-Path $priPath)) { throw "MakePri did not produce resources.pri." }
+    Remove-Item -LiteralPath $priConfigPath -Force -ErrorAction SilentlyContinue
+
     $makeAppx = Resolve-SdkTool 'makeappx.exe'
     & $makeAppx pack /d $stageDirectory /p $output /nv /o
     if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }

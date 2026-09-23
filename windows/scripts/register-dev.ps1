@@ -27,6 +27,20 @@ if (-not (Test-Path $helper)) { throw "Share Target helper not found: $helper" }
 if (-not (Test-Path (Join-Path $installRoot 'WeChatBridge.Windows.exe'))) { throw 'WPF host not found under InstallRoot.' }
 if (-not (Test-Path $manifestPath)) { throw "Sparse package manifest not found: $manifestPath" }
 
+# An AllowExternalContent package resolves the paths its manifest declares against the
+# external location, not against the payload copy under WindowsApps. The logos therefore
+# have to exist under the install root as well, or the shell cannot resolve the share
+# target and silently leaves it out of the share sheet.
+$assetSource = Join-Path $manifestDir 'Assets'
+if (Test-Path $assetSource) {
+    $assetTarget = Join-Path $installRoot 'Assets'
+    New-Item -ItemType Directory -Force -Path $assetTarget | Out-Null
+    Get-ChildItem -Path $assetSource -Force | ForEach-Object {
+        Copy-Item -Path $_.FullName -Destination (Join-Path $assetTarget $_.Name) -Recurse -Force
+    }
+    Write-RegistrationLog "已同步图标资源到外部内容目录：$assetTarget"
+}
+
 if (-not $CertificateThumbprint) {
     $CertificateThumbprint = (Get-ChildItem Cert:\CurrentUser\My |
         Where-Object Subject -eq 'CN=WeChatBridge Windows Dev' |
