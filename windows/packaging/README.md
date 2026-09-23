@@ -20,3 +20,8 @@ Authorities store, then run the registration script again.
 
 The package is signed with a local development certificate. No generated
 certificate or MSIX belongs in Git.
+
+For a release or tester build, use the repository workflow
+`.github/workflows/windows-sign.yml` with SignPath Foundation. Configure the
+SignPath organization, project, signing policy, API token, and the exact MSIX
+publisher subject as repository variables and secrets before dispatching it.

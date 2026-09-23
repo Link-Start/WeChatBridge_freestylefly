@@ -36,3 +36,14 @@ windows\scripts\register-dev.ps1 -InstallRoot <install-root>
 如果注册时出现 `0x800B0109`，打开当前用户的“受信任的根证书颁发机构”，导入脚本输出的
 `WeChatBridge.Windows.Dev.cer`，然后重新运行注册脚本。注册脚本会把失败的 HResult 写入
 `<install-root>\registration.log`。
+
+## SignPath Foundation 签名
+
+正式测试包使用仓库根目录的 `.github/workflows/windows-sign.yml`，通过 GitHub Actions 手动触发。
+在 GitHub 仓库中配置以下内容：
+
+- Secret：`SIGNPATH_API_TOKEN`
+- Variables：`SIGNPATH_ORGANIZATION_ID`、`SIGNPATH_PROJECT_SLUG`、`SIGNPATH_SIGNING_POLICY_SLUG`
+- Variable：`SIGNPATH_MSIX_PUBLISHER`，必须与 SignPath 证书 Subject 完全一致
+
+SignPath 项目创建完成后，工作流会先构建和测试，再上传未签名 MSIX，提交 SignPath 签名请求，最后上传签名后的 MSIX。`pack-msix.ps1` 会在签名前注入 Publisher 和版本号。

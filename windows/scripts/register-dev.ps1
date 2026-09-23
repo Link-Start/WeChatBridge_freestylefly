@@ -27,15 +27,6 @@ if (-not (Test-Path $helper)) { throw "Share Target helper not found: $helper" }
 if (-not (Test-Path (Join-Path $installRoot 'WeChatBridge.Windows.exe'))) { throw 'WPF host not found under InstallRoot.' }
 if (-not (Test-Path $manifestPath)) { throw "Sparse package manifest not found: $manifestPath" }
 
-function Resolve-SdkTool([string]$name) {
-    $command = Get-Command $name -ErrorAction SilentlyContinue
-    if ($command) { return $command.Source }
-    $candidate = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\$name" -ErrorAction SilentlyContinue |
-        Sort-Object FullName -Descending | Select-Object -First 1
-    if ($candidate) { return $candidate.FullName }
-    throw "$name was not found. Install the Windows SDK or add it to PATH."
-}
-
 if (-not $CertificateThumbprint) {
     $CertificateThumbprint = (Get-ChildItem Cert:\CurrentUser\My |
         Where-Object Subject -eq 'CN=WeChatBridge Windows Dev' |
@@ -45,11 +36,16 @@ if (-not $CertificateThumbprint) { throw 'Run new-dev-certificate.ps1 first.' }
 $certificate = Get-ChildItem Cert:\CurrentUser\My\$CertificateThumbprint -ErrorAction SilentlyContinue
 if (-not $certificate) { throw "Development certificate not found: $CertificateThumbprint" }
 
-$makeAppx = Resolve-SdkTool 'makeappx.exe'
-$signTool = Resolve-SdkTool 'signtool.exe'
-& $makeAppx pack /d $manifestDir /p $packagePath /nv /o
-if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }
-& $signTool sign /fd SHA256 /sha1 $CertificateThumbprint $packagePath
+$packScript = Join-Path $PSScriptRoot 'pack-msix.ps1'
+& $packScript -Publisher 'CN=WeChatBridge Windows Dev' -OutputPath $packagePath
+$signTool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+if (-not $signTool) {
+    $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | Select-Object -First 1
+}
+if (-not $signTool) { throw 'signtool.exe was not found. Install the Windows SDK or add it to PATH.' }
+$signToolPath = if ($signTool.FullName) { $signTool.FullName } else { $signTool.Source }
+& $signToolPath sign /fd SHA256 /sha1 $CertificateThumbprint $packagePath
 if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
 
 $signature = Get-AuthenticodeSignature -FilePath $packagePath
