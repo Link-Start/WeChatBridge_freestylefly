@@ -26,6 +26,7 @@ jobs:
           SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
           SIGNPATH_MSIX_PUBLISHER: ${{ vars.SIGNPATH_MSIX_PUBLISHER }}
         run: |
           $required = @(
@@ -33,6 +34,7 @@ jobs:
             'SIGNPATH_ORGANIZATION_ID',
             'SIGNPATH_PROJECT_SLUG',
             'SIGNPATH_SIGNING_POLICY_SLUG',
+            'SIGNPATH_ARTIFACT_CONFIGURATION_SLUG',
             'SIGNPATH_MSIX_PUBLISHER'
           )
           foreach ($name in $required) {
@@ -52,6 +54,12 @@ jobs:
           dotnet build windows/WeChatBridge.Windows.sln --configuration Release --no-restore --nologo
           dotnet test windows/WeChatBridge.Windows.sln --configuration Release --no-build --nologo
 
+      - name: Publish external binaries
+        run: |
+          New-Item -ItemType Directory -Force -Path windows/artifacts/release/share-target | Out-Null
+          dotnet publish windows/src/WeChatBridge.Windows/WeChatBridge.Windows.csproj --configuration Release --runtime win-x64 --self-contained false --output windows/artifacts/release --nologo
+          dotnet publish windows/src/WeChatBridge.ShareTarget/WeChatBridge.ShareTarget.csproj --configuration Release --runtime win-x64 --self-contained false --output windows/artifacts/release/share-target --nologo
+
       - name: Create unsigned MSIX
         shell: pwsh
         env:
@@ -61,14 +69,19 @@ jobs:
           ./windows/scripts/pack-msix.ps1 `
             -Publisher $env:SIGNPATH_MSIX_PUBLISHER `
             -Version '${{ inputs.version }}' `
-            -OutputPath windows/artifacts/WeChatBridge.ShareTarget.msix
+            -OutputPath windows/artifacts/release/WeChatBridge.ShareTarget.msix
 
-      - name: Upload unsigned MSIX
+      - name: Create unsigned release bundle
+        shell: pwsh
+        run: |
+          Compress-Archive -Path windows/artifacts/release/* -DestinationPath windows/artifacts/WeChatBridge.Windows-${{ inputs.version }}.zip -Force
+
+      - name: Upload unsigned release bundle
         id: upload-unsigned
         uses: actions/upload-artifact@v4
         with:
-          name: WeChatBridge.ShareTarget-unsigned
-          path: windows/artifacts/WeChatBridge.ShareTarget.msix
+          name: WeChatBridge.Windows-unsigned
+          path: windows/artifacts/WeChatBridge.Windows-${{ inputs.version }}.zip
           archive: false
 
       - name: Submit to SignPath Foundation
@@ -79,6 +92,7 @@ jobs:
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
           wait-for-completion: true
           output-artifact-directory: windows/artifacts/signed
@@ -87,5 +101,5 @@ jobs:
       - name: Upload signed MSIX
         uses: actions/upload-artifact@v4
         with:
-          name: WeChatBridge.ShareTarget-signed-${{ inputs.version }}
+          name: WeChatBridge.Windows-signed-${{ inputs.version }}
           path: windows/artifacts/signed

@@ -45,6 +45,7 @@ windows\scripts\register-dev.ps1 -InstallRoot <install-root>
 
 - Secret：`SIGNPATH_API_TOKEN`
 - Variables：`SIGNPATH_ORGANIZATION_ID`、`SIGNPATH_PROJECT_SLUG`、`SIGNPATH_SIGNING_POLICY_SLUG`
+- Variable：`SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`，指向仓库中的 `windows/packaging/signpath-artifact-configuration.xml`
 - Variable：`SIGNPATH_MSIX_PUBLISHER`，必须与 SignPath 证书 Subject 完全一致
 
-SignPath 项目创建完成后，工作流会先构建和测试，再上传未签名 MSIX，提交 SignPath 签名请求，最后上传签名后的 MSIX。`pack-msix.ps1` 会在签名前注入 Publisher 和版本号。
+SignPath 项目创建完成后，工作流会先构建和测试，再发布外部 EXE/DLL、生成 MSIX 并打成 ZIP，提交 SignPath 签名请求，最后上传签名后的 bundle。Artifact Configuration 会覆盖外部程序和 MSIX 的签名；`pack-msix.ps1` 会在签名前注入 Publisher 和版本号。

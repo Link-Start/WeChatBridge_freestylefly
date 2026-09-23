@@ -10,23 +10,11 @@ $ErrorActionPreference = 'Stop'
 $output = [IO.Path]::GetFullPath($OutputPath)
 $outputDirectory = [IO.Path]::GetDirectoryName($output)
 $sourceDirectory = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\packaging\SparsePackage'))
-$stageDirectory = Join-Path $outputDirectory "SparsePackage-$([Guid]::NewGuid().ToString('N'))"
+$stageDirectory = Join-Path ([IO.Path]::GetTempPath()) "WeChatBridge-SparsePackage-$([Guid]::NewGuid().ToString('N'))"
 
 if ([string]::IsNullOrWhiteSpace($Publisher)) { throw 'Publisher must not be empty.' }
 if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "Invalid MSIX version: $Version" }
 if (-not (Test-Path (Join-Path $sourceDirectory 'AppxManifest.xml'))) { throw 'Sparse package manifest was not found.' }
-
-New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
-New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
-Get-ChildItem -Path $sourceDirectory -Force | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination (Join-Path $stageDirectory $_.Name) -Recurse -Force
-}
-
-$manifestPath = Join-Path $stageDirectory 'AppxManifest.xml'
-[xml]$manifest = Get-Content -Raw $manifestPath
-$manifest.Package.Identity.Publisher = $Publisher
-$manifest.Package.Identity.Version = $Version
-$manifest.Save($manifestPath)
 
 function Resolve-SdkTool([string]$name) {
     $command = Get-Command $name -ErrorAction SilentlyContinue
@@ -37,9 +25,29 @@ function Resolve-SdkTool([string]$name) {
     throw "$name was not found. Install the Windows SDK or add it to PATH."
 }
 
-$makeAppx = Resolve-SdkTool 'makeappx.exe'
-& $makeAppx pack /d $stageDirectory /p $output /nv /o
-if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }
+try {
+    New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+    New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
+    Get-ChildItem -Path $sourceDirectory -Force | ForEach-Object {
+        Copy-Item -Path $_.FullName -Destination (Join-Path $stageDirectory $_.Name) -Recurse -Force
+    }
+
+    $manifestPath = Join-Path $stageDirectory 'AppxManifest.xml'
+    [xml]$manifest = Get-Content -Raw $manifestPath
+    $manifest.Package.Identity.Publisher = $Publisher
+    $manifest.Package.Identity.Version = $Version
+    $manifest.Save($manifestPath)
+
+    $makeAppx = Resolve-SdkTool 'makeappx.exe'
+    & $makeAppx pack /d $stageDirectory /p $output /nv /o
+    if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }
+}
+finally {
+    if (Test-Path $stageDirectory) {
+        Remove-Item -LiteralPath $stageDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Write-Output "Packed: $output"
 Write-Output "Publisher: $Publisher"
 Write-Output "Version: $Version"

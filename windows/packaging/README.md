@@ -24,5 +24,7 @@ certificate or MSIX belongs in Git.
 
 For a release or tester build, use the repository workflow
 `.github/workflows/windows-sign.yml` with SignPath Foundation. Configure the
-SignPath organization, project, signing policy, API token, and the exact MSIX
-publisher subject as repository variables and secrets before dispatching it.
+SignPath organization, project, signing policy, artifact configuration, API
+token, and the exact MSIX publisher subject as repository variables and secrets
+before dispatching it. The artifact configuration in this directory signs the
+external WPF/helper binaries and the sparse MSIX in one ZIP bundle.
