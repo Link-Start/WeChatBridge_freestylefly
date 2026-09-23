@@ -47,7 +47,11 @@ if (-not $trusted) {
 $rootTrusted = Get-ChildItem Cert:\CurrentUser\Root -ErrorAction SilentlyContinue |
     Where-Object Thumbprint -eq $root.Thumbprint
 if (-not $rootTrusted) {
-    Write-Warning "Root CA is not trusted in the current-user store. Import $rootCer into the Local Computer Trusted People store before registering the MSIX."
+    $rootTrusted = Get-ChildItem Cert:\LocalMachine\Root, Cert:\LocalMachine\TrustedPeople -ErrorAction SilentlyContinue |
+        Where-Object Thumbprint -eq $root.Thumbprint
+}
+if (-not $rootTrusted) {
+    Write-Warning "Root CA is not trusted. Import $rootCer into the Local Computer Root or Trusted People store before registering the MSIX."
 }
 
 Write-Output "Subject: $($certificate.Subject)"
@@ -56,4 +60,4 @@ Write-Output "Thumbprint: $($certificate.Thumbprint)"
 Write-Output "Certificate store: Cert:\CurrentUser\My"
 Write-Output "Exported public certificate: $cer"
 Write-Output "Exported root certificate: $rootCer"
-Write-Output "Before registration, import the root .cer into Local Computer > Trusted People, then rerun register-dev.ps1."
+Write-Output "Before registration, import the leaf .cer into Local Computer > Trusted People and the root .cer into Local Computer > Root or Trusted People, then rerun register-dev.ps1."

@@ -33,8 +33,9 @@ windows\scripts\new-dev-certificate.ps1
 windows\scripts\register-dev.ps1 -InstallRoot <install-root>
 ```
 
-注册前需要用管理员权限打开 `certlm.msc`，把脚本输出的
-`WeChatBridge.Windows.Dev.cer` 导入“本地计算机\受信任的人”，然后重新运行注册脚本。
+注册前需要用管理员权限打开 `certlm.msc`，把脚本输出的叶证书
+`WeChatBridge.Windows.Dev.cer` 导入“本地计算机\受信任的人”，并把
+`WeChatBridge.Windows.Dev.Root.cer` 导入“本地计算机\受信任的根证书颁发机构”或“受信任的人”，然后重新运行注册脚本。
 注册脚本会把失败的 HResult 写入 `<install-root>\registration.log`。
 
 ## SignPath Foundation 签名
