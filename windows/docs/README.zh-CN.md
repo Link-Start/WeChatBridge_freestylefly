@@ -32,3 +32,7 @@ $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 windows\scripts\new-dev-certificate.ps1
 windows\scripts\register-dev.ps1 -InstallRoot <install-root>
 ```
+
+如果注册时出现 `0x800B0109`，打开当前用户的“受信任的根证书颁发机构”，导入脚本输出的
+`WeChatBridge.Windows.Dev.cer`，然后重新运行注册脚本。注册脚本会把失败的 HResult 写入
+`<install-root>\registration.log`。
