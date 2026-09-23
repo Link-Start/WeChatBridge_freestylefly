@@ -7,12 +7,25 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $installRoot = [IO.Path]::GetFullPath($InstallRoot)
+$installRoot = New-Item -ItemType Directory -Force -Path $installRoot | Select-Object -ExpandProperty FullName
+$registrationLog = Join-Path $installRoot 'registration.log'
+function Write-RegistrationLog([string]$message) {
+    Add-Content -Path $registrationLog -Value ("{0:O} {1}" -f [DateTimeOffset]::UtcNow, $message)
+}
+trap {
+    $hresult = ('0x{0:X8}' -f ($_.Exception.HResult -band 0xffffffff))
+    Write-RegistrationLog "失败 $hresult $($_.Exception.Message)"
+    throw
+}
+
 $helper = Join-Path $installRoot 'share-target\WeChatBridge.ShareTarget.exe'
 $manifestDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\packaging\SparsePackage'))
+$manifestPath = Join-Path $manifestDir 'AppxManifest.xml'
 $packagePath = Join-Path $installRoot 'WeChatBridge.ShareTarget.msix'
 
 if (-not (Test-Path $helper)) { throw "Share Target helper not found: $helper" }
 if (-not (Test-Path (Join-Path $installRoot 'WeChatBridge.Windows.exe'))) { throw 'WPF host not found under InstallRoot.' }
+if (-not (Test-Path $manifestPath)) { throw "Sparse package manifest not found: $manifestPath" }
 
 function Resolve-SdkTool([string]$name) {
     $command = Get-Command $name -ErrorAction SilentlyContinue
@@ -29,10 +42,11 @@ if (-not $CertificateThumbprint) {
         Sort-Object NotAfter -Descending | Select-Object -First 1).Thumbprint
 }
 if (-not $CertificateThumbprint) { throw 'Run new-dev-certificate.ps1 first.' }
+$certificate = Get-ChildItem Cert:\CurrentUser\My\$CertificateThumbprint -ErrorAction SilentlyContinue
+if (-not $certificate) { throw "Development certificate not found: $CertificateThumbprint" }
 
 $makeAppx = Resolve-SdkTool 'makeappx.exe'
 $signTool = Resolve-SdkTool 'signtool.exe'
-New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
 & $makeAppx pack /d $manifestDir /p $packagePath /nv /o
 if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }
 & $signTool sign /fd SHA256 /sha1 $CertificateThumbprint $packagePath
@@ -54,4 +68,5 @@ catch {
 }
 $registered = Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
 if (-not $registered) { throw 'Add-AppxPackage returned but the package is not registered.' }
+Write-RegistrationLog "成功 $($registered.PackageFullName)"
 Write-Output "Registered: $($registered.PackageFullName)"
