@@ -9,7 +9,7 @@
   <Properties>
     <DisplayName>微信流 Windows</DisplayName>
     <PublisherDisplayName>WeChatBridge</PublisherDisplayName>
-    <Logo>Assets\Logo.png</Logo>
+    <Logo>Assets\Square150x150Logo.png</Logo>
     <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
   </Properties>
   <Resources>
@@ -25,14 +25,14 @@
   </Capabilities>
   <Applications>
     <Application Id="WeChatBridgeShareTarget" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="微信流 Windows" Description="将微信聊天归档接入微信流" BackgroundColor="transparent" Square44x44Logo="Assets\Logo.png" Square150x150Logo="Assets\Logo.png" />
+      <uap:VisualElements AppListEntry="none" DisplayName="微信流 Windows" Description="将微信聊天归档接入微信流" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
       <Extensions>
         <uap:Extension Category="windows.shareTarget">
           <uap:ShareTarget Description="发送到微信流 Windows">
             <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
             <uap:DataFormat>StorageItems</uap:DataFormat>
             <uap:DataFormat>Text</uap:DataFormat>
-            <uap:DataFormat>Uri</uap:DataFormat>
+            <uap:DataFormat>URI</uap:DataFormat>
             <uap:DataFormat>Bitmap</uap:DataFormat>
           </uap:ShareTarget>
         </uap:Extension>
