@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -33,8 +34,33 @@ public sealed record BatchManifest(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        Converters = { new JsonStringEnumConverter() }
+        Converters = { new UtcIso8601Converter(), new JsonStringEnumConverter() }
     };
+}
+
+/// <summary>
+/// macOS writes manifest timestamps with <c>JSONEncoder.dateEncodingStrategy = .iso8601</c>,
+/// which produces <c>2026-09-23T09:04:42Z</c>. A bare <see cref="DateTimeOffset"/> would emit
+/// <c>+00:00</c> instead, so a manifest written by one platform could not be read back by the
+/// other. Normalising to the shared <c>Z</c> form keeps both implementations interchangeable
+/// and satisfies the "ISO-8601 UTC" contract in the migration plan.
+/// </summary>
+public sealed class UtcIso8601Converter : JsonConverter<DateTimeOffset>
+{
+    private const string Format = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+
+    public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var text = reader.GetString()
+            ?? throw new JsonException("Manifest timestamp was null.");
+        return DateTimeOffset.Parse(
+            text,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.RoundtripKind);
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.ToUniversalTime().ToString(Format, CultureInfo.InvariantCulture));
 }
 
 public sealed record BatchCommitResult(Guid BatchId, string BatchDirectory, BatchManifest Manifest);
@@ -62,6 +88,98 @@ public sealed class InboxPaths
         Directory.CreateDirectory(Failed);
         Directory.CreateDirectory(Logs);
     }
+
+    /// <summary>
+    /// Removes staging trees that no live share can still be filling. Mirrors
+    /// <c>Inbox.pruneStaging</c> on macOS, including its choice to measure age from the
+    /// newest timestamp anywhere in the tree: a multi-gigabyte copy only touches the file
+    /// being written, so aging a batch by its directory timestamp would delete a share
+    /// that is still in progress.
+    /// </summary>
+    public int PruneStaging(TimeSpan? olderThan = null, DateTimeOffset? now = null)
+    {
+        var age = olderThan ?? TimeSpan.FromMinutes(30);
+        var reference = now ?? DateTimeOffset.UtcNow;
+        if (!Directory.Exists(Staging))
+            return 0;
+
+        var removed = 0;
+        try
+        {
+            foreach (var candidate in Directory.EnumerateFileSystemEntries(Staging))
+            {
+                var newest = NewestWriteTime(candidate);
+                if (newest is null || reference - newest.Value <= age)
+                    continue;
+                try
+                {
+                    if (Directory.Exists(candidate))
+                        Directory.Delete(candidate, recursive: true);
+                    else
+                        File.Delete(candidate);
+                    removed++;
+                }
+                catch (IOException)
+                {
+                    // Another share may still hold a handle; the next pass retries.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Same: pruning is a backstop and must never fail a share.
+                }
+            }
+        }
+        catch (IOException)
+        {
+            return removed;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return removed;
+        }
+        return removed;
+    }
+
+    private static DateTimeOffset? NewestWriteTime(string path)
+    {
+        DateTimeOffset? newest = null;
+        void Consider(string candidate)
+        {
+            try
+            {
+                var stamp = File.GetLastWriteTimeUtc(candidate);
+                if (stamp == DateTime.MinValue)
+                    return;
+                var value = new DateTimeOffset(stamp, TimeSpan.Zero);
+                if (newest is null || value > newest.Value)
+                    newest = value;
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        Consider(path);
+        if (Directory.Exists(path))
+        {
+            try
+            {
+                foreach (var child in Directory.EnumerateFileSystemEntries(path, "*", SearchOption.AllDirectories))
+                    Consider(child);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return newest;
+    }
+}
+
+/// <summary>
+/// Size guards applied while staging a share. The defaults are the PoC contract, and they
+/// are injectable so the guards can be exercised without writing gigabyte fixtures.
+/// </summary>
+public sealed record InboxLimits(long MaxFileBytes, long MaxBatchBytes)
+{
+    public static InboxLimits Default { get; } = new(InboxWriter.MaxFileBytes, InboxWriter.MaxBatchBytes);
 }
 
 public static class InboxWriter
@@ -72,11 +190,13 @@ public static class InboxWriter
     public static async Task<BatchCommitResult> CommitAsync(
         InboxPaths paths,
         IReadOnlyList<InboxSourceFile> sources,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        InboxLimits? limits = null)
     {
         if (sources.Count == 0)
             throw new InboxValidationException("分享中没有可处理的文件。");
 
+        var effectiveLimits = limits ?? InboxLimits.Default;
         paths.EnsureCreated();
         var batchId = Guid.NewGuid();
         var staging = Path.Combine(paths.Staging, $"{batchId:N}.staging");
@@ -96,11 +216,11 @@ public static class InboxWriter
                 var source = sources[index];
                 ValidateSource(source);
                 var sourceInfo = new FileInfo(source.SourcePath);
-                if (sourceInfo.Length > MaxFileBytes)
+                if (sourceInfo.Length > effectiveLimits.MaxFileBytes)
                     throw new InboxValidationException($"文件过大：{source.DisplayName}");
 
                 totalBytes = checked(totalBytes + sourceInfo.Length);
-                if (totalBytes > MaxBatchBytes)
+                if (totalBytes > effectiveLimits.MaxBatchBytes)
                     throw new InboxValidationException("分享批次过大。");
 
                 var safeName = MakeUniqueFileName(SanitizeFileName(source.DisplayName), usedFileNames);

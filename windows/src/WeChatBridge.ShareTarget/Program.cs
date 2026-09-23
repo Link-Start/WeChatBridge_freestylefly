@@ -72,6 +72,10 @@ internal static class Program
             }
 
             var committed = await InboxWriter.CommitAsync(paths, sources);
+            // The batch is durable at this point, so everything below is an
+            // optimisation that is allowed to fail. Sweeping here is what keeps
+            // debris from a share that was killed mid-copy from accumulating.
+            paths.PruneStaging();
             var clipboardWritten = TryWriteClipboard(committed.Manifest.Items, committed.BatchDirectory, paths);
             SignalMainProcess();
             StartMainProcess(committed.BatchId);

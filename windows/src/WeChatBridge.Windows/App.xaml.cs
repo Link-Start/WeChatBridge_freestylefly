@@ -28,6 +28,11 @@ public partial class App : Application
             return;
         }
 
+        // Debris from a helper that was killed mid-copy. Swept by the owning instance
+        // only, and it runs long after any such copy would have died. Matches the macOS
+        // app, which prunes on start for the same reason.
+        _paths.PruneStaging();
+
         _changeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ChangeEventName);
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
