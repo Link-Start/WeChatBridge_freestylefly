@@ -94,34 +94,4 @@ public sealed class InboxWriterTests
             fixture.Paths,
             [new InboxSourceFile(link, "link.zip", "application/zip", 0, 0)]));
     }
-
-    private sealed class TempInbox : IDisposable
-    {
-        private readonly string _root = Path.Combine(Path.GetTempPath(), "WeChatBridgeTests", Guid.NewGuid().ToString("N"));
-        private readonly string _sourceRoot;
-
-        public TempInbox()
-        {
-            Paths = new InboxPaths(_root);
-            _sourceRoot = Path.Combine(_root, "sources");
-            Directory.CreateDirectory(_sourceRoot);
-        }
-
-        public InboxPaths Paths { get; }
-
-        public string Root => _root;
-
-        public string WriteSource(string name, string content)
-        {
-            var path = Path.Combine(_sourceRoot, name);
-            File.WriteAllText(path, content);
-            return path;
-        }
-
-        public void Dispose()
-        {
-            if (Directory.Exists(_root))
-                Directory.Delete(_root, recursive: true);
-        }
-    }
 }
