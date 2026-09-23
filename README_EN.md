@@ -206,15 +206,15 @@ Join the WeChatBridge community group to share workflows, exchange tips, and rep
 
 ## About Us
 
-Follow project updates, join the discussion, or contact us on WeChat by searching for “向明” or “苍何”.
+Follow project updates, join the discussion, or contact us on WeChat by searching for “数字生命蜗牛” or “苍何”.
 
 <table>
   <tr>
-    <th align="center">向明</th>
+    <th align="center">数字生命蜗牛</th>
     <th align="center">苍何</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/wechat-xiangming.jpg" width="420" alt="WeChat QR code for 向明" /></td>
+    <td align="center"><img src="Resources/Screenshots/wechat-digital-life-snail.png" width="420" alt="WeChat QR code for 数字生命蜗牛" /></td>
     <td align="center"><img src="Resources/Screenshots/wechat-canghe.jpg" width="420" alt="WeChat QR code for 苍何" /></td>
   </tr>
 </table>

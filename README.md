@@ -210,15 +210,15 @@ Scripts/dev-preview.sh
 
 ## 关于我们
 
-关注项目动态、使用交流与后续更新，可通过微信搜索“向明”或“苍何”联系我们。
+关注项目动态、使用交流与后续更新，可通过微信搜索“数字生命蜗牛”或“苍何”联系我们。
 
 <table>
   <tr>
-    <th align="center">向明</th>
+    <th align="center">数字生命蜗牛</th>
     <th align="center">苍何</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/wechat-xiangming.jpg" width="420" alt="向明微信二维码" /></td>
+    <td align="center"><img src="Resources/Screenshots/wechat-digital-life-snail.png" width="420" alt="数字生命蜗牛微信二维码" /></td>
     <td align="center"><img src="Resources/Screenshots/wechat-canghe.jpg" width="420" alt="苍何微信二维码" /></td>
   </tr>
 </table>
