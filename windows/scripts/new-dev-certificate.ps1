@@ -4,26 +4,56 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$existing = Get-ChildItem Cert:\CurrentUser\My |
-    Where-Object Subject -eq $Subject |
+$rootSubject = "$Subject Root"
+$root = Get-ChildItem Cert:\CurrentUser\My |
+    Where-Object Subject -eq $rootSubject |
     Sort-Object NotAfter -Descending |
     Select-Object -First 1
-if ($existing -and $existing.NotAfter -gt (Get-Date).AddDays(30)) {
-    $certificate = $existing
-} else {
-    $certificate = New-SelfSignedCertificate -Type CodeSigningCert -Subject $Subject -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(2)
+if (-not $root -or $root.NotAfter -le (Get-Date).AddDays(30)) {
+    $root = New-SelfSignedCertificate `
+        -Type Custom `
+        -Subject $rootSubject `
+        -CertStoreLocation Cert:\CurrentUser\My `
+        -KeyAlgorithm RSA `
+        -KeyLength 3072 `
+        -KeyExportPolicy NonExportable `
+        -KeyUsage CertSign, CRLSign, DigitalSignature `
+        -TextExtension @('2.5.29.19={critical}{text}ca=true&pathlength=1') `
+        -NotAfter (Get-Date).AddYears(5)
+}
+
+$certificate = Get-ChildItem Cert:\CurrentUser\My |
+    Where-Object { $_.Subject -eq $Subject -and $_.Issuer -eq $root.Subject } |
+    Sort-Object NotAfter -Descending |
+    Select-Object -First 1
+if (-not $certificate -or $certificate.NotAfter -le (Get-Date).AddDays(30)) {
+    $certificate = New-SelfSignedCertificate `
+        -Type CodeSigningCert `
+        -Subject $Subject `
+        -Signer $root `
+        -CertStoreLocation Cert:\CurrentUser\My `
+        -NotAfter (Get-Date).AddYears(2)
 }
 
 $cer = Join-Path $env:TEMP 'WeChatBridge.Windows.Dev.cer'
+$rootCer = Join-Path $env:TEMP 'WeChatBridge.Windows.Dev.Root.cer'
 Export-Certificate -Cert $certificate -FilePath $cer -Force | Out-Null
+Export-Certificate -Cert $root -FilePath $rootCer -Force | Out-Null
 $trusted = Get-ChildItem Cert:\CurrentUser\TrustedPeople -ErrorAction SilentlyContinue |
     Where-Object Thumbprint -eq $certificate.Thumbprint
 if (-not $trusted) {
     Import-Certificate -FilePath $cer -CertStoreLocation Cert:\CurrentUser\TrustedPeople -Confirm:$false | Out-Null
 }
+$rootTrusted = Get-ChildItem Cert:\CurrentUser\Root -ErrorAction SilentlyContinue |
+    Where-Object Thumbprint -eq $root.Thumbprint
+if (-not $rootTrusted) {
+    Write-Warning "Root CA is not trusted in the current-user store. Import $rootCer into the Local Computer Trusted People store before registering the MSIX."
+}
 
 Write-Output "Subject: $($certificate.Subject)"
+Write-Output "Issuer: $($certificate.Issuer)"
 Write-Output "Thumbprint: $($certificate.Thumbprint)"
 Write-Output "Certificate store: Cert:\CurrentUser\My"
 Write-Output "Exported public certificate: $cer"
-Write-Output "If Add-AppxPackage reports 0x800B0109, trust this .cer in the current-user Root store, then rerun register-dev.ps1."
+Write-Output "Exported root certificate: $rootCer"
+Write-Output "Before registration, import the root .cer into Local Computer > Trusted People, then rerun register-dev.ps1."

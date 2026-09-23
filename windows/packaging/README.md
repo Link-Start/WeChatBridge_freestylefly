@@ -14,9 +14,9 @@ For local development:
 2. Publish the WPF app and helper into the layout above.
 3. Run `scripts/register-dev.ps1 -InstallRoot <install-root>`.
 
-If Windows reports `0x800B0109`, import the `.cer` path printed by
-`new-dev-certificate.ps1` into the current user's Trusted Root Certification
-Authorities store, then run the registration script again.
+Before registration, import the `.cer` path printed by
+`new-dev-certificate.ps1` into the **Local Computer > Trusted People** store
+with administrator rights. Then run the registration script.
 
 The package is signed with a local development certificate. No generated
 certificate or MSIX belongs in Git.
