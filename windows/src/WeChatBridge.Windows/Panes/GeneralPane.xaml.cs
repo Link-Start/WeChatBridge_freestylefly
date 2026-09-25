@@ -32,6 +32,10 @@ public partial class GeneralPane : UserControl
 
     private void RevealInbox_Click(object sender, RoutedEventArgs e) => Model?.RevealInbox();
 
+    /// <summary>重新运行设置向导 — macOS SettingsActions.restartOnboarding.</summary>
+    private void RestartOnboarding_Click(object sender, RoutedEventArgs e) =>
+        (Application.Current as App)?.RestartOnboarding();
+
     private void OpenProject_Click(object sender, RoutedEventArgs e)
     {
         try

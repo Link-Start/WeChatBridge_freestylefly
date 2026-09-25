@@ -159,6 +159,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private DeliveryEngine? _delivery;
     private SceneService? _scenes;
     private CustomTargetService? _customTargets;
+    private SkillService? _skills;
+    /// <summary>
+    /// macOS chains forwards through <c>ActionRunner.pending</c>: two
+    /// unserialised forwards interleave — the second's clipboard write lands
+    /// while the first still waits to paste, and the first delivers the
+    /// second's files. One intent runs at a time.
+    /// </summary>
+    private Task _pendingForward = Task.CompletedTask;
     private string _query = string.Empty;
     private string? _inboxFailure;
 
@@ -207,6 +215,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     internal CustomTargetService CustomTargets =>
         _customTargets ??= CustomTargetService.CreateWindowed(_targetStore);
+
+    /// <summary>
+    /// The shared skill catalog/status probe — the pane owns one too, but a
+    /// second instance is just a read view, which is all the forward path
+    /// needs for the missing-skills nudge.
+    /// </summary>
+    internal SkillService Skills => _skills ??= new SkillService(
+        scenes: () => Scenes.LoadSettings().EnabledScenes);
 
     /// <summary>
     /// Releases whatever was lazily built — App.OnExit is the only caller.
@@ -351,10 +367,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         switch (_reader.ConsumeIntent(batch.Id))
         {
             case { Kind: ConsumedIntentKind.Ready, Intent: { } intent }:
-                // Fire-and-forget: delivery rewrites the clipboard, activates
-                // the target and records its own outcome — Reload at its end
-                // publishes the result, so nothing is recorded here.
-                _ = PerformForward(batch, intent.Action, ResolveTarget(intent), freshShare: true);
+                // Queued, not parallel: delivery rewrites the clipboard, so two
+                // in flight would paste each other's files. Nothing is recorded
+                // here — the forward's own outcome lands at its end.
+                EnqueueForward(batch, intent);
                 return false;
             case { Kind: ConsumedIntentKind.Expired, Intent: { } intent }:
                 // Only a paste can go stale. A copy was finished by the helper
@@ -380,6 +396,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return null;
         return _targetStore.Load().FirstOrDefault(t => t.BundleIdentifier == id)
             ?? new ForwardTarget(id, intent.TargetDisplayName ?? id, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// Chains the forward behind whatever is still delivering — the port of
+    /// <c>ActionRunner.pending</c>. Freshness is checked again here, not only
+    /// where the intent came off disk: a forward can wait behind an unanswered
+    /// picker or a target app that never comes forward, and a request the user
+    /// has stopped thinking about must not paste into whatever they opened
+    /// since. The files stay on the clipboard either way.
+    /// </summary>
+    private void EnqueueForward(ReadyBatch batch, BatchIntent intent)
+    {
+        var previous = _pendingForward;
+        _pendingForward = RunAfter(previous);
+
+        async Task RunAfter(Task predecessor)
+        {
+            try
+            {
+                await predecessor;
+            }
+            catch
+            {
+                // A failed forward must not stall the queue behind it.
+            }
+            if (!intent.IsFresh())
+            {
+                Record(BatchOutcomeKind.Expired, batch.Id);
+                Reload();
+                return;
+            }
+            await PerformForward(batch, intent.Action, ResolveTarget(intent), freshShare: true);
+        }
     }
 
     /// <summary>Ages out finished history. A non-positive window keeps forever.</summary>
@@ -544,7 +593,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         if (choice.GroupName is not null || choice.Scene is not null)
             _reader.RecordContext(batch.Id, choice.GroupName, choice.Scene?.Id, choice.Scene?.Name);
-        var prompt = Scenes.RenderPrompt(choice, AgentIds.Matching(action));
+        var agent = AgentIds.Matching(action)
+            ?? AgentIds.MatchingBundleId(target?.BundleIdentifier);
+        var prompt = Scenes.RenderPrompt(choice, agent);
 
         var name = target?.DisplayName ?? action.TargetDisplayName();
         try
@@ -553,12 +604,27 @@ public sealed class MainViewModel : INotifyPropertyChanged
             // advance only on a real landing — the scene watermark must not
             // swallow a batch that never reached its app.
             if (result.Delivered)
+            {
                 Scenes.CompleteForward(choice);
-            ToastRequested?.Invoke(
-                result.Delivered
-                    ? $"已发给 {name}"
-                    : $"{result.Outcome.Detail ?? $"没能发给 {name}"}；文件已在剪贴板",
-                null, null, !result.Delivered);
+                // macOS removed the success capsule — the user is looking at
+                // the target app with their files already in it. What it kept
+                // is the missing-skills nudge: a delivered batch whose scene
+                // names skills this agent does not have yet gets pointed at 技能.
+                var missing = MissingSkills(choice.Scene, agent);
+                if (missing.Count > 0)
+                {
+                    var names = string.Join("、", missing.Select(s => s.Name));
+                    ToastRequested?.Invoke(
+                        $"场景「{choice.Scene!.Name}」还可安装技能：{names}",
+                        "去安装", () => Navigate(AppTab.Skills), true);
+                }
+            }
+            else
+            {
+                ToastRequested?.Invoke(
+                    $"{result.Outcome.Detail ?? $"没能发给 {name}"}；文件已在剪贴板",
+                    null, null, true);
+            }
         }
         catch (Exception error)
         {
@@ -568,6 +634,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
             InboxLogger.Write(_paths, "投递引擎异常", error);
         }
         Reload();
+    }
+
+    /// <summary>
+    /// The macOS <c>missingSkills</c> port: the skills a delivered scene
+    /// requires that this agent does not have installed or confirmed yet.
+    /// Touches <see cref="Skills"/> lazily — a share with no scene never
+    /// builds the catalog.
+    /// </summary>
+    private List<OfficialSkill> MissingSkills(WeChatScene? scene, AgentId? agent)
+    {
+        if (scene is null || agent is null || scene.RequiredSkillIDs.Count == 0)
+            return [];
+        var missing = new List<OfficialSkill>();
+        foreach (var skillId in scene.RequiredSkillIDs)
+        {
+            var skill = Skills.Rows.FirstOrDefault(r => r.Skill.Id == skillId)?.Skill;
+            if (skill is null || !skill.SupportedAgents.Contains(agent.Value))
+                continue;
+            if (Skills.Status(skill, agent.Value)
+                    is not (SkillAgentStatus.Installed or SkillAgentStatus.ManualConfirmed))
+                missing.Add(skill);
+        }
+        return missing;
     }
 
     /// <summary>发给… menu contents: built-ins first, then the user's own order.</summary>

@@ -78,6 +78,24 @@ public static class AgentIds
         _ => null,
     };
 
+    /// <summary>
+    /// The <c>AgentID.matching(bundleIdentifier:)</c> port. Windows stores an
+    /// AUMID, an AppID or an exe name where macOS kept a bundle identifier, so
+    /// custom targets match on the known registrations rather than equality.
+    /// </summary>
+    public static AgentId? MatchingBundleId(string? bundleId) => bundleId switch
+    {
+        null => null,
+        var id when id.StartsWith("OpenAI.Codex_", StringComparison.Ordinal) => AgentId.ChatGptCodex,
+        var id when id.StartsWith("Claude_", StringComparison.Ordinal) => AgentId.Claude,
+        "Doubao.ChatApp" => AgentId.Doubao,
+        "WorkBuddy.WorkBuddy" => AgentId.WorkBuddy,
+        var id when id.Contains("WeSight", StringComparison.OrdinalIgnoreCase) => AgentId.WeSight,
+        var id when id.Contains("Qianwen", StringComparison.OrdinalIgnoreCase)
+            || id.Contains("QwenWork", StringComparison.OrdinalIgnoreCase) => AgentId.QwenWork,
+        _ => null,
+    };
+
     public static IReadOnlyList<AgentId> All { get; } = Enum.GetValues<AgentId>();
 }
 

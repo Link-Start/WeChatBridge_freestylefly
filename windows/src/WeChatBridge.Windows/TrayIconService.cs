@@ -143,6 +143,15 @@ public sealed class TrayIconService : IDisposable
     private readonly Dictionary<int, Action> _commands = [];
     private int _nextCommandId;
 
+    /// <summary>The toast action the open balloon stands in for; cleared on dismiss.</summary>
+    private Action? _balloonAction;
+    /// <summary>
+    /// When the last balloon was raised. NIN_BALLOONSHOW and NIN_POPUPMENU share
+    /// the 0x0402 low word, so a popup arriving right after a balloon request is
+    /// read as the balloon's arrival notice, not a right-click.
+    /// </summary>
+    private long _balloonRequestedAt = -2000;
+
     /// <summary>
     /// Create on the UI thread (App.OnStartup). <paramref name="window"/> is a
     /// delegate so a future close-to-tray mode can hand back a new window
@@ -178,6 +187,12 @@ public sealed class TrayIconService : IDisposable
             version.uTimeoutOrVersion = Native.NotifyIconVersion4;
             Native.Shell_NotifyIcon(Native.NimSetVersion, ref version);
         }
+
+        // The macOS toast is a floating capsule that exists whether or not a
+        // window does. The in-window capsule covers the visible case; when the
+        // window is hidden — the resident app's normal state — a tray balloon
+        // says it instead, or a failure would go unnoticed.
+        _model.ToastRequested += OnToastRequested;
     }
 
     // MARK: - Window procedure
@@ -197,6 +212,26 @@ public sealed class TrayIconService : IDisposable
                     handled = true;
                     break;
                 case Native.NinPopupMenu:
+                    // 0x0402 is also NIN_BALLOONSHOW: a balloon we just raised
+                    // reports its arrival here. Only a right-click after the
+                    // notice window is a real menu request.
+                    if (Environment.TickCount64 - _balloonRequestedAt >= 1500)
+                        ShowContextMenu();
+                    handled = true;
+                    break;
+                case Native.NinBalloonUserClick:
+                    // The toast's action, run as if the capsule's button was
+                    // pressed — and show the window first, since the action is
+                    // usually a pane navigation that a hidden window hides.
+                    ToggleWindow(showOnly: true);
+                    _balloonAction?.Invoke();
+                    _balloonAction = null;
+                    handled = true;
+                    break;
+                case Native.NinBalloonHide:
+                case Native.NinBalloonTimeout:
+                    _balloonAction = null;
+                    break;
                 case Native.WmContextMenu:
                     ShowContextMenu();
                     handled = true;
@@ -236,6 +271,27 @@ public sealed class TrayIconService : IDisposable
             case TrayMenu.Command.About: OpenTab(AppTab.About); break;
             case TrayMenu.Command.Quit: _quit(); break;
         }
+    }
+
+    // MARK: - Balloon
+
+    /// <summary>
+    /// When the main window is hidden the in-window capsule cannot be seen, so
+    /// the toast becomes a tray balloon. Its action — 去添加应用 and friends —
+    /// rides along: a click on the balloon runs it.
+    /// </summary>
+    private void OnToastRequested(string message, string? actionTitle, Action? action, bool warning)
+    {
+        if (!_added || _window()?.IsVisible == true)
+            return;
+        _balloonAction = action;
+        _balloonRequestedAt = Environment.TickCount64;
+        var data = IconData(Native.NifInfo);
+        data.szInfoTitle = "微信流";
+        data.szInfo = actionTitle is null ? message : $"{message}（点击：{actionTitle}）";
+        data.dwInfoFlags = warning ? Native.NiifWarning : Native.NiifInfo;
+        if (!Native.Shell_NotifyIcon(Native.NimModify, ref data))
+            _balloonAction = null;
     }
 
     // MARK: - Context menu
@@ -463,6 +519,7 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
+        _model.ToastRequested -= OnToastRequested;
         if (_added)
         {
             var data = IconData(0);
@@ -496,10 +553,14 @@ public sealed class TrayIconService : IDisposable
         public const uint WmLButtonDblClk = 0x0203;
         public const uint NinSelect = 0x0400;   // WM_USER + 0
         public const uint NinKeySelect = 0x0401;
-        public const uint NinPopupMenu = 0x0402;
+        public const uint NinPopupMenu = 0x0402;  // same low word as NIN_BALLOONSHOW
+        public const uint NinBalloonHide = 0x0403;
+        public const uint NinBalloonTimeout = 0x0404;
+        public const uint NinBalloonUserClick = 0x0405;
         public const uint WmTrayIcon = 0x8000 + 1; // WM_APP + 1
 
         public const uint NimAdd = 0;
+        public const uint NimModify = 1;
         public const uint NimDelete = 2;
         public const uint NimSetVersion = 4;
 
@@ -507,8 +568,12 @@ public sealed class TrayIconService : IDisposable
         public const uint NifIcon = 0x2;
         public const uint NifTip = 0x4;
         public const uint NifVersion = 0x8;
+        public const uint NifInfo = 0x10;
         public const uint NifGuid = 0x20;
         public const uint NotifyIconVersion4 = 4;
+
+        public const int NiifInfo = 0x1;
+        public const int NiifWarning = 0x2;
 
         public const uint MfString = 0x0;
         public const uint MfGrayed = 0x1;

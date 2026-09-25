@@ -86,6 +86,23 @@ public partial class App : Application
         _ = WaitForChangesAsync(_shutdown.Token);
     }
 
+    /// <summary>
+    /// 通用页's 重新运行设置向导 — the macOS SettingsActions.restartOnboarding
+    /// port. A finished guide restarts at the top; the completion flag stays
+    /// so the next launch does not think the app was never introduced.
+    /// </summary>
+    public void RestartOnboarding()
+    {
+        var store = new OnboardingStateStore();
+        var state = store.Load();
+        if (state.Step != 0)
+        {
+            state.Step = 0;
+            store.Save(state);
+        }
+        new OnboardingWindow(store) { Owner = MainWindow }.Show();
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _tray?.Dispose();

@@ -190,6 +190,24 @@
                     访问项目
                 </Button>
             </Grid>
+            <Border Height="1" Background="{StaticResource StrokeSoftColor}" Margin="0,14" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
+                               Text="重新运行设置向导" />
+                    <TextBlock Margin="0,3,0,0" FontSize="12"
+                               Foreground="{StaticResource InkSecondaryColor}" TextWrapping="Wrap"
+                               Text="再走一遍欢迎、入口和驻留说明，不改动已设置的偏好。" />
+                </StackPanel>
+                <Button Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
+                        Style="{StaticResource SettingsButton}" Click="RestartOnboarding_Click">
+                    重新运行
+                </Button>
+            </Grid>
         </StackPanel>
     </StackPanel>
 </UserControl>
