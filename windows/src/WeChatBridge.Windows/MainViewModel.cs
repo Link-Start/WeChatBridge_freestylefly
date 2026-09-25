@@ -833,8 +833,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         ShareAction.Codex => "激活 ChatGPT 并直接粘贴到输入框。",
         ShareAction.Claude => "激活 Claude 并直接粘贴到输入框。",
-        ShareAction.Doubao => "激活豆包并直接粘贴到输入框。",
-        ShareAction.Qwen => "激活千问办公并直接粘贴到输入框。",
+        ShareAction.Doubao => "激活豆包，把压缩包路径粘贴到输入框。",
+        ShareAction.Qwen => "激活千问办公，把压缩包路径粘贴到输入框。",
         ShareAction.WorkBuddy => "激活 WorkBuddy 并直接粘贴到输入框。",
         ShareAction.WeSight => "激活 WeSight 并直接粘贴到输入框。",
         ShareAction.Obsidian => _settings.ObsidianVaultPath is { Length: > 0 } path

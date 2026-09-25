@@ -209,19 +209,21 @@ public sealed class DeliveryEngineTests
         Assert.Equal([$"text:{line}", "resolve:MyTerm", "activate", $"text:{line}", "ctrlv"], os.Ops);
     }
 
-    [Fact]
-    public async Task DoubaoReadsTheArchivePathRatherThanReceivingAFileDrop()
+    [Theory]
+    [InlineData(ShareAction.Doubao)]
+    [InlineData(ShareAction.Qwen)]
+    public async Task AgentModeTargetsReadTheArchivePathRatherThanReceivingAFileDrop(ShareAction action)
     {
-        // Ports the macOS agent-mode shortcut: a ZIP for Doubao goes as a
-        // readable local path, not a file it must upload. Pending on-device
-        // verification — the flag lives on the target spec.
+        // Ports the macOS agent-mode shortcut: a ZIP goes as a readable local
+        // path, not a file the client must upload — Windows 千问 cannot take a
+        // pasted archive either, so it shares Doubao's channel.
         var os = new FakeOs
         {
             Resolved = new ResolvedTarget(
-                WindowsForwardTargets.For(ShareAction.Doubao)!, FakeOs.TargetPid, FakeOs.TargetHwnd, null),
+                WindowsForwardTargets.For(action)!, FakeOs.TargetPid, FakeOs.TargetHwnd, null),
         };
         var engine = new DeliveryEngine(os.Env);
-        var result = await engine.DeliverAsync(DeliveryFixtures.Batch(ShareAction.Doubao, A));
+        var result = await engine.DeliverAsync(DeliveryFixtures.Batch(action, A));
 
         Assert.True(result.Delivered);
         var text = Assert.IsType<PastePayload.Text>(Assert.Single(result.Plan));
@@ -330,10 +332,16 @@ public sealed class DeliveryTargetTableTests
     }
 
     [Fact]
-    public void DoubaoIsTheOnlyTargetThatReadsLocalArchives()
+    public void DoubaoAndQwenReadLocalArchives()
     {
+        // Both Windows clients can read a local ZIP path but cannot take a
+        // pasted archive; the rest receive a real file drop.
         Assert.True(WindowsForwardTargets.For(ShareAction.Doubao)!.ReadsLocalArchives);
+        Assert.True(WindowsForwardTargets.For(ShareAction.Qwen)!.ReadsLocalArchives);
         Assert.False(WindowsForwardTargets.For(ShareAction.Codex)!.ReadsLocalArchives);
+        Assert.False(WindowsForwardTargets.For(ShareAction.Claude)!.ReadsLocalArchives);
+        Assert.False(WindowsForwardTargets.For(ShareAction.WorkBuddy)!.ReadsLocalArchives);
+        Assert.False(WindowsForwardTargets.For(ShareAction.WeSight)!.ReadsLocalArchives);
     }
 
     [Fact]

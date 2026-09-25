@@ -111,7 +111,9 @@ public static class WindowsForwardTargets
                 Aumid: "Doubao.ChatApp",
                 ReadsLocalArchives: true),
             // Verified on device: the Windows build of 千问 installs as Qianwen
-            // (exe Qianwen.exe), a plain win32 app with no AUMID.
+            // (exe Qianwen.exe), a plain win32 app with no AUMID. Its Windows
+            // client cannot take a pasted ZIP (the macOS one could), so — like
+            // Doubao — it gets the archive path as text to read itself.
             [ShareAction.Qwen] = new(
                 "千问办公",
                 ["Qianwen", "QwenWork"],
@@ -119,7 +121,8 @@ public static class WindowsForwardTargets
                     @"%LOCALAPPDATA%\Programs\Qianwen\Qianwen.exe",
                     "Qianwen.exe",
                     "QwenWork.exe",
-                ]),
+                ],
+                ReadsLocalArchives: true),
             // Verified on device: machine-wide install under Program Files;
             // WorkBuddy.WorkBuddy is its registered shell AppID.
             [ShareAction.WorkBuddy] = new(
