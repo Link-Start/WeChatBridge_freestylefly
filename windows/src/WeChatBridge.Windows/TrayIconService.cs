@@ -390,6 +390,9 @@ public sealed class TrayIconService : IDisposable
         var assets = Path.Combine(AppContext.BaseDirectory, "Assets");
         foreach (var name in new[]
         {
+            // The mark on transparency first — the white-tile packaging logo
+            // disappears against a light taskbar and reads tiny at 16 px.
+            "TrayGlyph.png",
             "Square44x44Logo.targetsize-256_altform-unplated.png",
             "Square44x44Logo.targetsize-256.png",
             "Square44x44Logo.targetsize-32.png",

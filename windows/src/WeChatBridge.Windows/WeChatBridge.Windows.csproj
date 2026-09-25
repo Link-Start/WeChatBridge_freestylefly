@@ -4,6 +4,10 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- The exe itself carries the mark: taskbar buttons, task thumbnails and
+         any shell surface that reads the module icon get it without the
+         white-tile packaging logo. -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
