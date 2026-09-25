@@ -40,6 +40,56 @@ public sealed class PackagingAssetsTests
             $"Properties/Logo points at {storeLogo}, which is not in the sparse package.");
     }
 
+    /// <summary>
+    /// Weixin hides share targets whose display name contains the contiguous brand
+    /// substrings 微信 / WeChat / Weixin, but does not normalise zero-width characters.
+    /// The manifest therefore spells the product name with a U+2060 WORD JOINER between
+    /// 微 and 信 so it renders as 微信流 without containing the filtered substring. Any
+    /// tooling that rewrites these strings (normalisation, pretty-printing, code-gen)
+    /// can silently strip the joiner and make the target vanish from the share menu —
+    /// which is exactly the failure this assertion exists to catch.
+    /// </summary>
+    [Fact]
+    public void DisplayStringsAvoidContiguousBrandSubstrings()
+    {
+        var manifest = XDocument.Load(
+            Path.Combine(PackagingRoot(), "SparsePackage", "AppxManifest.xml"));
+
+        var application = manifest.Root!
+            .Element(Foundation + "Applications")!
+            .Element(Foundation + "Application")!;
+        var visualElements = application.Element(Uap + "VisualElements")!;
+
+        var displayStrings = new[]
+        {
+            manifest.Root.Element(Foundation + "Properties")!.Element(Foundation + "DisplayName")!.Value,
+            visualElements.Attribute("DisplayName")!.Value,
+        };
+        var descriptionStrings = new[]
+        {
+            visualElements.Attribute("Description")!.Value,
+            application
+                .Element(Foundation + "Extensions")!
+                .Element(Uap + "Extension")!
+                .Element(Uap + "ShareTarget")!
+                .Attribute("Description")!.Value,
+        };
+
+        foreach (var display in displayStrings)
+        {
+            Assert.Contains("微⁠信流", display);
+        }
+
+        // Ordinal comparison mirrors Weixin's raw substring check; culture-aware
+        // comparison would treat U+2060 as ignorable and report a false positive.
+        foreach (var text in displayStrings.Concat(descriptionStrings))
+        {
+            Assert.DoesNotContain("微信", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("WeChat", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Weixin", text, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private static void AssertLogo(string sparsePackage, string field, string declared, int size)
     {
         var file = Resolve(sparsePackage, declared);

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/windows-port]
   pull_request:
     branches: [main]
 
