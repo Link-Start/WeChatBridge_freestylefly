@@ -252,18 +252,15 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Scene list card. Content-sized and top-aligned: the page
-                     scrolls as one surface, like the macOS settings pane — no
-                     second scrollbar track inside the card. -->
+                <!-- Scene list card. -->
                 <Border Grid.Column="0" Style="{StaticResource Card}" Padding="0"
-                        VerticalAlignment="Top"
                         AllowDrop="True" Drop="SceneList_Drop" DragOver="SceneList_DragOver">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
@@ -308,8 +305,8 @@
                         <Border Grid.Row="2" Height="1" Background="{StaticResource StrokeColor}" />
 
                         <ListBox x:Name="SceneList" Grid.Row="3" BorderThickness="0"
-                                 Background="Transparent" MinHeight="240"
-                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                 Background="Transparent" MinHeight="240" MaxHeight="430"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  ItemContainerStyle="{StaticResource RowItem}"
                                  SelectionChanged="SceneList_SelectionChanged">
                             <ListBox.ItemTemplate>
@@ -364,10 +361,8 @@
                     </Grid>
                 </Border>
 
-                <!-- Scene detail — the embedded port of macOS SceneEditor.
-                     MinHeight keeps the empty state a card, not a sliver. -->
-                <Border Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top"
-                        MinHeight="200" Style="{StaticResource Card}">
+                <!-- Scene detail — the embedded port of macOS SceneEditor. -->
+                <Border Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource Card}">
                     <Grid>
                         <StackPanel x:Name="EditorEmpty" VerticalAlignment="Center"
                                     HorizontalAlignment="Center">
@@ -380,7 +375,8 @@
                                        TextAlignment="Center" />
                         </StackPanel>
 
-                        <StackPanel x:Name="EditorContent" Visibility="Collapsed">
+                        <ScrollViewer x:Name="EditorContent" Visibility="Collapsed"
+                                      VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -513,7 +509,7 @@
                                             Click="Save_Click" />
                                 </StackPanel>
                             </StackPanel>
-                        </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </Border>
             </Grid>
@@ -525,16 +521,14 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Group list card — same single-scroll rule as 场景管理:
-                     content-sized, the page owns the only scrollbar. -->
-                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="0"
-                        VerticalAlignment="Top">
+                <!-- Group list card. -->
+                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
                         <StackPanel Margin="12,12,12,10" Orientation="Horizontal">
@@ -568,7 +562,9 @@
                         </Grid>
                         <Border Grid.Row="2" Height="1" Background="{StaticResource StrokeColor}" />
 
-                        <StackPanel Grid.Row="3" Margin="0,4,0,8">
+                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto"
+                                      MaxHeight="430">
+                            <StackPanel Margin="0,4,0,8">
                                 <TextBlock x:Name="BoundHeader" Margin="12,8,12,4" FontSize="12"
                                            Foreground="{StaticResource InkTertiaryColor}"
                                            Text="已绑定" />
@@ -676,12 +672,12 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </Border>
 
                 <!-- Binding editor — the port of GroupBindingEditor. -->
-                <Border Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top"
-                        MinHeight="200" Style="{StaticResource Card}">
+                <Border Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource Card}">
                     <Grid>
                         <StackPanel x:Name="GroupEmpty" VerticalAlignment="Center"
                                     HorizontalAlignment="Center">
@@ -694,7 +690,9 @@
                                        TextAlignment="Center" />
                         </StackPanel>
 
-                        <StackPanel x:Name="GroupEditor" Visibility="Collapsed">
+                        <ScrollViewer x:Name="GroupEditor" Visibility="Collapsed"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
                                 <TextBlock x:Name="GroupTitle" FontSize="17" FontWeight="SemiBold"
                                            Foreground="{StaticResource InkColor}" />
                                 <TextBlock x:Name="GroupBoundCount" Margin="0,3,0,0" FontSize="12"
@@ -771,6 +769,7 @@
                                         HorizontalAlignment="Right"
                                         Click="ClearBinding_Click" />
                             </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </Border>
             </Grid>

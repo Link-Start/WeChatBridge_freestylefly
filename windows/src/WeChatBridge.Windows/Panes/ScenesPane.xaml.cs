@@ -33,19 +33,6 @@ public partial class ScenesPane : UserControl
     public ScenesPane()
     {
         InitializeComponent();
-        // SceneList keeps a disabled ScrollViewer — it still swallows wheel
-        // events, so hovering the list would dead-end page scrolling. Hand
-        // the delta to the page scroller ourselves.
-        SceneList.PreviewMouseWheel += (_, e) =>
-        {
-            e.Handled = true;
-            FindPageScroller(SceneList)?.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(
-                e.MouseDevice, e.Timestamp, e.Delta)
-            {
-                RoutedEvent = UIElement.MouseWheelEvent,
-                Source = SceneList,
-            });
-        };
         Loaded += (_, _) =>
         {
             _loaded = true;
@@ -60,17 +47,6 @@ public partial class ScenesPane : UserControl
             if (DataContext is SceneService service)
                 Bind(service);
         };
-    }
-
-    private static ScrollViewer? FindPageScroller(DependencyObject node)
-    {
-        while (node is not null)
-        {
-            node = VisualTreeHelper.GetParent(node);
-            if (node is ScrollViewer scroller)
-                return scroller;
-        }
-        return null;
     }
 
     /// <summary>Wire the pane to its service. Idempotent.</summary>
