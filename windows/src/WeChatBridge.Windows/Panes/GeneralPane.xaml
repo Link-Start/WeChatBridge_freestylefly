@@ -101,7 +101,7 @@
         </Style>
     </UserControl.Resources>
 
-    <StackPanel MaxWidth="720">
+    <StackPanel>
         <!-- 运行状态 — the one real card: a block, not a settings row. -->
         <StackPanel>
             <TextBlock Style="{StaticResource SectionLabel}" Text="运行状态" />

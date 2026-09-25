@@ -227,7 +227,7 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="980">
+        <StackPanel>
             <!-- 场景管理 / 群聊匹配 — the segmented pagePicker: sunken capsule,
                  radius 10, 2px inset, white raised slice for the active page. -->
             <Border Width="300" Margin="0,4,0,0" Padding="2" CornerRadius="10"

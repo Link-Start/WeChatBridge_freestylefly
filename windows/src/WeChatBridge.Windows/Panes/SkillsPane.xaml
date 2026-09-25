@@ -377,7 +377,7 @@
     </UserControl.Resources>
 
     <ScrollViewer x:Name="Root" VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="980">
+        <StackPanel>
             <!-- Catalog load failure — the loadError line on macOS. -->
             <Border Margin="0,4,0,0" Padding="12,10" CornerRadius="10"
                     Background="{StaticResource WarnFillColor}"

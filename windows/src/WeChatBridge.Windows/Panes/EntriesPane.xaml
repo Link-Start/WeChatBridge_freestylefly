@@ -11,7 +11,7 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="720">
+        <StackPanel>
             <!-- 分享入口 — the carded ShareEntryList port: one well, hairlines
                  between rows, a real logo or a tinted letter badge at the left. -->
             <StackPanel>
