@@ -47,7 +47,7 @@ public static class AgentIds
         AgentId.ChatGptCodex => "ChatGPT / Codex",
         AgentId.Claude => "Claude",
         AgentId.Doubao => "豆包",
-        AgentId.QwenWork => "千问办公",
+        AgentId.QwenWork => "千问",
         AgentId.WorkBuddy => "WorkBuddy",
         AgentId.WeSight => "WeSight",
         _ => throw new ArgumentOutOfRangeException(nameof(id)),

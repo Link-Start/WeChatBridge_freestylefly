@@ -115,7 +115,7 @@ public static class WindowsForwardTargets
             // client cannot take a pasted ZIP (the macOS one could), so — like
             // Doubao — it gets the archive path as text to read itself.
             [ShareAction.Qwen] = new(
-                "千问办公",
+                "千问",
                 ["Qianwen", "QwenWork"],
                 [
                     @"%LOCALAPPDATA%\Programs\Qianwen\Qianwen.exe",
