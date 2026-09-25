@@ -427,11 +427,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         if (action == ShareAction.Obsidian)
         {
-            // Vault delivery is a separate work package; until it lands the
-            // honest record is the same clipboard fallback every failure gets.
-            CopyItems(batch.Items, pathsOnly: false);
-            Record(BatchOutcomeKind.Failed, batch.Id, "Obsidian 沉淀将在后续接入", "Obsidian");
-            ToastRequested?.Invoke("Obsidian 沉淀将在后续版本接入；文件已复制到剪贴板", null, null, false);
+            var vault = _settings.ObsidianVaultPath;
+            if (string.IsNullOrEmpty(vault))
+            {
+                Record(BatchOutcomeKind.Failed, batch.Id, "尚未选择 Obsidian 知识库", "Obsidian");
+                ToastRequested?.Invoke("还没有选择 Obsidian 知识库", "去入口页设置", () => Navigate(AppTab.Entries), true);
+            }
+            else
+            {
+                try
+                {
+                    var paths = batch.Items.Select(i => i.FullPath).ToList();
+                    var written = KnowledgeDelivery.Deliver(
+                        paths, vault, _settings.ObsidianSubfolder, batch.ChatName, batch.SceneName);
+                    Record(BatchOutcomeKind.Delivered, batch.Id, null, "Obsidian");
+                    ToastRequested?.Invoke($"已沉淀到 Obsidian（{written.Count} 篇笔记）", null, null, false);
+                }
+                catch (KnowledgeDelivery.FailureException error)
+                {
+                    CopyItems(batch.Items, pathsOnly: false);
+                    Record(BatchOutcomeKind.Failed, batch.Id, error.Message, "Obsidian");
+                    ToastRequested?.Invoke($"{error.Message} 文件已复制到剪贴板", null, null, true);
+                }
+            }
             Reload();
             return;
         }
