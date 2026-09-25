@@ -4,6 +4,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- The share menu reads this module's icon, not the package logo:
+         the same mark the main app carries. -->
+    <ApplicationIcon>..\WeChatBridge.Windows\Assets\AppIcon.ico</ApplicationIcon>
     <PublishSingleFile>false</PublishSingleFile>
   </PropertyGroup>
 
