@@ -163,13 +163,18 @@ public sealed class TrayIconService : IDisposable
         _window = window;
         _quit = quit;
 
-        // A message-only HWND the icon can post to: independent of the main
-        // window, which a --background launch never shows.
+        // A real top-level window kept hidden off-screen — NOT HWND_MESSAGE:
+        // message-only windows can never be foreground, and TrackPopupMenuEx
+        // destroys the menu the moment it loses activation without one. That
+        // was why right-click looked dead: the menu appeared and died instantly.
         _source = new HwndSource(new HwndSourceParameters("WeChatBridgeTray")
         {
             Width = 0,
             Height = 0,
-            ParentWindow = new IntPtr(-3), // HWND_MESSAGE
+            WindowStyle = unchecked((int)0x80000000), // WS_POPUP
+            ExtendedWindowStyle = 0x00000080, // WS_EX_TOOLWINDOW: stays out of Alt-Tab/taskbar
+            PositionX = -32000,
+            PositionY = -32000,
         });
         _source.AddHook(WndProc);
         _hwnd = _source.Handle;
