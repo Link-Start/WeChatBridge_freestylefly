@@ -43,7 +43,10 @@ public static class WindowsTargetResolver
     /// launch returns with the process id and window handle filled in, so the
     /// engine's foreground wait has something exact to compare against.
     /// </summary>
-    public static async Task<ResolvedTarget> ActivateAsync(ResolvedTarget target, CancellationToken ct)
+    public static async Task<ResolvedTarget> ActivateAsync(
+        ResolvedTarget target,
+        CancellationToken ct,
+        Action<string>? log = null)
     {
         if (target.ProcessId is null && target.MainWindowHandle == 0)
             Launch(target);
@@ -52,9 +55,14 @@ public static class WindowsTargetResolver
             target = await WaitForWindow(target, ct).ConfigureAwait(false) ?? target;
 
         if (target.MainWindowHandle != 0)
-            Win32.BringToForeground(target.MainWindowHandle);
+        {
+            Win32.BringToForeground(target.MainWindowHandle, out var diag);
+            log?.Invoke($"bring-to-front hwnd={target.MainWindowHandle}: {diag}");
+        }
         else if (target.ProcessId is { } pid)
-            BringMainWindowForward(pid);
+        {
+            log?.Invoke($"bring-to-front pid={pid}: {BringMainWindowForward(pid)}");
+        }
         return target;
     }
 
@@ -87,7 +95,7 @@ public static class WindowsTargetResolver
                     {
                         // Elevated or protected process — the window handle still works.
                     }
-                    var hwnd = SafeMainWindowHandle(process);
+                    var hwnd = MainWindowOf(process);
                     if (hwnd != 0)
                         return new ResolvedTarget(spec, process.Id, hwnd, path);
                     windowless ??= new ResolvedTarget(spec, process.Id, 0, path);
@@ -182,8 +190,9 @@ public static class WindowsTargetResolver
                 try
                 {
                     using var process = Process.GetProcessById(pid);
-                    if (process is { HasExited: false } && process.MainWindowHandle != 0)
-                        return target with { MainWindowHandle = process.MainWindowHandle };
+                    var hwnd = process is { HasExited: false } ? MainWindowOf(process) : 0;
+                    if (hwnd != 0)
+                        return target with { MainWindowHandle = hwnd };
                 }
                 catch
                 {
@@ -191,39 +200,51 @@ public static class WindowsTargetResolver
                     return null;
                 }
             }
-            else
-            {
-                // A bare-name launch or AUMID: the process appears under one of
-                // the spec's names once it is up.
-                if (FindRunning(target.Spec) is { } running)
-                    return running;
-            }
+            // A launcher or App-execution-alias stub (C:\Windows\notepad.exe,
+            // shell:AppsFolder) exits or hands the window to a different real
+            // pid — Windows Notepad resolved to the stub at 38244 while the
+            // window belonged to 43768 (2026-09-25 self-test). Keep scanning
+            // the spec's process names and only accept a match that owns a
+            // window; a windowless process here wins nothing.
+            if (FindRunning(target.Spec) is { MainWindowHandle: not 0 } windowed)
+                return windowed;
             await Task.Delay(PollInterval, ct).ConfigureAwait(false);
         }
         return null;
     }
 
-    /// <summary>Foregrounds the main window of a known process, waiting briefly for it to appear.</summary>
-    private static void BringMainWindowForward(int pid)
+    /// <summary>Foregrounds the main window of a known process; returns diagnostics for the delivery log.</summary>
+    private static string BringMainWindowForward(int pid)
     {
         try
         {
             using var process = Process.GetProcessById(pid);
-            var hwnd = SafeMainWindowHandle(process);
-            if (hwnd != 0)
-                Win32.BringToForeground(hwnd);
+            var hwnd = MainWindowOf(process);
+            if (hwnd == 0)
+                return "no window";
+            Win32.BringToForeground(hwnd, out var diag);
+            return $"hwnd={hwnd} {diag}";
         }
         catch
         {
             // The process exited mid-forward; the foreground wait reports it.
+            return "process exited";
         }
     }
 
-    private static nint SafeMainWindowHandle(Process process)
+    /// <summary>
+    /// The delivery window for a process: the largest visible titled top-level
+    /// window, falling back to <c>MainWindowHandle</c>. Electron apps own
+    /// several windows per process and <c>MainWindowHandle</c> is not
+    /// guaranteed to be the visible one — Doubao's 52×52 helper widget won it
+    /// while the real chat window stayed background (2026-09-25).
+    /// </summary>
+    private static nint MainWindowOf(Process process)
     {
         try
         {
-            return process.MainWindowHandle;
+            var found = Win32.FindMainWindow((uint)process.Id);
+            return found != 0 ? found : process.MainWindowHandle;
         }
         catch
         {

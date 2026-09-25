@@ -136,6 +136,7 @@ public sealed class DeliveryEngine
         WriteManualPayload(plan, paths);
 
         var resolved = _env.ResolveTarget(spec);
+        _env.Log?.Invoke($"[deliver {batch.Id:N}] resolve {targetName}: {(resolved is null ? "null" : $"pid={resolved.ProcessId?.ToString() ?? "null"} hwnd={resolved.MainWindowHandle} exe={resolved.ExePath ?? "null"} aumid={resolved.Spec.Aumid ?? "null"}")}");
         if (resolved is null)
         {
             return Fail(batch, DeliveryFailureKind.NotInstalled,
@@ -143,6 +144,7 @@ public sealed class DeliveryEngine
         }
 
         resolved = await _env.ActivateAsync(resolved, ct).ConfigureAwait(false);
+        _env.Log?.Invoke($"[deliver {batch.Id:N}] after activate: pid={resolved.ProcessId?.ToString() ?? "null"} hwnd={resolved.MainWindowHandle} fg={_env.ForegroundWindow()}");
         if (!await WaitUntilForeground(resolved, ct).ConfigureAwait(false))
         {
             return Fail(batch, DeliveryFailureKind.DidNotBecomeActive,
@@ -150,6 +152,19 @@ public sealed class DeliveryEngine
         }
 
         await _env.DelayAsync(_env.ForegroundSettle ?? ForegroundSettle, ct).ConfigureAwait(false);
+
+        // Point the keyboard at the composer before the first paste. Without
+        // this a Ctrl+V into an unfocused chat window lands nowhere — the
+        // keystroke is accepted but nothing arrives (observed live 2026-09-25).
+        try
+        {
+            var focused = _env.FocusTextInput?.Invoke(_env.ForegroundWindow());
+            _env.Log?.Invoke($"[deliver {batch.Id:N}] focus composer: {focused?.ToString() ?? "skipped"}");
+        }
+        catch (Exception error)
+        {
+            _env.Log?.Invoke($"聚焦输入框失败，继续粘贴：{error.Message}");
+        }
 
         for (var index = 0; index < plan.Count; index++)
         {
@@ -166,6 +181,7 @@ public sealed class DeliveryEngine
                 return Fail(batch, DeliveryFailureKind.KeystrokeRejected,
                     "系统没有接受这次按键事件。", targetName, plan);
             }
+            _env.Log?.Invoke($"[deliver {batch.Id:N}] pasted {index + 1}/{plan.Count} fg={_env.ForegroundWindow()}");
         }
 
         var delivered = new BatchOutcome(BatchOutcomeKind.Delivered, null, _env.Now());
@@ -184,14 +200,23 @@ public sealed class DeliveryEngine
         var timeout = _env.ForegroundTimeout ?? ForegroundTimeout;
         var poll = _env.ForegroundPoll ?? ForegroundPoll;
         var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        nint lastHwnd = -1;
+        uint lastPid = 0;
         while (Environment.TickCount64 < deadline)
         {
             ct.ThrowIfCancellationRequested();
             var hwnd = _env.ForegroundWindow();
             if (hwnd != 0 && target.OwnsForeground(hwnd, _env.WindowProcessId(hwnd), ownPid))
                 return true;
+            if (hwnd != lastHwnd)
+            {
+                lastHwnd = hwnd;
+                lastPid = hwnd == 0 ? 0 : _env.WindowProcessId(hwnd);
+                _env.Log?.Invoke($"[wait-foreground] hwnd={hwnd} pid={lastPid} (want hwnd={target.MainWindowHandle} pid={target.ProcessId?.ToString() ?? "any≠self"})");
+            }
             await _env.DelayAsync(poll, ct).ConfigureAwait(false);
         }
+        _env.Log?.Invoke($"[wait-foreground] timed out; last hwnd={lastHwnd} pid={lastPid}");
         return false;
     }
 

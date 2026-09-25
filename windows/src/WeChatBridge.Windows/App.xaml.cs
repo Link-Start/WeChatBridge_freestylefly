@@ -8,9 +8,17 @@ public partial class App : Application
 {
     private const string MutexName = "Local\\WeChatBridge.Windows.Main";
     private const string ChangeEventName = "Local\\WeChatBridge.Windows.InboxChanged";
+    /// <summary>
+    /// A second *interactive* launch asks for the window. Kept separate from
+    /// <see cref="ChangeEventName"/>: a share must never pull our window to the
+    /// front — the delivery engine is busy foregrounding the target app, and a
+    /// window that grabs focus mid-paste steals the Ctrl+V.
+    /// </summary>
+    private const string ForegroundEventName = "Local\\WeChatBridge.Windows.Foreground";
 
     private Mutex? _mutex;
     private EventWaitHandle? _changeEvent;
+    private EventWaitHandle? _foregroundEvent;
     private CancellationTokenSource? _shutdown;
     private InboxPaths? _paths;
 
@@ -34,12 +42,18 @@ public partial class App : Application
         _paths.PruneStaging();
 
         _changeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ChangeEventName);
+        _foregroundEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ForegroundEventName);
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
+        var background = e.Args.Any(a => string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase));
         var model = new MainViewModel(_paths);
         var window = new MainWindow(model, requestedBatch);
         MainWindow = window;
-        window.Show();
+        // The share helper launches us with --background purely so the fresh
+        // intent is consumed and the forward runs. Showing the window here
+        // would fight the target app for the foreground.
+        if (!background)
+            window.Show();
         _ = WaitForChangesAsync(_shutdown.Token);
     }
 
@@ -47,6 +61,7 @@ public partial class App : Application
     {
         _shutdown?.Cancel();
         _changeEvent?.Dispose();
+        _foregroundEvent?.Dispose();
         if (_mutex is not null)
         {
             try { _mutex.ReleaseMutex(); } catch (ApplicationException) { }
@@ -61,21 +76,23 @@ public partial class App : Application
         {
             try
             {
-                await Task.Run(() => _changeEvent?.WaitOne(500), cancellationToken);
-                if (!cancellationToken.IsCancellationRequested)
+                var signalled = await Task.Run(
+                    () => WaitHandle.WaitAny(new WaitHandle?[] { _changeEvent, _foregroundEvent }
+                        .OfType<WaitHandle>().ToArray(), 500),
+                    cancellationToken);
+                if (signalled == WaitHandle.WaitTimeout || cancellationToken.IsCancellationRequested)
+                    continue;
+
+                Dispatcher.Invoke(() =>
                 {
-                    // The helper signals on every committed share and a second
-                    // launch signals to foreground this window — same gesture:
-                    // refresh, then bring the window up.
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (MainWindow is MainWindow window)
-                        {
-                            window.RefreshBatches();
-                            window.BringToFront();
-                        }
-                    });
-                }
+                    if (MainWindow is not MainWindow window)
+                        return;
+                    window.RefreshBatches();
+                    // Only an explicit second launch pulls the window forward —
+                    // the share helper's inbox signal just refreshes the list.
+                    if (signalled == 1)
+                        window.BringToFront();
+                });
             }
             catch (OperationCanceledException) { return; }
             catch (Exception error)
@@ -91,7 +108,7 @@ public partial class App : Application
     {
         try
         {
-            using var signal = EventWaitHandle.OpenExisting(ChangeEventName);
+            using var signal = EventWaitHandle.OpenExisting(ForegroundEventName);
             signal.Set();
         }
         catch (WaitHandleCannotBeOpenedException) { }

@@ -181,7 +181,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string InboxRoot => _paths.Root;
 
     /// <summary>Created lazily so constructing the view model never touches Win32.</summary>
-    private DeliveryEngine Delivery => _delivery ??= new DeliveryEngine(inbox: _reader);
+    private DeliveryEngine Delivery => _delivery ??= new DeliveryEngine(
+        DeliveryEnvironment.Create(message => InboxLogger.Write(_paths, message)),
+        _reader);
 
     /// <summary>The retention choice indexes <see cref="AppSettings.RetentionChoices"/>.</summary>
     public int RetentionIndex

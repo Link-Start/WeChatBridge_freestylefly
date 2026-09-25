@@ -34,6 +34,14 @@ public sealed record DeliveryEnvironment
     /// <summary>One physical Ctrl+V through <c>SendInput</c>; false when rejected.</summary>
     public required Func<bool> SendCtrlV { get; init; }
 
+    /// <summary>
+    /// Points the keyboard at the target's composer before pasting — the port of
+    /// macOS's <c>focusTextInput</c>. Best effort: a paste into the unfocused
+    /// message list silently does nothing, so this is attempted but never
+    /// required. Null skips the step.
+    /// </summary>
+    public Func<nint, bool>? FocusTextInput { get; init; }
+
     /// <summary>This process's id — the "not ours" marker for AUMID targets with no known pid.</summary>
     public Func<uint> ThisProcessId { get; init; } = () => (uint)Environment.ProcessId;
 
@@ -58,10 +66,11 @@ public sealed record DeliveryEnvironment
     public Action<string>? Log { get; init; }
 
     /// <summary>The production wiring — everything above backed by Win32.</summary>
-    public static DeliveryEnvironment Create() => new()
+    public static DeliveryEnvironment Create(Action<string>? log = null) => new()
     {
+        Log = log,
         ResolveTarget = WindowsTargetResolver.Resolve,
-        ActivateAsync = WindowsTargetResolver.ActivateAsync,
+        ActivateAsync = (target, ct) => WindowsTargetResolver.ActivateAsync(target, ct, log),
         ForegroundWindow = Win32.GetForegroundWindow,
         WindowProcessId = hwnd =>
         {
@@ -71,5 +80,6 @@ public sealed record DeliveryEnvironment
         WriteFileDropList = WindowsClipboard.WriteFileDropList,
         WriteClipboardText = WindowsClipboard.WriteText,
         SendCtrlV = Win32.SendCtrlV,
+        FocusTextInput = Win32.FocusTextInput,
     };
 }

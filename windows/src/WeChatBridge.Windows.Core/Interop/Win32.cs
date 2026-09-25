@@ -25,6 +25,7 @@ internal static class Win32
 
     internal const ushort VK_CONTROL = 0x11;
     internal const ushort VK_V = 0x56;
+    internal const ushort VK_F24 = 0x87;
 
     internal const uint INPUT_KEYBOARD = 1;
     internal const uint KEYEVENTF_KEYUP = 0x0002;
@@ -93,6 +94,117 @@ internal static class Win32
     [DllImport("kernel32.dll")]
     internal static extern nint GlobalFree(nint hMem);
 
+    internal delegate bool EnumWindowsProc(nint hwnd, nint lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsWindowVisible(nint hWnd);
+
+    [DllImport("user32.dll")]
+    internal static extern int GetWindowTextLength(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumChildWindows(nint hWndParent, EnumWindowsProc lpEnumFunc, nint lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetClassName(nint hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetFocus(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    /// <summary>
+    /// Best-effort port of macOS's <c>focusTextInput</c>: point the keyboard at
+    /// the control most likely to be the composer so the pasted Ctrl+V lands in
+    /// the input box rather than the message list. Native edit classes win;
+    /// for Electron/Chromium targets the render widget is focused — Chromium
+    /// restores DOM focus to the last focused element, typically the composer.
+    /// </summary>
+    internal static bool FocusTextInput(nint hwnd)
+    {
+        if (hwnd == 0)
+            return false;
+        nint edit = 0, chromium = 0;
+        long chromiumArea = -1;
+        EnumChildWindows(hwnd, (child, _) =>
+        {
+            var name = new System.Text.StringBuilder(64);
+            GetClassName(child, name, name.Capacity);
+            var cls = name.ToString();
+            var isEdit = cls.StartsWith("Edit", StringComparison.Ordinal)
+                || cls.StartsWith("RichEdit", StringComparison.OrdinalIgnoreCase)
+                || cls.StartsWith("RICHEDIT", StringComparison.OrdinalIgnoreCase);
+            if (edit == 0 && isEdit)
+                edit = child;
+            else if (cls is "Chrome_RenderWidgetHostHWND" or "MozillaWindowClass")
+            {
+                if (GetWindowRect(child, out var rect))
+                {
+                    var area = (long)(rect.Right - rect.Left) * (rect.Bottom - rect.Top);
+                    if (area > chromiumArea)
+                    {
+                        chromiumArea = area;
+                        chromium = child;
+                    }
+                }
+                else if (chromium == 0)
+                    chromium = child;
+            }
+            return true;
+        }, 0);
+        var target = edit != 0 ? edit : chromium;
+        return target != 0 && SetFocus(target);
+    }
+
+    /// <summary>
+    /// The window a delivery should aim at for <paramref name="processId"/>: the
+    /// largest *visible* top-level window with a title. Process.MainWindowHandle
+    /// is whatever the process touched first — Electron apps routinely own a
+    /// 50px helper widget that wins it (Doubao's real 1200×800 window lost to a
+    /// 52×52 widget on 2026-09-25), and pasting into that goes nowhere.
+    /// </summary>
+    internal static nint FindMainWindow(uint processId)
+    {
+        nint best = 0;
+        long bestArea = 0;
+        var bestTitled = false;
+        EnumWindows((hwnd, _) =>
+        {
+            GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid != processId || !IsWindowVisible(hwnd) || !GetWindowRect(hwnd, out var rect))
+                return true;
+            var titled = GetWindowTextLength(hwnd) > 0;
+            var area = (long)(rect.Right - rect.Left) * (rect.Bottom - rect.Top);
+            // A titled window beats an untitled one outright; among equals, larger wins.
+            if ((titled && !bestTitled) || (titled == bestTitled && area > bestArea))
+            {
+                best = hwnd;
+                bestArea = area;
+                bestTitled = titled;
+            }
+            return true;
+        }, 0);
+        return best;
+    }
+
     /// <summary>
     /// One Ctrl+V. The macOS original posted ⌘V through the HID event tap so it
     /// arrived like a physical press; <c>SendInput</c> is the same promise on
@@ -101,14 +213,11 @@ internal static class Win32
     /// </summary>
     internal static bool SendCtrlV()
     {
-        var inputs = new[]
-        {
+        return SendInputs(
             Key(VK_CONTROL, keyUp: false),
             Key(VK_V, keyUp: false),
             Key(VK_V, keyUp: true),
-            Key(VK_CONTROL, keyUp: true),
-        };
-        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) == inputs.Length;
+            Key(VK_CONTROL, keyUp: true));
     }
 
     /// <summary>
@@ -117,20 +226,40 @@ internal static class Win32
     /// only ever raises the window we are handed, never enumerates and unminimizes
     /// a whole app's window list — the same 「只动用户正看着的那一个窗口」 rule.
     /// </summary>
-    internal static bool BringToForeground(nint hwnd)
+    internal static bool BringToForeground(nint hwnd) =>
+        BringToForeground(hwnd, out _);
+
+    internal static bool BringToForeground(nint hwnd, out string diagnostic)
     {
         if (hwnd == 0)
+        {
+            diagnostic = "hwnd=0";
             return false;
+        }
         ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
         var foreground = GetForegroundWindow();
-        var foregroundThread = GetWindowThreadProcessId(foreground, out _);
+        var foregroundThread = GetWindowThreadProcessId(foreground, out var foregroundPid);
         var current = GetCurrentThreadId();
         var attached = foregroundThread != 0
             && foregroundThread != current
             && AttachThreadInput(current, foregroundThread, true);
         try
         {
-            return SetForegroundWindow(hwnd);
+            var result = SetForegroundWindow(hwnd);
+            var unlocked = false;
+            if (!result)
+            {
+                // SetForegroundWindow is denied while the system foreground
+                // lock is armed — observed live with attach=True set=False
+                // against a WorkBuddy foreground (2026-09-25). One synthetic
+                // F24 press arms the "caller generated input" permission; F24
+                // is unbound everywhere so nothing ever reacts to it.
+                SendInputs(Key(VK_F24, keyUp: false), Key(VK_F24, keyUp: true));
+                unlocked = true;
+                result = SetForegroundWindow(hwnd);
+            }
+            diagnostic = $"set={result} attach={attached} unlock={unlocked} fgHwnd={foreground} fgPid={foregroundPid} fgThread={foregroundThread}";
+            return result;
         }
         finally
         {
@@ -138,6 +267,9 @@ internal static class Win32
                 AttachThreadInput(current, foregroundThread, false);
         }
     }
+
+    private static bool SendInputs(params INPUT[] inputs) =>
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) == inputs.Length;
 
     private static INPUT Key(ushort virtualKey, bool keyUp) => new()
     {
