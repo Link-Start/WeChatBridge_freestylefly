@@ -1,0 +1,59 @@
+<Window x:Class="WeChatBridge.Windows.ScenePickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择场景" Width="290" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
+        WindowStartupLocation="Manual">
+    <Border Padding="10" Background="#F9FAFB" CornerRadius="10"
+            BorderBrush="#D0D5DD" BorderThickness="1">
+        <StackPanel>
+            <Grid Margin="4,0,4,8">
+                <StackPanel>
+                    <TextBlock Text="选择场景" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock Text="每次转发只加载一个场景，也可以直接转发。"
+                               Foreground="#667085" FontSize="11" />
+                </StackPanel>
+                <Button x:Name="CloseButton" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Width="22" Height="22" Padding="0" Content="✕"
+                        BorderThickness="0" Background="Transparent" Foreground="#98A2B3"
+                        ToolTip="关闭" Click="OnCloseClicked" />
+            </Grid>
+            <ListBox x:Name="SceneList" Height="204" BorderThickness="0"
+                     Background="Transparent" SelectionMode="Single"
+                     SelectionChanged="OnSelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="32">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="Mark" Text="○" Width="20" VerticalAlignment="Center"
+                                       Foreground="#98A2B3" FontSize="13" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" />
+                                <TextBlock Text="{Binding SummaryText}" Foreground="#667085"
+                                           FontSize="11" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                         Value="True">
+                                <Setter TargetName="Mark" Property="Text" Value="●" />
+                                <Setter TargetName="Mark" Property="Foreground" Value="#2E7FD9" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <Grid Margin="4,8,4,0">
+                <Button x:Name="DirectButton" Content="直接转发" HorizontalAlignment="Left"
+                        Padding="12,4" IsCancel="True" Click="OnDirectClicked" />
+                <Button x:Name="ConfirmButton" Content="使用此场景" HorizontalAlignment="Right"
+                        Padding="12,4" IsDefault="True" IsEnabled="False"
+                        Click="OnConfirmClicked" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>
