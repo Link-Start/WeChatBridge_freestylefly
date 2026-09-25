@@ -28,10 +28,16 @@ public partial class App : Application
         _paths = new InboxPaths();
         _paths.EnsureCreated();
 
+        var background = e.Args.Any(a => string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase));
         _mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
         if (!createdNew)
         {
-            SignalExistingInstance();
+            // A share that arrives while we are running spawns a second
+            // --background instance (the helper always launches us). It must
+            // exit quietly — foregrounding belongs to interactive launches
+            // only, otherwise every share would steal focus mid-delivery.
+            if (!background)
+                SignalExistingInstance();
             Shutdown();
             return;
         }
@@ -45,7 +51,6 @@ public partial class App : Application
         _foregroundEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ForegroundEventName);
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
-        var background = e.Args.Any(a => string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase));
         var model = new MainViewModel(_paths);
         var window = new MainWindow(model, requestedBatch);
         MainWindow = window;
@@ -54,6 +59,15 @@ public partial class App : Application
         // would fight the target app for the foreground.
         if (!background)
             window.Show();
+        // MainWindow's inbox load rides the Loaded event — a hidden window
+        // never raises it, so a background launch must load explicitly or it
+        // would idle forever with intents unconsumed (seen live 2026-09-25:
+        // helper relaunched us hidden and two shares were never delivered).
+        Dispatcher.BeginInvoke(() =>
+        {
+            model.RebuildEntries();
+            window.RefreshBatches();
+        });
         _ = WaitForChangesAsync(_shutdown.Token);
     }
 
