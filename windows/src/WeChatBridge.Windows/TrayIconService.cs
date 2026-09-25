@@ -185,12 +185,13 @@ public sealed class TrayIconService : IDisposable
         data.hIcon = _icon;
         data.szTip = "微信流";
         _added = Native.Shell_NotifyIcon(Native.NimAdd, ref data);
+        var versioned = false;
         if (_added)
         {
             // Version 4 gives NIN_* notifications and per-event coordinates.
             var version = IconData(Native.NifVersion);
             version.uTimeoutOrVersion = Native.NotifyIconVersion4;
-            Native.Shell_NotifyIcon(Native.NimSetVersion, ref version);
+            versioned = Native.Shell_NotifyIcon(Native.NimSetVersion, ref version);
         }
 
         // The macOS toast is a floating capsule that exists whether or not a
@@ -199,7 +200,7 @@ public sealed class TrayIconService : IDisposable
         // says it instead, or a failure would go unnoticed.
         _model.ToastRequested += OnToastRequested;
 
-        InboxLogger.Write(new InboxPaths(), $"tray icon registered: {_added}, hwnd={_hwnd}");
+        InboxLogger.Write(new InboxPaths(), $"tray icon registered: {_added}, v4={versioned}, hwnd={_hwnd}");
     }
 
     // MARK: - Window procedure
@@ -220,6 +221,11 @@ public sealed class TrayIconService : IDisposable
                     ToggleWindow(showOnly: true);
                     handled = true;
                     break;
+                // The pre-v4 contract — and in practice the only one this
+                // shell honours: raw WM_RBUTTONUP arrives instead of
+                // NIN_POPUPMENU (seen live in windows.log), so both paths
+                // lead to the same menu.
+                case Native.WmRButtonUp:
                 case Native.NinPopupMenu:
                     // 0x0402 is also NIN_BALLOONSHOW: a balloon we just raised
                     // reports its arrival here. Only a right-click after the
@@ -563,6 +569,7 @@ public sealed class TrayIconService : IDisposable
         public const uint WmContextMenu = 0x007B;
         public const uint WmLButtonUp = 0x0202;
         public const uint WmLButtonDblClk = 0x0203;
+        public const uint WmRButtonUp = 0x0205;
         public const uint NinSelect = 0x0400;   // WM_USER + 0
         public const uint NinKeySelect = 0x0401;
         public const uint NinPopupMenu = 0x0402;  // same low word as NIN_BALLOONSHOW
