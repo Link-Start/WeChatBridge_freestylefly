@@ -61,7 +61,8 @@ public partial class MainWindow : Window
         DataContext = _model;
         PaneHost.Content = _panes[AppTab.History].Pane;
         PaneCaption.Text = _panes[AppTab.History].Caption;
-        NavList.SelectedIndex = 0;
+        NavList.SelectedItem = NavList.Items.OfType<ListBoxItem>()
+            .FirstOrDefault(i => i.Tag as string == nameof(AppTab.History));
 
         _model.ToastRequested += ShowToast;
         _model.NavigationRequested += SelectTab;

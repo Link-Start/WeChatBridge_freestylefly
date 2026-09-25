@@ -75,22 +75,12 @@
                         </Setter>
                     </Style>
                 </ListBox.Resources>
-                <ListBoxItem Tag="History">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE81C;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="记录" />
-                    </StackPanel>
-                </ListBoxItem>
+                <!-- macOS sidebar order: 通用 场景 技能 入口 权限 记录 关于 —
+                     权限 has no Windows counterpart, so it is omitted. -->
                 <ListBoxItem Tag="General">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE713;" />
                         <TextBlock Style="{StaticResource NavLabel}" Text="通用" />
-                    </StackPanel>
-                </ListBoxItem>
-                <ListBoxItem Tag="Entries">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE72D;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="入口" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="Scenes">
@@ -103,6 +93,18 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE8EF;" />
                         <TextBlock Style="{StaticResource NavLabel}" Text="技能" />
+                    </StackPanel>
+                </ListBoxItem>
+                <ListBoxItem Tag="Entries">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE72D;" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="入口" />
+                    </StackPanel>
+                </ListBoxItem>
+                <ListBoxItem Tag="History">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE81C;" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="记录" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="About">
