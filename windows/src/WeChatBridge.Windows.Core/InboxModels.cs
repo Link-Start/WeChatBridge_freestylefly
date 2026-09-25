@@ -34,7 +34,17 @@ public sealed record BatchManifest(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        Converters = { new UtcIso8601Converter(), new JsonStringEnumConverter() }
+        // The type-specific converters must precede JsonStringEnumConverter: the
+        // Converters collection wins over [JsonConverter] type attributes, and the
+        // first matching converter in the collection claims the enum.
+        Converters =
+        {
+            new UtcIso8601Converter(),
+            new ShareActionConverter(),
+            new BatchOutcomeKindConverter(),
+            new AgentIdConverter(),
+            new JsonStringEnumConverter()
+        }
     };
 }
 
