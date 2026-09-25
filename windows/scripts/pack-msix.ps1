@@ -33,7 +33,7 @@ try {
     }
 
     $manifestPath = Join-Path $stageDirectory 'AppxManifest.xml'
-    [xml]$manifest = Get-Content -Raw $manifestPath
+    [xml]$manifest = Get-Content -Raw -Encoding UTF8 $manifestPath
     $manifest.Package.Identity.Publisher = $Publisher
     $manifest.Package.Identity.Version = $Version
     $manifest.Save($manifestPath)
