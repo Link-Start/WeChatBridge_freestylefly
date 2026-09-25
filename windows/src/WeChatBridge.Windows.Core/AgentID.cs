@@ -109,11 +109,22 @@ public sealed record OfficialSkillCatalog(int SchemaVersion, IReadOnlyList<Offic
 {
     public const int CurrentSchemaVersion = 1;
 
+    /// <summary>
+    /// catalog.json is authored snake_case (schema_version, supported_agents);
+    /// macOS decodes with .convertFromSnakeCase, so this loader must not reuse
+    /// the camelCase inbox options.
+    /// </summary>
+    private static readonly JsonSerializerOptions CatalogJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        Converters = { new AgentIdConverter() },
+    };
+
     public static OfficialSkillCatalog LoadFrom(string resourcesRoot)
     {
         var path = Path.Combine(resourcesRoot, "Skills", "catalog.json");
         var catalog = JsonSerializer.Deserialize<OfficialSkillCatalog>(
-            File.ReadAllText(path), BatchManifest.JsonOptions)
+            File.ReadAllText(path), CatalogJsonOptions)
             ?? throw new SkillInstallException("技能清单内容无效。");
         if (catalog.SchemaVersion != CurrentSchemaVersion)
             throw new SkillInstallException("技能清单版本不受支持。");
