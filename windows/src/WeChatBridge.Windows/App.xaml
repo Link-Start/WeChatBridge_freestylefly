@@ -1,5 +1,99 @@
 <Application x:Class="WeChatBridge.Windows.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Application.Resources />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WeChatBridge.Windows">
+    <Application.Resources>
+        <local:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertBoolToVisibility" />
+        <local:ExpandGlyphConverter x:Key="ExpandGlyph" />
+        <local:ByteCountTextConverter x:Key="ByteCountText" />
+
+        <!-- Palette mirrors the macOS Theme values the PoC already used. -->
+        <Color x:Key="InkColor">#FF1D2939</Color>
+        <Color x:Key="InkSecondaryColor">#FF667085</Color>
+        <Color x:Key="InkTertiaryColor">#FF98A2B3</Color>
+        <Color x:Key="StrokeColor">#FFD0D5DD</Color>
+        <Color x:Key="StrokeSoftColor">#FFE4E7EC</Color>
+        <Color x:Key="SunkenColor">#FFF2F4F7</Color>
+        <Color x:Key="SurfaceColor">#FFFFFFFF</Color>
+        <Color x:Key="HoverColor">#FFF9FAFB</Color>
+        <Color x:Key="BrandColor">#FF12A150</Color>
+        <Color x:Key="BrandTintColor">#FFE7F6EC</Color>
+        <Color x:Key="WarningColor">#FFB54708</Color>
+        <Color x:Key="WarningSoftColor">#FFFEF0C7</Color>
+        <Color x:Key="LiveInkColor">#FF067647</Color>
+        <Color x:Key="LiveFillColor">#FFDCFAE6</Color>
+        <Color x:Key="WarnInkColor">#FFB54708</Color>
+        <Color x:Key="WarnFillColor">#FFFEF0C7</Color>
+        <Color x:Key="NeutralInkColor">#FF475467</Color>
+        <Color x:Key="NeutralFillColor">#FFF2F4F7</Color>
+
+        <!-- A plain rounded button in the settings window's vocabulary. -->
+        <Style x:Key="SettingsButton" TargetType="Button">
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{StaticResource InkColor}" />
+            <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource StrokeColor}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource HoverColor}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The status pill on a history row. Fill/ink follow BatchRow.Tone. -->
+        <Style x:Key="StatusPill" TargetType="Border">
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Background" Value="{StaticResource NeutralFillColor}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tone}" Value="Live">
+                    <Setter Property="Background" Value="{StaticResource LiveFillColor}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tone}" Value="Warn">
+                    <Setter Property="Background" Value="{StaticResource WarnFillColor}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StatusPillText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource NeutralInkColor}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tone}" Value="Live">
+                    <Setter Property="Foreground" Value="{StaticResource LiveInkColor}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tone}" Value="Warn">
+                    <Setter Property="Foreground" Value="{StaticResource WarnInkColor}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Card: the white rounded surface every pane section sits on. -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeSoftColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+    </Application.Resources>
 </Application>

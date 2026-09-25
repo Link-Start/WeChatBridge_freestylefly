@@ -1,0 +1,179 @@
+<UserControl x:Class="WeChatBridge.Windows.Panes.HistoryPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WeChatBridge.Windows">
+    <UserControl.Resources>
+        <!-- One history row: title, subtitle, clock, status pill, actions. -->
+        <DataTemplate x:Key="BatchRowTemplate" DataType="{x:Type local:BatchRow}">
+            <Border Background="{StaticResource SunkenColor}" CornerRadius="8"
+                    Padding="12,9" Margin="0,0,0,6">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Row tap target: expands the item list. -->
+                        <Button Grid.Column="0" VerticalAlignment="Center"
+                                Padding="4" Margin="0,0,8,0"
+                                Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" Click="ToggleDetail_Click"
+                                ToolTip="展开详情">
+                            <TextBlock FontSize="11" Foreground="{StaticResource InkTertiaryColor}"
+                                       Text="{Binding IsExpanded, Converter={StaticResource ExpandGlyph}}"
+                                       RenderTransformOrigin="0.5,0.5" />
+                        </Button>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkColor}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Margin="0,2,0,0"
+                                       Foreground="{StaticResource InkSecondaryColor}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0"
+                                   FontSize="11.5" Foreground="{StaticResource InkTertiaryColor}"
+                                   Text="{Binding Clock}" />
+
+                        <Border Grid.Column="3" VerticalAlignment="Center" Margin="8,0,0,0"
+                                Style="{StaticResource StatusPill}">
+                            <TextBlock Style="{StaticResource StatusPillText}" Text="{Binding StatusText}" />
+                        </Border>
+
+                        <Button Grid.Column="4" VerticalAlignment="Center" Margin="8,0,0,0"
+                                Style="{StaticResource SettingsButton}" Padding="10,4"
+                                Click="Resend_Click" ToolTip="重新执行这批记录的操作">
+                            重新发送
+                        </Button>
+                        <Button Grid.Column="5" VerticalAlignment="Center" Margin="6,0,0,0"
+                                Style="{StaticResource SettingsButton}" Padding="10,4"
+                                Click="Forward_Click" ToolTip="选择要发到的应用">
+                            发给…
+                        </Button>
+                        <Button Grid.Column="6" VerticalAlignment="Center" Margin="6,0,0,0"
+                                Style="{StaticResource SettingsButton}" Padding="10,4"
+                                Click="More_Click" ToolTip="更多操作">
+                            ⋯
+                        </Button>
+                    </Grid>
+
+                    <!-- Item detail, expanded on row click. -->
+                    <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                        <Border Height="1" Background="{StaticResource StrokeSoftColor}" Margin="0,9,0,7" />
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                                   FontSize="12" Foreground="{StaticResource InkColor}"
+                                                   Text="{Binding DisplayName}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0"
+                                                   FontSize="11" Foreground="{StaticResource InkTertiaryColor}"
+                                                   Text="{Binding ByteCount, Converter={StaticResource ByteCountText}}" />
+                                        <Button Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                Style="{StaticResource SettingsButton}" Padding="8,2" FontSize="11"
+                                                Click="RevealItem_Click">
+                                            在文件夹中显示
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Margin="0,6,0,0" FontSize="11" Foreground="{StaticResource InkTertiaryColor}"
+                                   Text="{Binding Destination, StringFormat='入口：{0}'}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: summary | search | reveal | clear. -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12"
+                       Foreground="{StaticResource InkSecondaryColor}"
+                       Text="{Binding SummaryText}" />
+            <TextBox x:Name="SearchBox" Grid.Column="2" Width="240" VerticalAlignment="Center"
+                     Margin="0,0,8,0" Padding="8,5" FontSize="12"
+                     Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}">
+                <TextBox.ToolTip>搜索群聊、场景或文件名</TextBox.ToolTip>
+            </TextBox>
+            <Button Grid.Column="3" VerticalAlignment="Center" Margin="0,0,6,0"
+                    Style="{StaticResource SettingsButton}" Click="RevealInbox_Click">
+                在文件夹中显示
+            </Button>
+            <Button x:Name="ClearButton" Grid.Column="4" VerticalAlignment="Center"
+                    Style="{StaticResource SettingsButton}" Click="Clear_Click">
+                清空记录…
+            </Button>
+        </Grid>
+
+        <Border Grid.Row="1" Margin="0,10,0,0" Padding="10,8" CornerRadius="6"
+                Background="{StaticResource WarnFillColor}"
+                Visibility="{Binding InboxFailure, Converter={StaticResource StringToVisibility}}">
+            <TextBlock FontSize="12" Foreground="{StaticResource WarnInkColor}"
+                       Text="{Binding InboxFailure}" TextWrapping="Wrap" />
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,14,0,0">
+            <!-- Empty states -->
+            <StackPanel x:Name="EmptyAll" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"
+                           Foreground="{StaticResource InkColor}" Text="还没有记录" />
+                <TextBlock FontSize="12" Margin="0,6,0,0" HorizontalAlignment="Center"
+                           Foreground="{StaticResource InkSecondaryColor}"
+                           Text="从微信转发到任意一个微信流入口后，这里会列出来。" />
+            </StackPanel>
+            <StackPanel x:Name="EmptyFilter" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"
+                           Foreground="{StaticResource InkColor}" Text="没有匹配的记录" />
+                <TextBlock FontSize="12" Margin="0,6,0,0" HorizontalAlignment="Center"
+                           Foreground="{StaticResource InkSecondaryColor}"
+                           Text="试试按群聊、场景或文件名搜索。" />
+            </StackPanel>
+
+            <ScrollViewer x:Name="RecordList" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="Groups" ItemsSource="{Binding Groups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,14">
+                                <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkSecondaryColor}"
+                                           Margin="4,0,0,6" />
+                                <ItemsControl ItemsSource="{Binding Rows}"
+                                              ItemTemplate="{StaticResource BatchRowTemplate}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

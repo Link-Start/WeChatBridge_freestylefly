@@ -36,7 +36,8 @@ public partial class App : Application
         _changeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ChangeEventName);
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
-        var window = new MainWindow(_paths, requestedBatch);
+        var model = new MainViewModel(_paths);
+        var window = new MainWindow(model, requestedBatch);
         MainWindow = window;
         window.Show();
         _ = WaitForChangesAsync(_shutdown.Token);
@@ -62,7 +63,19 @@ public partial class App : Application
             {
                 await Task.Run(() => _changeEvent?.WaitOne(500), cancellationToken);
                 if (!cancellationToken.IsCancellationRequested)
-                    Dispatcher.Invoke(() => (MainWindow as MainWindow)?.RefreshBatches());
+                {
+                    // The helper signals on every committed share and a second
+                    // launch signals to foreground this window — same gesture:
+                    // refresh, then bring the window up.
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (MainWindow is MainWindow window)
+                        {
+                            window.RefreshBatches();
+                            window.BringToFront();
+                        }
+                    });
+                }
             }
             catch (OperationCanceledException) { return; }
             catch (Exception error)

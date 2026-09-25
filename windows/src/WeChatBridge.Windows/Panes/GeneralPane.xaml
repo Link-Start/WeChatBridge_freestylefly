@@ -1,0 +1,78 @@
+<UserControl x:Class="WeChatBridge.Windows.Panes.GeneralPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WeChatBridge.Windows">
+    <StackPanel>
+        <TextBlock FontSize="13" Foreground="{StaticResource InkSecondaryColor}"
+                   Text="微信流状态与应用偏好" TextWrapping="Wrap" />
+
+        <!-- 运行状态 -->
+        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource InkColor}"
+                               Text="运行状态" />
+                    <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="{StaticResource InkSecondaryColor}"
+                               TextWrapping="Wrap"
+                               Text="{Binding InboxRoot, StringFormat='Inbox：{0}'}" />
+                    <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="{StaticResource InkSecondaryColor}"
+                               Text="{Binding SummaryText}" />
+                </StackPanel>
+                <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                        Style="{StaticResource SettingsButton}" Click="RevealInbox_Click">
+                    打开 Inbox 文件夹
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- 应用行为 -->
+        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+            <StackPanel>
+                <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource InkColor}"
+                           Text="应用行为" />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
+                                   Text="记录保留时间" />
+                        <TextBlock Margin="0,2,0,0" FontSize="11.5" Foreground="{StaticResource InkSecondaryColor}"
+                                   Text="到期的记录会移入回收站；回收站里的内容仍可以恢复。" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" VerticalAlignment="Center" Width="140"
+                              SelectedIndex="{Binding RetentionIndex, Mode=TwoWay}">
+                        <ComboBoxItem>永久保留</ComboBoxItem>
+                        <ComboBoxItem>保留 7 天</ComboBoxItem>
+                        <ComboBoxItem>保留 30 天</ComboBoxItem>
+                    </ComboBox>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- 软件与帮助 -->
+        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource InkColor}"
+                               Text="软件与帮助" />
+                    <TextBlock x:Name="VersionText" Margin="0,8,0,0" FontSize="12"
+                               Foreground="{StaticResource InkSecondaryColor}" />
+                </StackPanel>
+                <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                        Style="{StaticResource SettingsButton}" Click="OpenProject_Click">
+                    访问项目
+                </Button>
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>

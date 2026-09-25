@@ -1,0 +1,152 @@
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using Microsoft.Win32;
+using WeChatBridge.Windows.Core;
+
+namespace WeChatBridge.Windows.Panes;
+
+/// <summary>
+/// What the Share menu offers, and the switches that decide which of it shows —
+/// the port of macOS EntriesPane + the ForwardTargetList editor and the Obsidian
+/// settings the macOS version hides behind sheets.
+/// </summary>
+public partial class EntriesPane : UserControl
+{
+    public EntriesPane()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => HookModel();
+        DataContextChanged += (_, _) => HookModel();
+    }
+
+    private MainViewModel? Model => DataContext as MainViewModel;
+    private MainViewModel? _hooked;
+
+    private void HookModel()
+    {
+        if (ReferenceEquals(_hooked, Model))
+        {
+            UpdateTargetsEmpty();
+            return;
+        }
+        if (_hooked is not null)
+            _hooked.TargetRows.CollectionChanged -= OnTargetsChanged;
+        _hooked = Model;
+        if (_hooked is not null)
+            _hooked.TargetRows.CollectionChanged += OnTargetsChanged;
+        UpdateTargetsEmpty();
+    }
+
+    private void OnTargetsChanged(object? sender, NotifyCollectionChangedEventArgs e) => UpdateTargetsEmpty();
+
+    private void UpdateTargetsEmpty()
+    {
+        if (!IsLoaded || Model is null)
+            return;
+        TargetsEmpty.Visibility = Model.TargetRows.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void EntryCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is { } model
+            && (sender as FrameworkElement)?.DataContext is EntryRow row
+            && sender is CheckBox box)
+        {
+            model.SetEntryEnabled(row.Action, box.IsChecked == true);
+        }
+    }
+
+    /// <summary>设置… / 管理… scroll the matching card into view.</summary>
+    private void Configure_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not EntryRow row)
+            return;
+        (row.Action == ShareAction.Obsidian ? ObsidianCard : CustomCard).BringIntoView();
+    }
+
+    private void ChooseVault_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is not { } model)
+            return;
+        var dialog = new OpenFolderDialog
+        {
+            Title = "选择知识库",
+            Multiselect = false,
+        };
+        if (model.ObsidianVaultPath is { Length: > 0 } current && Directory.Exists(current))
+            dialog.FolderName = current;
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true)
+            model.ObsidianVaultPath = dialog.FolderName;
+    }
+
+    private void RevealVault_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model?.ObsidianVaultPath is not { Length: > 0 } path || !Directory.Exists(path))
+            return;
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{path}\"",
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // Explorer is always there; a refused launch is not worth a dialog.
+        }
+    }
+
+    private void BrowseExe_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择应用",
+            Filter = "可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            return;
+        NewTargetPath.Text = dialog.FileName;
+        if (NewTargetName.Text.Trim().Length == 0)
+            NewTargetName.Text = Path.GetFileNameWithoutExtension(dialog.FileName);
+    }
+
+    private void AddTarget_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is not { } model)
+            return;
+        var identifier = NewTargetPath.Text.Trim();
+        if (identifier.Length == 0)
+        {
+            model.ShowToast("请填写 .exe 路径或应用 AUMID", warning: true);
+            return;
+        }
+        model.AddForwardTarget(identifier, NewTargetName.Text);
+        NewTargetName.Text = string.Empty;
+        NewTargetPath.Text = string.Empty;
+    }
+
+    private void RemoveTarget_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is { } model && (sender as FrameworkElement)?.DataContext is ForwardTargetRow row)
+            model.RemoveForwardTarget(row.Target);
+    }
+
+    private void PastesPathOnly_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is { } model
+            && (sender as FrameworkElement)?.DataContext is ForwardTargetRow row
+            && sender is CheckBox box)
+        {
+            model.SetPastesPathOnly(row.Target, box.IsChecked == true);
+        }
+    }
+}
