@@ -197,11 +197,22 @@ public static class InboxWriter
     public const long MaxFileBytes = 1_073_741_824;
     public const long MaxBatchBytes = 1_073_741_824;
 
+    /// <param name="action">
+    /// Which share-menu entry produced this batch. Written into manifest.json so the
+    /// history can say what was asked for even after intent.json is consumed.
+    /// </param>
+    /// <param name="intent">
+    /// The one-shot forward request, written as intent.json inside the staging tree so
+    /// it commits atomically with the batch — a share that is durable but whose intent
+    /// was lost must not exist. Only meaningful when <see cref="ShareActions.NeedsIntent"/>.
+    /// </param>
     public static async Task<BatchCommitResult> CommitAsync(
         InboxPaths paths,
         IReadOnlyList<InboxSourceFile> sources,
         CancellationToken cancellationToken = default,
-        InboxLimits? limits = null)
+        InboxLimits? limits = null,
+        ShareAction action = ShareAction.Clipboard,
+        BatchIntent? intent = null)
     {
         if (sources.Count == 0)
             throw new InboxValidationException("分享中没有可处理的文件。");
@@ -257,13 +268,21 @@ public static class InboxWriter
                 BatchManifest.CurrentSchemaVersion,
                 batchId,
                 DateTimeOffset.UtcNow,
-                "clipboard",
+                action.RawValue(),
                 committedItems);
             var manifestPath = Path.Combine(staging, "manifest.json");
             await File.WriteAllTextAsync(
                 manifestPath,
                 JsonSerializer.Serialize(manifest, BatchManifest.JsonOptions),
                 cancellationToken);
+
+            if (intent is not null)
+            {
+                await File.WriteAllTextAsync(
+                    Path.Combine(staging, BatchIntent.FileName),
+                    JsonSerializer.Serialize(intent, BatchManifest.JsonOptions),
+                    cancellationToken);
+            }
 
             Directory.Move(staging, ready);
             return new BatchCommitResult(batchId, ready, manifest);

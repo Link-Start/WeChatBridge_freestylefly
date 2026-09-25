@@ -23,13 +23,18 @@ public sealed class PackagingAssetsTests
     {
         var sparsePackage = Path.Combine(PackagingRoot(), "SparsePackage");
         var manifest = XDocument.Load(Path.Combine(sparsePackage, "AppxManifest.xml"));
-        var visualElements = manifest.Root!
+        var applications = manifest.Root!
             .Element(Foundation + "Applications")!
-            .Element(Foundation + "Application")!
-            .Element(Uap + "VisualElements")!;
+            .Elements(Foundation + "Application")
+            .ToList();
+        Assert.NotEmpty(applications);
 
-        AssertLogo(sparsePackage, "Square44x44Logo", visualElements.Attribute("Square44x44Logo")!.Value, 44);
-        AssertLogo(sparsePackage, "Square150x150Logo", visualElements.Attribute("Square150x150Logo")!.Value, 150);
+        foreach (var application in applications)
+        {
+            var visualElements = application.Element(Uap + "VisualElements")!;
+            AssertLogo(sparsePackage, "Square44x44Logo", visualElements.Attribute("Square44x44Logo")!.Value, 44);
+            AssertLogo(sparsePackage, "Square150x150Logo", visualElements.Attribute("Square150x150Logo")!.Value, 150);
+        }
 
         // The store logo is what the shell falls back to when no scaled variant is installed.
         var storeLogo = manifest.Root
@@ -55,38 +60,69 @@ public sealed class PackagingAssetsTests
         var manifest = XDocument.Load(
             Path.Combine(PackagingRoot(), "SparsePackage", "AppxManifest.xml"));
 
-        var application = manifest.Root!
+        var applications = manifest.Root!
             .Element(Foundation + "Applications")!
-            .Element(Foundation + "Application")!;
-        var visualElements = application.Element(Uap + "VisualElements")!;
+            .Elements(Foundation + "Application")
+            .ToList();
+        Assert.NotEmpty(applications);
 
-        var displayStrings = new[]
+        // The product name is the package identity's string: the one place the
+        // U+2060 spelling must survive so the menu renders 微信流.
+        Assert.Contains("微⁠信流",
+            manifest.Root.Element(Foundation + "Properties")!.Element(Foundation + "DisplayName")!.Value);
+
+        // Every entry's user-visible strings — DisplayName, app Description and
+        // the ShareTarget description — go through the same filter. Entry titles
+        // (发给 Codex, 复制到剪贴板…) carry no brand words at all.
+        var visibleStrings = new List<string>();
+        foreach (var application in applications)
         {
-            manifest.Root.Element(Foundation + "Properties")!.Element(Foundation + "DisplayName")!.Value,
-            visualElements.Attribute("DisplayName")!.Value,
-        };
-        var descriptionStrings = new[]
-        {
-            visualElements.Attribute("Description")!.Value,
-            application
+            var visualElements = application.Element(Uap + "VisualElements")!;
+            visibleStrings.Add(visualElements.Attribute("DisplayName")!.Value);
+            visibleStrings.Add(visualElements.Attribute("Description")!.Value);
+            visibleStrings.Add(application
                 .Element(Foundation + "Extensions")!
                 .Element(Uap + "Extension")!
                 .Element(Uap + "ShareTarget")!
-                .Attribute("Description")!.Value,
-        };
-
-        foreach (var display in displayStrings)
-        {
-            Assert.Contains("微⁠信流", display);
+                .Attribute("Description")!.Value);
         }
 
         // Ordinal comparison mirrors Weixin's raw substring check; culture-aware
         // comparison would treat U+2060 as ignorable and report a false positive.
-        foreach (var text in displayStrings.Concat(descriptionStrings))
+        foreach (var text in visibleStrings)
         {
             Assert.DoesNotContain("微信", text, StringComparison.Ordinal);
             Assert.DoesNotContain("WeChat", text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Weixin", text, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// The helper tells entries apart from its own AUMID suffix, so every
+    /// Application Id in the manifest must be a <c>ShareEntryId</c> of a known
+    /// action — an Id that resolves to nothing silently degrades to clipboard.
+    /// </summary>
+    [Fact]
+    public void EveryShareEntryMapsToAKnownAction()
+    {
+        var manifest = XDocument.Load(
+            Path.Combine(PackagingRoot(), "SparsePackage", "AppxManifest.xml"));
+        var ids = manifest.Root!
+            .Element(Foundation + "Applications")!
+            .Elements(Foundation + "Application")
+            .Select(a => a.Attribute("Id")!.Value)
+            .ToList();
+
+        var expected = Core.ShareActions.All
+            .Select(Core.ShareActions.ShareEntryId)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToList();
+        Assert.Equal(expected, ids.OrderBy(id => id, StringComparer.Ordinal).ToList());
+
+        // The Windows schema rejects Ids with underscores; keep the pattern pinned.
+        foreach (var id in ids)
+        {
+            Assert.Matches(@"^([A-Za-z][A-Za-z0-9]*)(\.[A-Za-z][A-Za-z0-9]*)*$", id);
         }
     }
 

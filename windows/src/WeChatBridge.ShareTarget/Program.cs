@@ -64,6 +64,7 @@ internal static class Program
         var paths = new InboxPaths();
         var operation = args.ShareOperation;
         operation.ReportStarted();
+        var action = ResolveEntryAction(paths);
 
         try
         {
@@ -92,7 +93,14 @@ internal static class Program
                     0));
             }
 
-            var committed = await InboxWriter.CommitAsync(paths, sources);
+            // A forward entry leaves a one-shot intent on the batch; 复制到剪贴板
+            // is finished here and needs none.
+            var intent = action.NeedsIntent()
+                ? new BatchIntent { Action = action, RequestedAt = DateTimeOffset.UtcNow }
+                : null;
+            var committed = await InboxWriter.CommitAsync(
+                paths, sources, cancellationToken: default, limits: null,
+                action: action, intent: intent);
             // The batch is durable at this point, so everything below is an
             // optimisation that is allowed to fail. Sweeping here is what keeps
             // debris from a share that was killed mid-copy from accumulating.
@@ -100,7 +108,7 @@ internal static class Program
             var clipboardWritten = TryWriteClipboard(committed.Manifest.Items, committed.BatchDirectory, paths);
             SignalMainProcess();
             StartMainProcess(committed.BatchId);
-            InboxLogger.Write(paths, $"分享批次已提交：{committed.BatchId}; clipboard={clipboardWritten}");
+            InboxLogger.Write(paths, $"分享批次已提交：{committed.BatchId}; action={action.RawValue()}; clipboard={clipboardWritten}");
             operation.ReportDataRetrieved();
             operation.ReportCompleted();
         }
@@ -109,6 +117,36 @@ internal static class Program
             InboxLogger.Write(paths, "Share Target 处理失败", error);
             operation.ReportError(error.Message);
         }
+    }
+
+    /// <summary>
+    /// Which share-menu entry invoked us. The sparse package declares one
+    /// <c>&lt;Application&gt;</c> per entry; each gets its own AUMID
+    /// <c>{PackageFamilyName}!{ShareEntryId}</c>, and <c>AppInfo.Current</c>
+    /// reports ours because the package gives this process identity.
+    /// An unresolved entry — the old single-entry manifest, or an unpackaged
+    /// debug run — degrades to 复制到剪贴板, the behaviour every entry still
+    /// performs as its fallback.
+    /// </summary>
+    private static ShareAction ResolveEntryAction(InboxPaths paths)
+    {
+        try
+        {
+            var aumid = AppInfo.Current.AppUserModelId;
+            var appId = aumid?.Split('!').LastOrDefault();
+            foreach (var action in ShareActions.All)
+            {
+                if (string.Equals(appId, action.ShareEntryId(), StringComparison.Ordinal))
+                    return action;
+            }
+            InboxLogger.Write(paths, $"未识别的分享入口 AUMID：{aumid}，按复制到剪贴板处理。");
+        }
+        catch (Exception error)
+        {
+            // No package identity at all (plain exe run) — clipboard is correct.
+            InboxLogger.Write(paths, "读取应用身份失败，按复制到剪贴板处理。", error);
+        }
+        return ShareAction.Clipboard;
     }
 
     private static bool TryWriteClipboard(
