@@ -198,6 +198,8 @@ public sealed class TrayIconService : IDisposable
         // window is hidden — the resident app's normal state — a tray balloon
         // says it instead, or a failure would go unnoticed.
         _model.ToastRequested += OnToastRequested;
+
+        InboxLogger.Write(new InboxPaths(), $"tray icon registered: {_added}, hwnd={_hwnd}");
     }
 
     // MARK: - Window procedure
@@ -206,7 +208,9 @@ public sealed class TrayIconService : IDisposable
     {
         if (msg == Native.WmTrayIcon)
         {
-            switch ((uint)lParam.ToInt64() & 0xFFFF)
+            var notifyCode = (uint)lParam.ToInt64() & 0xFFFF;
+            InboxLogger.Write(new InboxPaths(), $"tray event 0x{notifyCode:x4}");
+            switch (notifyCode)
             {
                 // Left click opens the window, exactly like the macOS status item.
                 case Native.WmLButtonUp:
