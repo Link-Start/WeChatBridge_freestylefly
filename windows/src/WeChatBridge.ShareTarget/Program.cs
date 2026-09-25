@@ -1,9 +1,11 @@
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Windows;
-using Microsoft.Windows.AppLifecycle;
 using WeChatBridge.Windows.Core;
+using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -18,14 +20,34 @@ internal static class Program
     [STAThread]
     private static async Task Main(string[] args)
     {
+        var paths = new InboxPaths();
+
         try
         {
-            WinRT.ComWrappersSupport.InitializeComWrappers();
-            var activated = AppInstance.GetCurrent().GetActivatedEventArgs();
+            // The sparse package gives this process package identity, so the inbox
+            // Windows.ApplicationModel.AppInstance API delivers the activation
+            // arguments directly. The WAS AppLifecycle equivalent needs a
+            // WindowsAppRuntime PackageDependency that the sparse manifest does not
+            // declare and fails with REGDB_E_CLASSNOTREG.
+            var activated = AppInstance.GetActivatedEventArgs();
 
-            if (activated?.Kind != ExtendedActivationKind.ShareTarget ||
-                activated.Data is not ShareTargetActivatedEventArgs shareArgs)
+            if (activated is null)
             {
+                InboxLogger.Write(paths, "未取得 Share Target 激活参数。");
+                return;
+            }
+
+            if (activated.Kind != ActivationKind.ShareTarget)
+            {
+                InboxLogger.Write(paths, $"收到非分享激活：{activated.Kind}");
+                return;
+            }
+
+            // For share activation the returned args object itself implements
+            // IShareTargetActivatedEventArgs.
+            if (activated is not IShareTargetActivatedEventArgs shareArgs)
+            {
+                InboxLogger.Write(paths, $"Share Target 激活参数类型不匹配：{activated.GetType().FullName}");
                 return;
             }
 
@@ -33,12 +55,11 @@ internal static class Program
         }
         catch (Exception error)
         {
-            var paths = new InboxPaths();
             InboxLogger.Write(paths, "Share Target 激活初始化失败", error);
         }
     }
 
-    private static async Task HandleShareAsync(ShareTargetActivatedEventArgs args)
+    private static async Task HandleShareAsync(IShareTargetActivatedEventArgs args)
     {
         var paths = new InboxPaths();
         var operation = args.ShareOperation;
@@ -106,7 +127,25 @@ internal static class Program
                 files.Add(path);
             }
 
-            WpfClipboard.SetFileDropList(files);
+            Exception? clipboardError = null;
+            var clipboardThread = new Thread(() =>
+            {
+                try
+                {
+                    WpfClipboard.SetFileDropList(files);
+                }
+                catch (Exception error)
+                {
+                    clipboardError = error;
+                }
+            });
+            clipboardThread.SetApartmentState(ApartmentState.STA);
+            clipboardThread.Start();
+            clipboardThread.Join();
+
+            if (clipboardError is not null)
+                ExceptionDispatchInfo.Capture(clipboardError).Throw();
+
             return true;
         }
         catch (Exception error)
