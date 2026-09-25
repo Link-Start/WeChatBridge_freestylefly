@@ -40,6 +40,13 @@ public sealed class AppSettings
     /// <summary>Folder under the vault the chat Markdown and original ZIP land in.</summary>
     public string ObsidianSubfolder { get; set; } = "微信流";
 
+    /// <summary>
+    /// Keep a hidden instance resident after sign-in. A share's latency is
+    /// dominated by cold-starting this process; resident, the helper's signal
+    /// is consumed and forwarded in under a second.
+    /// </summary>
+    public bool LaunchAtLogin { get; set; } = true;
+
     public bool IsEntryEnabled(ShareAction action) =>
         !DisabledEntries.Contains(action.RawValue());
 

@@ -164,6 +164,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _settingsStore = new AppSettingsStore();
         _targetStore = new ForwardTargetStore();
         _settings = _settingsStore.Load();
+        // Residency is the whole point of the background instance: reconcile
+        // the stored preference with the Run key at every start so a fresh
+        // install self-registers and a user deletion stays deleted.
+        if (_settings.LaunchAtLogin != WeChatBridge.Windows.LaunchAtLogin.IsRegistered())
+            WeChatBridge.Windows.LaunchAtLogin.Apply(_settings.LaunchAtLogin);
     }
 
     /// <summary>A status capsule inside the window: message, optional button, its action.</summary>
@@ -204,6 +209,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
             SaveSettings();
             OnPropertyChanged(nameof(RetentionIndex));
             Reload();
+        }
+    }
+
+    /// <summary>开机自动启动 — the toggle reads the Run key itself so a registry edit elsewhere is shown, not overwritten.</summary>
+    public bool AutoStartEnabled
+    {
+        get => WeChatBridge.Windows.LaunchAtLogin.IsRegistered();
+        set
+        {
+            WeChatBridge.Windows.LaunchAtLogin.Apply(value);
+            _settings.LaunchAtLogin = value;
+            SaveSettings();
+            OnPropertyChanged(nameof(AutoStartEnabled));
         }
     }
 

@@ -41,6 +41,20 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
+                                   Text="开机自动启动" />
+                        <TextBlock Margin="0,2,0,0" FontSize="11.5" Foreground="{StaticResource InkSecondaryColor}"
+                                   Text="登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。" />
+                    </StackPanel>
+                    <CheckBox Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                              IsChecked="{Binding AutoStartEnabled, Mode=TwoWay}" />
+                </Grid>
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
                                    Text="记录保留时间" />
                         <TextBlock Margin="0,2,0,0" FontSize="11.5" Foreground="{StaticResource InkSecondaryColor}"
                                    Text="到期的记录会移入回收站；回收站里的内容仍可以恢复。" />
