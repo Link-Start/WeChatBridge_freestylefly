@@ -205,6 +205,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// lands on the UI dispatcher — ScenePickerWindow creates a Window.
     /// </summary>
     internal SceneService Scenes => _scenes ??= new SceneService(
+        // UIA reads the live chat name out of mmui::MainWindow; the window
+        // title only ever says 「微信」 and stays as the fallback.
+        titleReader: ct => Task.Run(
+            () => Services.WeChatUiTitleReader.TryRead()
+                ?? new WeChatWindowTitleReader().TryRead(), ct),
         picker: (scenes, ct) => System.Windows.Application.Current?.Dispatcher
                 .InvokeAsync(() => ScenePickerWindow.ChooseAsync(
                     scenes, ct, System.Windows.Application.Current.MainWindow))
