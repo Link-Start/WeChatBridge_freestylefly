@@ -78,49 +78,59 @@ public static class WindowsForwardTargets
     public static IReadOnlyDictionary<ShareAction, WindowsForwardTarget> Defaults { get; } =
         new Dictionary<ShareAction, WindowsForwardTarget>
         {
-            // Process names + install roots are best guesses pending on-device
-            // verification; display names mirror ShareAction.TargetDisplayName.
+            // Verified on device 2026-09-25: the Windows Codex desktop app is the
+            // MSIX package OpenAI.Codex (the ChatGPT desktop app). Its main-window
+            // process is ChatGPT.exe inside the package; the AUMID's publisher
+            // suffix 2p2nqsd0c76g0 is OpenAI's hash and stable across machines.
+            // Codex.exe in the package is the CLI helper, not the chat window.
             [ShareAction.Codex] = new(
                 "Codex",
-                ["Codex"],
-                [
-                    @"%LOCALAPPDATA%\Programs\Codex\Codex.exe",
-                    @"%LOCALAPPDATA%\Codex\Codex.exe",
-                    "Codex.exe",
-                ]),
+                ["ChatGPT", "Codex"],
+                ["ChatGPT.exe"],
+                Aumid: "OpenAI.Codex_2p2nqsd0c76g0!App"),
+            // Verified against Anthropic's deployment docs: Claude desktop on
+            // Windows ships only as MSIX — package Claude, stable publisher hash
+            // pzs8sxrjxfjjc, binary app\Claude.exe inside protected WindowsApps.
+            // AUMID is the only reliable handle; no user-level exe path exists.
             [ShareAction.Claude] = new(
                 "Claude",
                 ["Claude"],
-                [
-                    @"%LOCALAPPDATA%\Programs\Claude\Claude.exe",
-                    @"%LOCALAPPDATA%\AnthropicClaude\Claude.exe",
-                    "Claude.exe",
-                ]),
+                ["Claude.exe"],
+                Aumid: "Claude_pzs8sxrjxfjjc!Claude"),
+            // Verified on device 2026-09-25: classic win32 install under
+            // %LOCALAPPDATA%\Doubao\Application; the shell-facing AUMID is the
+            // app-registered "Doubao.ChatApp" (not PFN!AppId — win32 apps can
+            // declare their own), which also launches through shell:AppsFolder.
             [ShareAction.Doubao] = new(
                 "豆包",
                 ["Doubao"],
                 [
-                    @"%LOCALAPPDATA%\Programs\Doubao\Doubao.exe",
-                    @"%LOCALAPPDATA%\Doubao\Doubao.exe",
+                    @"%LOCALAPPDATA%\Doubao\Application\Doubao.exe",
                     "Doubao.exe",
                 ],
+                Aumid: "Doubao.ChatApp",
                 ReadsLocalArchives: true),
+            // Verified on device: the Windows build of 千问 installs as Qianwen
+            // (exe Qianwen.exe), a plain win32 app with no AUMID.
             [ShareAction.Qwen] = new(
                 "千问办公",
-                ["QwenWork", "千问办公"],
+                ["Qianwen", "QwenWork"],
                 [
-                    @"%LOCALAPPDATA%\Programs\QwenWork\QwenWork.exe",
-                    @"%LOCALAPPDATA%\千问办公\QwenWork.exe",
+                    @"%LOCALAPPDATA%\Programs\Qianwen\Qianwen.exe",
+                    "Qianwen.exe",
                     "QwenWork.exe",
                 ]),
+            // Verified on device: machine-wide install under Program Files;
+            // WorkBuddy.WorkBuddy is its registered shell AppID.
             [ShareAction.WorkBuddy] = new(
                 "WorkBuddy",
                 ["WorkBuddy"],
                 [
+                    @"C:\Program Files\WorkBuddy\WorkBuddy.exe",
                     @"%LOCALAPPDATA%\Programs\WorkBuddy\WorkBuddy.exe",
-                    @"%LOCALAPPDATA%\WorkBuddy\WorkBuddy.exe",
                     "WorkBuddy.exe",
-                ]),
+                ],
+                Aumid: "WorkBuddy.WorkBuddy"),
             [ShareAction.WeSight] = new(
                 "WeSight",
                 ["WeSight"],
