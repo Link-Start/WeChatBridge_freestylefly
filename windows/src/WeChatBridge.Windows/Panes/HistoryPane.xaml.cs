@@ -2,6 +2,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using WeChatBridge.Windows.Core;
 
 namespace WeChatBridge.Windows.Panes;
@@ -73,10 +75,20 @@ public partial class HistoryPane : UserControl
             row.IsExpanded = !row.IsExpanded;
     }
 
-    private void Resend_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// The whole card is the disclosure target — the chevron is just the
+    /// affordance. Clicks that land inside the expanded file list (or on a
+    /// button, which swallows them first) are theirs, not the toggle's.
+    /// </summary>
+    private void Row_Click(object sender, MouseButtonEventArgs e)
     {
-        if (Model is { } model && RowOf(sender) is { } row)
-            _ = model.Resend(row.Batch);
+        if (sender is not Border card || RowOf(sender) is not { } row)
+            return;
+        for (var el = e.OriginalSource as DependencyObject; el is not null && el != card;
+             el = VisualTreeHelper.GetParent(el))
+            if (el is FrameworkElement fe && fe.Name == "DetailPanel")
+                return;
+        row.IsExpanded = !row.IsExpanded;
     }
 
     /// <summary>
@@ -119,6 +131,14 @@ public partial class HistoryPane : UserControl
         copy.Click += (_, _) => model.CopyBatchToClipboard(row.Batch);
         menu.Items.Add(copy);
 
+        // macOS exposes resend only through the original share's own intent;
+        // the row menu is where Windows keeps the same gesture reachable.
+        var resend = new MenuItem { Header = "重新发送" };
+        resend.Click += (_, _) => _ = model.Resend(row.Batch);
+        menu.Items.Add(resend);
+
+        menu.Items.Add(new Separator());
+
         var reveal = new MenuItem { Header = "在文件夹中显示" };
         reveal.Click += (_, _) => model.Reveal(row.Batch);
         menu.Items.Add(reveal);
@@ -130,6 +150,27 @@ public partial class HistoryPane : UserControl
         menu.Items.Add(discard);
 
         OpenMenu(sender, menu);
+    }
+
+    /// <summary>
+    /// The header 「···」— macOS SettingsMoreActionsButton — holds what was a
+    /// standalone button: 清空记录…, plus the field's own affordance.
+    /// </summary>
+    private void HeaderMore_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is null)
+            return;
+        var menu = new ContextMenu();
+        var clear = new MenuItem { Header = "清空记录…" };
+        clear.Click += Clear_Click;
+        menu.Items.Add(clear);
+        OpenMenu(sender, menu);
+    }
+
+    private void ClearSearch_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        SearchBox.Focus();
     }
 
     private static void OpenMenu(object sender, ContextMenu menu)

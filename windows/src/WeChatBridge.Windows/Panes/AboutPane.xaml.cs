@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 
 namespace WeChatBridge.Windows.Panes;
 
@@ -12,8 +14,28 @@ public partial class AboutPane : UserControl
         InitializeComponent();
         var informational = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        var version = informational ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.1.0";
-        VersionText.Text = $"版本 {version} · Windows";
+        VersionText.Text = $"版本 {ShortVersion(informational)} · Windows";
+
+        // The sparse package ships Assets\Square150x150Logo.png in the install
+        // root; a bare dotnet build output does not, so the brand tile stays.
+        var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "Square150x150Logo.png");
+        if (File.Exists(icon))
+        {
+            AppIconImage.Source = new BitmapImage(new Uri(icon, UriKind.Absolute));
+            AppIconImage.Visibility = Visibility.Visible;
+        }
+    }
+
+    /// <summary>1.0.0+commithash → 1.0.0 (short hash): the NuGet metadata stays, the label stays readable.</summary>
+    private static string ShortVersion(string? informational)
+    {
+        if (string.IsNullOrEmpty(informational))
+            return "0.1.0";
+        var plus = informational.IndexOf('+');
+        if (plus < 0)
+            return informational;
+        var hash = informational[(plus + 1)..Math.Min(plus + 8, informational.Length)];
+        return $"{informational[..plus]} ({hash})";
     }
 
     private void Open(string url)
@@ -30,6 +52,9 @@ public partial class AboutPane : UserControl
 
     private void OpenProject_Click(object sender, RoutedEventArgs e) =>
         Open("https://github.com/freestylefly/WeChatBridge");
+
+    private void OpenWebsite_Click(object sender, RoutedEventArgs e) =>
+        Open("https://render.qmuse.pub/p/muse/2413870555736078");
 
     private void OpenIssues_Click(object sender, RoutedEventArgs e) =>
         Open("https://github.com/freestylefly/WeChatBridge/issues/new");

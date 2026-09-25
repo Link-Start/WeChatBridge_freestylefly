@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using WeChatBridge.Windows.Core;
 using WeChatBridge.Windows.Core.Delivery;
@@ -57,11 +58,15 @@ public partial class TargetPickerWindow : Window
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly DispatcherTimer _deadline;
     private readonly IReadOnlyList<ForwardTarget> _targets;
+    /// <summary>The 0.96 → 1 settle of Motion.panelIn, applied to the panel.</summary>
+    private readonly ScaleTransform _entranceScale = new(0.96, 0.96);
 
     public TargetPickerWindow(IReadOnlyList<ForwardTarget> targets)
     {
         _targets = targets;
         InitializeComponent();
+        Root.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+        Root.RenderTransform = _entranceScale;
         TargetList.ItemsSource = targets
             .Select((target, index) => new Row(target, index))
             .ToList();
@@ -97,6 +102,22 @@ public partial class TargetPickerWindow : Window
         window.Activate();
         window.TargetList.Focus();
         return window._completion.Task;
+    }
+
+    /// <summary>
+    /// Motion.panelIn on the way in: alpha 0 → 1 with the content settling
+    /// 0.96 → 1, ease-out, in the 160–180 ms the macOS capsule takes.
+    /// </summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(170));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        BeginAnimation(OpacityProperty,
+            new DoubleAnimation(1, duration) { EasingFunction = ease });
+        _entranceScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(1, duration) { EasingFunction = ease });
+        _entranceScale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(1, duration) { EasingFunction = ease });
     }
 
     /// <summary>
@@ -216,11 +237,18 @@ public partial class TargetPickerWindow : Window
         }
     }
 
-    /// <summary>Row wrapper: the printed digit is the shortcut that picks it.</summary>
+    /// <summary>
+    /// Row wrapper: the printed digit is the shortcut that picks it, and the
+    /// logo is the app's own mark where <see cref="AppLogos"/> has one.
+    /// </summary>
     private sealed class Row(ForwardTarget target, int index)
     {
         public ForwardTarget Target { get; } = target;
         public string DisplayName => Target.DisplayName;
+        public string? LogoPath { get; } = AppLogos.PathFor(target.DisplayName);
+        /// <summary>The letter-badge fallback when no logo file exists.</summary>
+        public string Initial =>
+            DisplayName.Length > 0 ? DisplayName[..1].ToUpperInvariant() : "?";
         public string Shortcut =>
             index < 9 ? (index + 1).ToString(CultureInfo.InvariantCulture) : string.Empty;
     }

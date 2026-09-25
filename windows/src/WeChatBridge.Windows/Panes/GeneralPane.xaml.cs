@@ -13,8 +13,19 @@ public partial class GeneralPane : UserControl
         InitializeComponent();
         var informational = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        var version = informational ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.1.0";
-        VersionText.Text = $"当前版本 {version}（Windows 移植版）";
+        VersionText.Text = $"当前版本 {ShortVersion(informational)}（Windows 移植版）";
+    }
+
+    /// <summary>1.0.0+commithash → 1.0.0 (short hash) — same rule as AboutPane.</summary>
+    private static string ShortVersion(string? informational)
+    {
+        if (string.IsNullOrEmpty(informational))
+            return "0.1.0";
+        var plus = informational.IndexOf('+');
+        if (plus < 0)
+            return informational;
+        var hash = informational[(plus + 1)..Math.Min(plus + 8, informational.Length)];
+        return $"{informational[..plus]} ({hash})";
     }
 
     private MainViewModel? Model => DataContext as MainViewModel;

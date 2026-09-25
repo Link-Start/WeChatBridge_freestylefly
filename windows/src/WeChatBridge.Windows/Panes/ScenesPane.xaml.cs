@@ -1,7 +1,11 @@
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using WeChatBridge.Windows.Core;
 using WeChatBridge.Windows.Services;
@@ -100,12 +104,18 @@ public partial class ScenesPane : UserControl
         public bool IsSelected { get; init; }
         public bool Editable { get; init; }
         public string Name => Agent.DisplayName();
+
+        /// <summary>One-letter stand-in under the logo when the PNG is missing.</summary>
+        public string Mark => Name.Length > 0 ? Name[..1] : "?";
     }
 
     private sealed class BoundSceneRow
     {
         public required WeChatScene Scene { get; init; }
         public bool IsBound { get; init; }
+
+        /// <summary>Last row in the list — hides its trailing hairline divider.</summary>
+        public bool IsLast { get; init; }
         public string NameText =>
             string.IsNullOrWhiteSpace(Scene.Name) ? "未命名场景" : Scene.Name;
         public string SummaryText =>
@@ -221,6 +231,12 @@ public partial class ScenesPane : UserControl
                 Editable = !scene.IsOfficial,
             })
             .ToList();
+
+        // Official templates keep the read-only hint row instead of the
+        // duplicate/delete/save action row.
+        EditorActions.Visibility = scene.IsOfficial
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     /// <summary>
@@ -332,6 +348,21 @@ public partial class ScenesPane : UserControl
             ShowNotice("已复制为我的场景。", good: true);
         }
         ReloadAll();
+    }
+
+    /// <summary>The editor's 删除 — the destructive half of the bottom action row.</summary>
+    private void Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settings.Scenes.FirstOrDefault(s => s.Id == _selectedSceneId) is { } scene
+            && !scene.IsOfficial)
+            RemoveScene(scene);
+    }
+
+    /// <summary>保存更改 — fields already commit on LostFocus; this just forces it.</summary>
+    private void Save_Click(object sender, RoutedEventArgs e)
+    {
+        CommitEdits();
+        ShowNotice("已保存更改。", good: true);
     }
 
     private void EditorMenu_Click(object sender, RoutedEventArgs e)
@@ -520,11 +551,13 @@ public partial class ScenesPane : UserControl
         var bound = _settings.ScenesFor(memory.BoundSceneIDs);
         GroupBoundCount.Text = $"已关联 {bound.Count} 个可选场景";
         var boundIds = memory.BoundSceneIDs.ToHashSet(StringComparer.Ordinal);
-        BoundSceneList.ItemsSource = _settings.EnabledScenes
-            .Select(scene => new BoundSceneRow
+        var enabled = _settings.EnabledScenes;
+        BoundSceneList.ItemsSource = enabled
+            .Select((scene, index) => new BoundSceneRow
             {
                 Scene = scene,
                 IsBound = boundIds.Contains(scene.Id),
+                IsLast = index == enabled.Count - 1,
             })
             .ToList();
 
@@ -578,4 +611,33 @@ public partial class ScenesPane : UserControl
             : (Brush)FindResource("WarnInkColor");
         NoticeBar.Visibility = Visibility.Visible;
     }
+}
+
+/// <summary>
+/// Resolves an <see cref="AgentId"/> to its bundled logo image — the XAML face
+/// of <see cref="AppLogos.PathFor(AgentId)"/>. A missing logo yields null, and
+/// callers keep a letter block behind the image as the fallback. Shared by the
+/// scenes pane's 适用 Agent tiles and the skills pane's agent rows.
+/// </summary>
+public sealed class AgentLogoConverter : IValueConverter
+{
+    private static readonly ConcurrentDictionary<AgentId, BitmapImage?> Cache = new();
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not AgentId agent)
+            return null;
+        return Cache.GetOrAdd(agent, a =>
+        {
+            var path = AppLogos.PathFor(a);
+            if (path is null)
+                return null;
+            var image = new BitmapImage(new Uri(path, UriKind.Absolute));
+            image.Freeze();
+            return image;
+        });
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }

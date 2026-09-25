@@ -1,256 +1,359 @@
 <Window x:Class="WeChatBridge.Windows.Onboarding.OnboardingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="微信流" Width="560" SizeToContent="Height"
+        Title="微信流" Width="920" MinHeight="600" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
-    <Window.Resources>
-        <!-- The footer's forward action: the InkButtonStyle port. Brand green
-             with a darker hover, where SettingsButton is the GhostButtonStyle
-             port. -->
-        <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Padding" Value="18,7" />
-            <Setter Property="FontSize" Value="12.5" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#FFFFFFFF" />
-            <Setter Property="Background" Value="{StaticResource BrandColor}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding Background}"
-                                BorderThickness="1" CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource LiveInkColor}" />
-                                <Setter Property="BorderBrush" Value="{StaticResource LiveInkColor}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
 
-    <!-- The margin leaves room for the borderless window's shadow; the Border
-         is the window. -->
-    <Border Margin="10" Background="{StaticResource SurfaceColor}" CornerRadius="10"
+    <!-- Metrics.onboardingWidth/onboardingHeight: the design's 920×600 frame,
+         with the height following the step rather than caging it. The margin
+         leaves room for the borderless window's shadow; the Border is the
+         window. -->
+    <Border Margin="14" Background="{StaticResource SurfaceColor}" CornerRadius="14"
             BorderBrush="{StaticResource StrokeColor}" BorderThickness="1"
             MouseLeftButtonDown="OnDragMove">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.14" />
+            <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.18" />
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <!-- StepBar: names rather than dots — a name says whether the step
                  you dread is still ahead. Built in code-behind so the current
                  step's label and underline can be restyled. -->
             <StackPanel x:Name="StepBarHost" Grid.Row="0" Orientation="Horizontal"
-                        HorizontalAlignment="Center" Margin="0,16,0,0" />
+                        HorizontalAlignment="Center" Margin="0,18,0,16" />
             <Button x:Name="CloseButton" Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
-                    Margin="0,10,10,0" Width="24" Height="24" Padding="0" Content="✕"
-                    BorderThickness="0" Background="Transparent" IsCancel="True"
+                    Margin="0,12,14,0" Width="24" Height="24" Padding="0" Content="✕" FontSize="10"
+                    BorderThickness="0" Background="Transparent" IsCancel="True" Cursor="Hand"
                     Foreground="{StaticResource InkTertiaryColor}" ToolTip="关闭"
                     Click="OnCloseClicked" />
 
-            <Border Grid.Row="1" Height="1" Margin="0,14,0,0"
-                    Background="{StaticResource StrokeSoftColor}" />
+            <Border Grid.Row="1" Height="1" Background="{StaticResource StrokeColor}" />
 
             <Grid Grid.Row="2">
-                <!-- Step 0 — welcome: what the app is for, in the order it is adopted. -->
-                <StackPanel x:Name="StepWelcome" Margin="40,26,40,24">
-                    <TextBlock FontSize="22" FontWeight="Bold" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkColor}"
-                               Text="把微信的转发菜单接到你要去的地方" />
-                    <TextBlock Margin="0,10,0,0" FontSize="12.5" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkSecondaryColor}"
-                               Text="微信流接住微信「转发到其他应用」分享的聊天记录压缩包，再交给目标应用。" />
-                    <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="16,8">
-                        <StackPanel>
-                            <Grid Margin="0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="20" Height="20" CornerRadius="10"
-                                        Background="{StaticResource BrandTintColor}">
-                                    <TextBlock Text="1" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrandColor}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
-                                               Text="在微信里多选聊天记录" />
-                                    <TextBlock FontSize="11" TextWrapping="Wrap"
-                                               Foreground="{StaticResource InkSecondaryColor}"
-                                               Text="勾选消息后，选「转发到其他应用」。" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="20" Height="20" CornerRadius="10"
-                                        Background="{StaticResource BrandTintColor}">
-                                    <TextBlock Text="2" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrandColor}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
-                                               Text="挑一个入口" />
-                                    <TextBlock FontSize="11" TextWrapping="Wrap"
-                                               Foreground="{StaticResource InkSecondaryColor}"
-                                               Text="下一步能看到全部 9 个。" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="20" Height="20" CornerRadius="10"
-                                        Background="{StaticResource BrandTintColor}">
-                                    <TextBlock Text="3" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource BrandColor}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
-                                               Text="其余的交给微信流" />
-                                    <TextBlock FontSize="11" TextWrapping="Wrap"
-                                               Foreground="{StaticResource InkSecondaryColor}"
-                                               Text="接住压缩包、激活目标应用并自动粘贴；失败时文件已在剪贴板。" />
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <Grid.ColumnDefinitions>
+                    <!-- Metrics.onboardingArtWidth -->
+                    <ColumnDefinition Width="300" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                <!-- Step 1 — entries: the ShareMenuArt port, listing the same nine
-                     EntryTitles the sparse package registers. -->
-                <StackPanel x:Name="StepEntries" Visibility="Collapsed" Margin="40,26,40,24">
-                    <TextBlock FontSize="22" FontWeight="Bold" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkColor}"
-                               Text="转发菜单里已经备好了 9 个入口" />
-                    <TextBlock Margin="0,10,0,0" FontSize="12.5" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkSecondaryColor}"
-                               Text="它们就在微信「转发到其他应用」里，看到即可用。" />
-                    <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="16,10">
-                        <StackPanel>
-                            <TextBlock Margin="0,0,0,6" FontSize="11"
+                <!-- AuroraBackdrop port: the neutral ground gradients top→bottom
+                     and two soft brand-green glows carry the light. Rounded only
+                     at bottom-left — the top of the column is interior, under
+                     the step bar. -->
+                <Border Grid.Column="0" CornerRadius="0,0,0,14">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#FFF8FAF9" Offset="0" />
+                            <GradientStop Color="#FFF2F5F3" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Grid ClipToBounds="True">
+                        <Ellipse Width="380" Height="380" HorizontalAlignment="Left"
+                                 VerticalAlignment="Top" Margin="-60,-170,0,0">
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#2E14C653" Offset="0" />
+                                    <GradientStop Color="#0014C653" Offset="1" />
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Ellipse Width="320" Height="320" HorizontalAlignment="Right"
+                                 VerticalAlignment="Bottom" Margin="0,0,-50,-90">
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#1A14C653" Offset="0" />
+                                    <GradientStop Color="#0014C653" Offset="1" />
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+
+                        <!-- Step 0 art: the brand tile, a stand-in for the
+                             aurora illustration's focal mark. -->
+                        <StackPanel x:Name="ArtWelcome" VerticalAlignment="Center"
+                                    HorizontalAlignment="Center">
+                            <Border Width="96" Height="96" CornerRadius="22">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FF18D45B" Offset="0" />
+                                        <GradientStop Color="#FF0FA845" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <TextBlock Text="↗" FontSize="42" FontWeight="Bold"
+                                           Foreground="#FFFFFFFF"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Margin="0,16,0,0" FontSize="12"
                                        Foreground="{StaticResource InkTertiaryColor}"
-                                       Text="转发到其他应用" />
-                            <ItemsControl x:Name="EntriesList">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Height="26">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="16" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Ellipse Width="5" Height="5" VerticalAlignment="Center"
-                                                     Fill="{StaticResource BrandColor}" />
-                                            <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                                       FontSize="12.5" Text="{Binding}"
-                                                       Foreground="{StaticResource InkColor}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                       Text="接住 · 转发 · 送达" />
                         </StackPanel>
-                    </Border>
-                    <TextBlock Margin="0,12,0,0" FontSize="11" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkTertiaryColor}"
-                               Text="随时可以在「入口」页关掉用不到的。" />
-                </StackPanel>
 
-                <!-- Step 2 — residency: the slot macOS spends on Accessibility.
-                     Windows asks for no permission, so this step is a note —
-                     and the one switch that decides whether a share forwards
-                     instantly. The state is shown, not toggled: the toggle
-                     lives in 通用 where its settings bookkeeping lives. -->
-                <StackPanel x:Name="StepResidency" Visibility="Collapsed" Margin="40,26,40,24">
-                    <TextBlock FontSize="22" FontWeight="Bold" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkColor}"
-                               Text="常驻后台，转发几乎零等待" />
-                    <Border Style="{StaticResource Card}" Margin="0,18,0,0">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Border x:Name="AutoStartTick" Width="22" Height="22" CornerRadius="11"
-                                    VerticalAlignment="Center"
-                                    Background="{StaticResource BrandColor}"
-                                    BorderBrush="{StaticResource BrandColor}" BorderThickness="1">
-                                <TextBlock x:Name="AutoStartTickText" Text="✓" FontSize="11"
-                                           FontWeight="Bold" Foreground="#FFFFFFFF"
+                        <!-- Steps 1 & 3 art: the ShareMenuArt port — what the
+                             Share menu looks like once the entries are on.
+                             Drawn rather than screenshotted, for the same
+                             reason macOS draws it. -->
+                        <Border x:Name="ArtMenu" Visibility="Collapsed"
+                                VerticalAlignment="Center" Margin="24,0"
+                                Padding="12,14" CornerRadius="12"
+                                Background="{StaticResource SurfaceColor}"
+                                BorderBrush="{StaticResource StrokeColor}"
+                                BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="6" Opacity="0.08" />
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="转发到其他应用" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkTertiaryColor}"
+                                           Margin="0,0,0,10" />
+                                <ItemsControl x:Name="EntriesArtList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Height="30">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="16" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Ellipse Width="5" Height="5" VerticalAlignment="Center"
+                                                         Fill="{StaticResource BrandColor}" />
+                                                <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                           FontSize="13.5" Text="{Binding}"
+                                                           Foreground="{StaticResource InkColor}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Step 2 art: the PermissionArt port — one note beside
+                             the row, because Windows asks for no permission. -->
+                        <Border x:Name="ArtNote" Visibility="Collapsed"
+                                VerticalAlignment="Center" Margin="24,0"
+                                Padding="20" CornerRadius="12"
+                                Background="{StaticResource SurfaceColor}"
+                                BorderBrush="{StaticResource StrokeColor}"
+                                BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="6" Opacity="0.08" />
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="∞" FontSize="22" FontWeight="Bold"
+                                           Foreground="{StaticResource BrandColor}" />
+                                <TextBlock Margin="0,12,0,0" FontSize="13" TextWrapping="Wrap"
+                                           Foreground="{StaticResource InkSecondaryColor}"
+                                           Text="Windows 不需要系统授权——让微信流常驻后台，分享进来时几乎立即转发。" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- One hairline is cheaper than making the gradient louder. -->
+                <Border Grid.Column="1" Width="1" Background="{StaticResource StrokeColor}" />
+
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <!-- Step 0 — welcome: what the app is for, in the order
+                             it is adopted. -->
+                        <StackPanel x:Name="StepWelcome" Margin="40,28,40,24">
+                            <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkColor}"
+                                       Text="把微信的转发菜单接到你要去的地方" />
+                            <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkSecondaryColor}"
+                                       Text="微信流接住微信「转发到其他应用」分享的聊天记录压缩包，再交给目标应用。" />
+                            <Border Style="{StaticResource Card}" Margin="0,20,0,0" Padding="16,8">
+                                <StackPanel>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="20" Height="20" CornerRadius="10"
+                                                Background="{StaticResource BrandTintColor}">
+                                            <TextBlock Text="1" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrandColor}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
+                                                       Text="在微信里多选聊天记录" />
+                                            <TextBlock FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource InkSecondaryColor}"
+                                                       Text="勾选消息后，选「转发到其他应用」。" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="20" Height="20" CornerRadius="10"
+                                                Background="{StaticResource BrandTintColor}">
+                                            <TextBlock Text="2" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrandColor}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
+                                                       Text="挑一个入口" />
+                                            <TextBlock FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource InkSecondaryColor}"
+                                                       Text="下一步能看到全部 9 个。" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="20" Height="20" CornerRadius="10"
+                                                Background="{StaticResource BrandTintColor}">
+                                            <TextBlock Text="3" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrandColor}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
+                                                       Text="其余的交给微信流" />
+                                            <TextBlock FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource InkSecondaryColor}"
+                                                       Text="接住压缩包、激活目标应用并自动粘贴；失败时文件已在剪贴板。" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Step 1 — entries: the nine EntryTitles the sparse
+                             package registers. -->
+                        <StackPanel x:Name="StepEntries" Visibility="Collapsed" Margin="40,28,40,24">
+                            <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkColor}"
+                                       Text="转发菜单里已经备好了 9 个入口" />
+                            <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkSecondaryColor}"
+                                       Text="它们就在微信「转发到其他应用」里，看到即可用。" />
+                            <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="16,10">
+                                <StackPanel>
+                                    <TextBlock Margin="0,0,0,6" FontSize="11"
+                                               Foreground="{StaticResource InkTertiaryColor}"
+                                               Text="转发到其他应用" />
+                                    <ItemsControl x:Name="EntriesList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Height="26">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Ellipse Width="5" Height="5" VerticalAlignment="Center"
+                                                             Fill="{StaticResource BrandColor}" />
+                                                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                               FontSize="13.5" Text="{Binding}"
+                                                               Foreground="{StaticResource InkColor}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkTertiaryColor}"
+                                       Text="随时可以在「入口」页关掉用不到的。" />
+                        </StackPanel>
+
+                        <!-- Step 2 — residency: the slot macOS spends on
+                             Accessibility. Windows asks for no permission, so
+                             this step is a note — and the one switch that
+                             decides whether a share forwards instantly. The
+                             state is shown, not toggled: the toggle lives in
+                             通用 where its settings bookkeeping lives. -->
+                        <StackPanel x:Name="StepResidency" Visibility="Collapsed" Margin="40,28,40,24">
+                            <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkColor}"
+                                       Text="常驻后台，转发几乎零等待" />
+                            <Border Style="{StaticResource Card}" Margin="0,20,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="AutoStartTick" Width="22" Height="22" CornerRadius="11"
+                                            VerticalAlignment="Center"
+                                            Background="{StaticResource BrandColor}"
+                                            BorderBrush="{StaticResource BrandColor}" BorderThickness="1">
+                                        <TextBlock x:Name="AutoStartTickText" Text="✓" FontSize="11"
+                                                   FontWeight="Bold" Foreground="#FFFFFFFF"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock FontSize="13.5" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkColor}"
+                                                   Text="开机自动启动" />
+                                        <TextBlock Margin="0,3,0,0" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource InkSecondaryColor}"
+                                                   Text="登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。" />
+                                    </StackPanel>
+                                    <Border x:Name="AutoStartPill" Grid.Column="2" VerticalAlignment="Center"
+                                            Margin="12,0,0,0" CornerRadius="9" Padding="8,2"
+                                            Background="{StaticResource LiveFillColor}">
+                                        <TextBlock x:Name="AutoStartPillText" FontSize="11" Text="已开启"
+                                                   Foreground="{StaticResource LiveInkColor}" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <TextBlock Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{StaticResource InkTertiaryColor}"
+                                       Text="可以在「通用」页里随时改。" />
+                        </StackPanel>
+
+                        <!-- Step 3 — done: the same menu step 2 promised, said
+                             once. A full stop belongs in the middle of the
+                             pane. -->
+                        <StackPanel x:Name="StepDone" Visibility="Collapsed"
+                                    VerticalAlignment="Center" Margin="40,28,40,28">
+                            <Border Width="64" Height="64" CornerRadius="32" HorizontalAlignment="Left"
+                                    Background="{StaticResource BrandSoftColor}">
+                                <TextBlock Text="✓" FontSize="26" FontWeight="Bold"
+                                           Foreground="{StaticResource BrandColor}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock FontSize="12.5" Foreground="{StaticResource InkColor}"
-                                           Text="开机自动启动" />
-                                <TextBlock Margin="0,3,0,0" FontSize="11" TextWrapping="Wrap"
-                                           Foreground="{StaticResource InkSecondaryColor}"
-                                           Text="登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。" />
-                            </StackPanel>
-                            <Border x:Name="AutoStartPill" Grid.Column="2" VerticalAlignment="Center"
-                                    Margin="12,0,0,0" CornerRadius="9" Padding="8,2"
-                                    Background="{StaticResource LiveFillColor}">
-                                <TextBlock x:Name="AutoStartPillText" FontSize="11" Text="已开启"
-                                           Foreground="{StaticResource LiveInkColor}" />
-                            </Border>
-                        </Grid>
-                    </Border>
-                    <TextBlock Margin="0,12,0,0" FontSize="11" TextWrapping="Wrap"
-                               Foreground="{StaticResource InkTertiaryColor}"
-                               Text="可以在「通用」页里随时改。" />
-                </StackPanel>
+                            <TextBlock Margin="0,20,0,0" FontSize="36" FontWeight="Bold"
+                                       Foreground="{StaticResource InkColor}" Text="好了" />
+                            <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap" MaxWidth="460"
+                                       Foreground="{StaticResource InkSecondaryColor}"
+                                       Text="去微信多选聊天记录 → 转发到其他应用，就能看到这些入口了。" />
+                            <Button x:Name="DoneButton" Margin="0,26,0,0" HorizontalAlignment="Left"
+                                    Style="{StaticResource PrimaryButton}" Content="完成"
+                                    Click="OnDoneClicked" />
+                        </StackPanel>
+                    </Grid>
 
-                <!-- Step 3 — done: the same menu step 2 promised, said once. -->
-                <StackPanel x:Name="StepDone" Visibility="Collapsed" Margin="40,30,40,34">
-                    <Border Width="56" Height="56" CornerRadius="28" HorizontalAlignment="Left"
-                            Background="{StaticResource BrandTintColor}">
-                        <TextBlock Text="✓" FontSize="22" FontWeight="Bold"
-                                   Foreground="{StaticResource BrandColor}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Margin="0,18,0,0" FontSize="30" FontWeight="Bold"
-                               Foreground="{StaticResource InkColor}" Text="好了" />
-                    <TextBlock Margin="0,10,0,0" FontSize="13" TextWrapping="Wrap" MaxWidth="460"
-                               Foreground="{StaticResource InkSecondaryColor}"
-                               Text="去微信多选聊天记录 → 转发到其他应用，就能看到这些入口了。" />
-                    <Button x:Name="DoneButton" Margin="0,24,0,0" HorizontalAlignment="Left"
-                            Style="{StaticResource PrimaryButton}" Content="完成"
-                            Click="OnDoneClicked" />
-                </StackPanel>
-            </Grid>
-
-            <!-- Back on the left, forward on the right, Return always on forward. -->
-            <Grid x:Name="Footer" Grid.Row="3" Margin="40,0,40,24">
-                <Button x:Name="BackButton" HorizontalAlignment="Left"
-                        Style="{StaticResource SettingsButton}" Content="上一步"
-                        Visibility="Collapsed" Click="OnBackClicked" />
-                <Button x:Name="NextButton" HorizontalAlignment="Right"
-                        Style="{StaticResource PrimaryButton}" Content="继续"
-                        IsDefault="True" Click="OnNextClicked" />
+                    <!-- Back on the left, forward on the right, Return always
+                         on forward. -->
+                    <Grid x:Name="Footer" Grid.Row="1" Margin="40,0,40,26">
+                        <Button x:Name="BackButton" HorizontalAlignment="Left"
+                                Style="{StaticResource SettingsButton}" Content="上一步"
+                                Visibility="Collapsed" Click="OnBackClicked" />
+                        <Button x:Name="NextButton" HorizontalAlignment="Right"
+                                Style="{StaticResource PrimaryButton}" Content="继续"
+                                IsDefault="True" Click="OnNextClicked" />
+                    </Grid>
+                </Grid>
             </Grid>
         </Grid>
     </Border>

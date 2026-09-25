@@ -3,54 +3,102 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="发给…" Width="260" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
-        WindowStartupLocation="Manual">
-    <Border Padding="10" Background="#F9FAFB" CornerRadius="10"
-            BorderBrush="#D0D5DD" BorderThickness="1">
+        Opacity="0" ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
+        WindowStartupLocation="Manual" Loaded="OnLoaded">
+    <!-- The FloatingCapsule port: Radius.panel=14 over SurfaceColor, a 1px
+         stroke and the capsule's soft shadow. The margin leaves room for the
+         blur; the Border is the panel, the window is only its frame. -->
+    <Border x:Name="Root" Margin="16" Padding="10" CornerRadius="14"
+            Background="{StaticResource SurfaceColor}"
+            BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.18" />
+        </Border.Effect>
         <StackPanel>
             <Grid Margin="4,0,4,8">
-                <StackPanel>
-                    <TextBlock Text="发给…" FontWeight="SemiBold" FontSize="13" />
-                    <TextBlock Text="回车或点击应用，Esc 取消。" Foreground="#667085" FontSize="11" />
-                </StackPanel>
+                <TextBlock Text="发给…" FontWeight="SemiBold" FontSize="12.5"
+                           Foreground="{StaticResource InkColor}" />
                 <Button x:Name="CloseButton" HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Width="22" Height="22" Padding="0" Content="✕"
-                        BorderThickness="0" Background="Transparent" Foreground="#98A2B3"
+                        Width="22" Height="22" Padding="0" Content="✕" FontSize="10"
+                        BorderThickness="0" Background="Transparent" Cursor="Hand"
+                        Foreground="{StaticResource InkTertiaryColor}"
                         ToolTip="关闭" Click="OnCloseClicked" />
             </Grid>
             <ListBox x:Name="TargetList" MaxHeight="256" BorderThickness="0"
                      Background="Transparent" SelectionMode="Single"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <ListBox.ItemContainerStyle>
+                    <!-- Radius.row=8: the highlight is the row's own rounded
+                         rect, the way the macOS panel draws it. -->
                     <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="row" CornerRadius="8" Padding="8,0"
+                                            Background="Transparent">
+                                        <ContentPresenter VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="row" Property="Background"
+                                                    Value="{StaticResource HoverColor}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="row" Property="Background"
+                                                    Value="{StaticResource BrandTintColor}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
                         <EventSetter Event="MouseLeftButtonUp" Handler="OnRowClicked" />
                     </Style>
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Grid Height="32">
+                        <Grid Height="31">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="Mark" Text="○" Width="20" VerticalAlignment="Center"
-                                       Foreground="#98A2B3" FontSize="13" />
-                            <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="12"
-                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="2" Text="{Binding Shortcut}" FontSize="10"
-                                       VerticalAlignment="Center" Foreground="#98A2B3" />
+                            <Grid Width="20" Height="20" VerticalAlignment="Center">
+                                <!-- The app's mark where AppLogos has one; a
+                                     letter badge where it does not. -->
+                                <Border x:Name="Badge" CornerRadius="5" Visibility="Collapsed"
+                                        Background="{StaticResource BrandTintColor}">
+                                    <TextBlock Text="{Binding Initial}" FontSize="10"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource BrandColor}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                                <Image Width="20" Height="20" Source="{Binding LogoPath}"
+                                       Visibility="{Binding LogoPath, Converter={StaticResource StringToVisibility}}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Margin="8,0,0,0"
+                                       Text="{Binding DisplayName}" FontSize="12.5"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"
+                                       Foreground="{StaticResource InkColor}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Margin="8,0,0,0"
+                                       Text="{Binding Shortcut}" FontSize="10"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource InkTertiaryColor}" />
                         </Grid>
                         <DataTemplate.Triggers>
-                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                                         Value="True">
-                                <Setter TargetName="Mark" Property="Text" Value="●" />
-                                <Setter TargetName="Mark" Property="Foreground" Value="#2E7FD9" />
+                            <DataTrigger Binding="{Binding LogoPath}" Value="{x:Null}">
+                                <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+            <TextBlock Margin="8,8,8,2" FontSize="11"
+                       Foreground="{StaticResource InkTertiaryColor}"
+                       Text="Esc 取消 · 数字键直选 · 90 秒内有效" />
         </StackPanel>
     </Border>
 </Window>

@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using WeChatBridge.Windows.Core;
 
@@ -20,12 +22,16 @@ public partial class ScenePickerWindow : Window
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly DispatcherTimer _deadline;
     private readonly IReadOnlyList<WeChatScene> _scenes;
+    /// <summary>The 0.96 → 1 settle of Motion.panelIn, applied to the panel.</summary>
+    private readonly ScaleTransform _entranceScale = new(0.96, 0.96);
 
     public ScenePickerWindow(IReadOnlyList<WeChatScene> scenes)
     {
         _scenes = scenes;
         InitializeComponent();
-        SceneList.ItemsSource = scenes.Select(scene => new Row(scene)).ToList();
+        Root.RenderTransformOrigin = new Point(0.5, 0.5);
+        Root.RenderTransform = _entranceScale;
+        SceneList.ItemsSource = scenes.Select((scene, index) => new Row(scene, index)).ToList();
         SceneList.SelectedIndex = -1;
         _deadline = new DispatcherTimer { Interval = BatchIntent.FreshnessWindow };
         _deadline.Tick += (_, _) => Finish(ScenePickerAnswer.Expired);
@@ -59,6 +65,22 @@ public partial class ScenePickerWindow : Window
         return window._completion.Task;
     }
 
+    /// <summary>
+    /// Motion.panelIn on the way in: alpha 0 → 1 with the content settling
+    /// 0.96 → 1, ease-out, in the 160–180 ms the macOS capsule takes.
+    /// </summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(170));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        BeginAnimation(OpacityProperty,
+            new DoubleAnimation(1, duration) { EasingFunction = ease });
+        _entranceScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(1, duration) { EasingFunction = ease });
+        _entranceScale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(1, duration) { EasingFunction = ease });
+    }
+
     private static void PositionWindowNearCursor(Window window)
     {
         if (!NativeMethods.GetCursorPos(out var point))
@@ -86,7 +108,35 @@ public partial class ScenePickerWindow : Window
                 MoveSelection(-1);
                 e.Handled = true;
                 break;
+            default:
+                // 1–9 jump to the row that prints the digit, like the target
+                // picker — except here a digit selects rather than sends,
+                // because the scene choice is not final until 使用此场景.
+                if (Keyboard.Modifiers != ModifierKeys.None)
+                    return;
+                var digit = e.Key switch
+                {
+                    >= Key.D1 and <= Key.D9 => (int)e.Key - (int)Key.D1 + 1,
+                    >= Key.NumPad1 and <= Key.NumPad9 => (int)e.Key - (int)Key.NumPad1 + 1,
+                    _ => 0,
+                };
+                if (digit > 0 && SelectAt(digit - 1))
+                    e.Handled = true;
+                break;
         }
+    }
+
+    /// <summary>
+    /// A digit moves the selection to its row. Out of range is ignored rather
+    /// than read as anything — the same rule the target picker applies.
+    /// </summary>
+    private bool SelectAt(int index)
+    {
+        if (index < 0 || index >= _scenes.Count)
+            return false;
+        SceneList.SelectedIndex = index;
+        SceneList.ScrollIntoView(SceneList.Items[index]);
+        return true;
     }
 
     /// <summary>Arrow keys move the highlight like the macOS panel's keyDown handler.</summary>
@@ -130,13 +180,18 @@ public partial class ScenePickerWindow : Window
         }
     }
 
-    /// <summary>Row wrapper so an empty summary still shows the hint text.</summary>
-    private sealed class Row(WeChatScene scene)
+    /// <summary>
+    /// Row wrapper so an empty summary still shows the hint text; the printed
+    /// digit is the shortcut that selects it.
+    /// </summary>
+    private sealed class Row(WeChatScene scene, int index)
     {
         public WeChatScene Scene { get; } = scene;
         public string Name => Scene.Name;
         public string SummaryText =>
             string.IsNullOrWhiteSpace(Scene.Summary) ? "没有一句话说明" : Scene.Summary;
+        public string Shortcut =>
+            index < 9 ? (index + 1).ToString(CultureInfo.InvariantCulture) : string.Empty;
     }
 
     private static class NativeMethods

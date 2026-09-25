@@ -1,18 +1,24 @@
-<UserControl x:Class="WeChatBridge.Windows.Panes.SkillsPane"
+﻿<UserControl x:Class="WeChatBridge.Windows.Panes.SkillsPane"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:panes="clr-namespace:WeChatBridge.Windows.Panes"
+             xmlns:services="clr-namespace:WeChatBridge.Windows.Services">
     <UserControl.Resources>
-        <!-- Status filter chips — the port of SkillStatusFilterBar. Tag=Selected marks the active one. -->
+        <panes:AgentLogoConverter x:Key="AgentLogo" />
+
+        <!-- Status filter chips — the port of SkillStatusFilterBar. Tag=Selected
+             marks the active one: brand-soft fill, ink text, brand hairline. -->
         <Style x:Key="FilterChip" TargetType="Button">
-            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Padding" Value="12,4" />
             <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Foreground" Value="{StaticResource InkSecondaryColor}" />
             <Setter Property="Background" Value="{StaticResource SunkenColor}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="chip" CornerRadius="6" Padding="{TemplateBinding Padding}"
+                        <Border x:Name="chip" CornerRadius="8" Padding="{TemplateBinding Padding}"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -23,9 +29,174 @@
             <Style.Triggers>
                 <Trigger Property="Tag" Value="Selected">
                     <Setter Property="Foreground" Value="{StaticResource InkColor}" />
-                    <Setter Property="Background" Value="{StaticResource BrandTintColor}" />
+                    <Setter Property="Background" Value="{StaticResource BrandSoftColor}" />
                     <Setter Property="FontWeight" Value="SemiBold" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border CornerRadius="8" Padding="{TemplateBinding Padding}"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{StaticResource BrandColor}" BorderThickness="1">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A popover row inside the agent drop-down. -->
+        <Style x:Key="MacComboItem" TargetType="ComboBoxItem">
+            <Setter Property="Padding" Value="9,5" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{StaticResource InkColor}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="row" CornerRadius="5" Padding="{TemplateBinding Padding}"
+                                Background="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="row" Property="Background" Value="{StaticResource HoverColor}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="row" Property="Background" Value="{StaticResource HoverColor}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="row" Property="Background" Value="{StaticResource BrandTintColor}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The agent drop-down — SettingsSelect's Windows counterpart: a sunken
+             rounded field with a chevron and a floating rounded popover. -->
+        <Style x:Key="MacCombo" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{StaticResource InkColor}" />
+            <Setter Property="Background" Value="{StaticResource SunkenColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputStrokeColor}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource MacComboItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="DropDownToggle" ClickMode="Press" Focusable="False"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="1"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="face" CornerRadius="8"
+                                                MinHeight="{Binding MinHeight, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                Padding="{Binding Padding, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <Grid>
+                                                <ContentPresenter VerticalAlignment="Center" Margin="0,0,18,0" />
+                                                <TextBlock Text="▾" FontSize="10" VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right" Margin="0,0,2,0"
+                                                           Foreground="{StaticResource InkSecondaryColor}" />
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="face" Property="Background" Value="{StaticResource HoverColor}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" AllowsTransparency="True" Placement="Bottom"
+                                   Focusable="False" PopupAnimation="Slide"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}">
+                                <Grid MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ComboBox}}">
+                                    <Border Margin="0,3,0,0" Padding="4" CornerRadius="8"
+                                            SnapsToDevicePixels="True"
+                                            Background="{StaticResource SurfaceColor}"
+                                            BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="14" ShadowDepth="3"
+                                                              Opacity="0.16" Color="#FF000000" />
+                                        </Border.Effect>
+                                        <ScrollViewer x:Name="DropDownScrollViewer" MaxHeight="320"
+                                                      CanContentScroll="True">
+                                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The card's one action button — a quiet secondary control that turns
+             into the brand button when the action is an install. -->
+        <Style x:Key="CardAction" TargetType="Button">
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{StaticResource InkColor}" />
+            <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ButtonBorderColor}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="10" Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource HoverColor}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource SelectedColor}" />
+                            </Trigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding PrimaryAction}" Value="{x:Static services:SkillRowAction.Install}" />
+                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrandHoverColor}" />
+                            </MultiDataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding PrimaryAction}" Value="{x:Static services:SkillRowAction.Install}" />
+                                    <Condition Binding="{Binding IsPressed, RelativeSource={RelativeSource Self}}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrandPressedColor}" />
+                            </MultiDataTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PrimaryAction}" Value="{x:Static services:SkillRowAction.Install}">
+                    <Setter Property="Background" Value="{StaticResource BrandColor}" />
+                    <Setter Property="Foreground" Value="{StaticResource OnBrandColor}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource BrandColor}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -33,14 +204,14 @@
         <Style x:Key="SkillBadge" TargetType="Border">
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="Padding" Value="9,3" />
-            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Margin" Value="0,0,8,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Background" Value="{StaticResource SunkenColor}" />
         </Style>
 
         <!-- One skill card: mark, name+summary, pill, badges, action, expandable agent rows. -->
         <DataTemplate x:Key="SkillCardTemplate">
-            <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+            <Border Style="{StaticResource Card}" Padding="14" Margin="0,0,0,8">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -51,15 +222,15 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Disclosure — the ▸/▾ toggle macOS hangs off the details button. -->
-                        <Button Grid.Column="0" VerticalAlignment="Top" Padding="4" Margin="0,2,6,0"
+                        <Button Grid.Column="0" VerticalAlignment="Top" Padding="4" Margin="0,4,6,0"
                                 Background="Transparent" BorderThickness="0" Cursor="Hand"
                                 Click="ToggleDetails_Click" ToolTip="展开或收起详情">
                             <TextBlock FontSize="11" Foreground="{StaticResource InkTertiaryColor}"
                                        Text="{Binding IsExpanded, Converter={StaticResource ExpandGlyph}}" />
                         </Button>
 
-                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="8"
-                                Background="{StaticResource BrandTintColor}" VerticalAlignment="Top">
+                        <Border Grid.Column="1" Width="44" Height="44" CornerRadius="10"
+                                Background="{StaticResource BrandSoftColor}" VerticalAlignment="Top">
                             <TextBlock FontSize="17" FontWeight="SemiBold"
                                        Foreground="{StaticResource BrandColor}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -68,59 +239,61 @@
 
                         <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock FontSize="13.5" FontWeight="SemiBold"
+                                <TextBlock FontSize="13.5" FontWeight="Medium"
                                            Foreground="{StaticResource InkColor}" Text="{Binding Skill.Name}" />
-                                <TextBlock Margin="6,0,0,0" FontSize="11" VerticalAlignment="Bottom"
+                                <TextBlock Margin="6,0,0,0" FontSize="12" VerticalAlignment="Bottom"
                                            Foreground="{StaticResource InkTertiaryColor}"
                                            Text="{Binding Skill.Version, StringFormat={}v{0}}" />
                             </StackPanel>
-                            <TextBlock Margin="0,3,0,0" FontSize="12" TextWrapping="Wrap"
+                            <TextBlock Margin="0,3,0,0" FontSize="12.5" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkSecondaryColor}"
                                        Text="{Binding Skill.Summary}" />
                         </StackPanel>
 
                         <Border Grid.Column="3" Style="{StaticResource StatusPill}"
-                                VerticalAlignment="Top" Margin="10,0,0,0">
+                                VerticalAlignment="Top" Margin="12,0,0,0">
                             <TextBlock Style="{StaticResource StatusPillText}" Text="{Binding StatusTitle}" />
                         </Border>
                     </Grid>
 
-                    <Grid Margin="0,10,0,0">
+                    <Grid Margin="0,12,0,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Border Style="{StaticResource SkillBadge}">
-                                <TextBlock FontSize="11" Foreground="{StaticResource InkSecondaryColor}"
+                                <TextBlock FontSize="11" FontWeight="Medium"
+                                           Foreground="{StaticResource InkSecondaryColor}"
                                            Text="官方技能" />
                             </Border>
                             <Border Style="{StaticResource SkillBadge}">
-                                <TextBlock FontSize="11" Foreground="{StaticResource InkSecondaryColor}"
+                                <TextBlock FontSize="11" FontWeight="Medium"
+                                           Foreground="{StaticResource InkSecondaryColor}"
                                            Text="{Binding SceneCount, StringFormat={}用于 {0} 个场景}" />
                             </Border>
-                            <TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11"
+                            <TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="12"
                                        Foreground="{StaticResource InkTertiaryColor}"
                                        Text="{Binding CoverageText}"
                                        Visibility="{Binding ShowCoverage, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                         <Button HorizontalAlignment="Right" VerticalAlignment="Center"
-                                Style="{StaticResource SettingsButton}" Padding="10,3" FontSize="11.5"
+                                Style="{StaticResource CardAction}"
                                 Content="{Binding PrimaryTitle}" IsEnabled="{Binding Ready}"
                                 Click="CardPrimary_Click" />
                     </Grid>
 
                     <!-- Per-agent rows — SkillAgentRow, expanded on demand. -->
                     <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
-                        <Border Height="1" Margin="0,10,0,6" Background="{StaticResource StrokeSoftColor}" />
+                        <Border Height="1" Margin="0,12,0,8" Background="{StaticResource StrokeSoftColor}" />
 
-                        <Border Margin="0,0,0,8" Padding="10,8" CornerRadius="6"
+                        <Border Margin="0,0,0,10" Padding="12,10" CornerRadius="10"
                                 Background="{StaticResource WarnFillColor}"
                                 Visibility="{Binding PackageMissing, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource WarnInkColor}"
+                            <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource WarnInkColor}"
                                        Text="技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。" />
                         </Border>
 
                         <ItemsControl ItemsSource="{Binding States}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid MinHeight="30" Margin="0,3">
+                                    <Grid MinHeight="30" Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="120" />
@@ -129,15 +302,25 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Grid.Column="0" Width="22" Height="22" CornerRadius="5"
-                                                VerticalAlignment="Center"
-                                                Background="{StaticResource BrandTintColor}">
-                                            <TextBlock FontSize="10.5" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BrandColor}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Text="{Binding AgentMark}" />
-                                        </Border>
-                                        <TextBlock Grid.Column="1" Margin="8,0,0,0" FontSize="12.5"
+                                        <!-- The real app logo over a letter fallback. -->
+                                        <Grid Grid.Column="0" Width="22" Height="22"
+                                              VerticalAlignment="Center">
+                                            <Border CornerRadius="5"
+                                                    Background="{StaticResource BrandSoftColor}">
+                                                <TextBlock FontSize="10.5" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource BrandColor}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           TextAlignment="Center" Text="{Binding AgentMark}" />
+                                            </Border>
+                                            <Image Width="22" Height="22"
+                                                   Source="{Binding Agent, Converter={StaticResource AgentLogo}}">
+                                                <Image.Clip>
+                                                    <RectangleGeometry Rect="0,0,22,22" RadiusX="5" RadiusY="5" />
+                                                </Image.Clip>
+                                            </Image>
+                                        </Grid>
+                                        <TextBlock Grid.Column="1" Margin="8,0,0,0" FontSize="13.5"
+                                                   FontWeight="Medium"
                                                    VerticalAlignment="Center" Foreground="{StaticResource InkColor}"
                                                    Text="{Binding AgentName}" TextTrimming="CharacterEllipsis" />
                                         <Border Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
@@ -195,11 +378,8 @@
 
     <ScrollViewer x:Name="Root" VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="980">
-            <TextBlock FontSize="13" Foreground="{StaticResource InkSecondaryColor}"
-                       Text="发现、安装和管理各 Agent 可用的技能。" TextWrapping="Wrap" />
-
             <!-- Catalog load failure — the loadError line on macOS. -->
-            <Border Margin="0,10,0,0" Padding="10,8" CornerRadius="6"
+            <Border Margin="0,4,0,0" Padding="12,10" CornerRadius="10"
                     Background="{StaticResource WarnFillColor}"
                     Visibility="{Binding LoadError, Converter={StaticResource StringToVisibility}}">
                 <TextBlock FontSize="12" Foreground="{StaticResource WarnInkColor}"
@@ -207,90 +387,117 @@
             </Border>
 
             <!-- Metrics — the three SkillMetricCard boxes. -->
-            <Grid Margin="0,12,0,0">
+            <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="14,10" Margin="0,0,6,0">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontSize="15" VerticalAlignment="Center" Margin="0,0,8,0"
+                <Border Grid.Column="0" Style="{StaticResource Card}" MinHeight="58"
+                        Padding="12" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Width="24" TextAlignment="Center"
                                    Foreground="{StaticResource BrandColor}" Text="◇" />
-                        <TextBlock FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                        <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center"
                                    Foreground="{StaticResource InkColor}"
                                    Text="{Binding SkillCount, StringFormat={}{0} 个技能}" />
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="1" Style="{StaticResource Card}" Padding="14,10" Margin="0,0,6,0">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontSize="15" VerticalAlignment="Center" Margin="0,0,8,0"
-                                   Foreground="{StaticResource WarnInkColor}" Text="△" />
-                        <TextBlock FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                <Border Grid.Column="1" Style="{StaticResource Card}" MinHeight="58"
+                        Padding="12" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Width="24" TextAlignment="Center"
+                                   Foreground="{StaticResource WarningColor}" Text="△" />
+                        <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center"
                                    Foreground="{StaticResource InkColor}"
                                    Text="{Binding PendingInstallCount, StringFormat={}{0} 项待安装}" />
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="2" Style="{StaticResource Card}" Padding="14,10">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontSize="15" VerticalAlignment="Center" Margin="0,0,8,0"
-                                   Foreground="{StaticResource InkTertiaryColor}" Text="◎" />
-                        <TextBlock FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                <Border Grid.Column="2" Style="{StaticResource Card}" MinHeight="58" Padding="12">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Width="24" TextAlignment="Center"
+                                   Foreground="{StaticResource BlueColor}" Text="◎" />
+                        <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center"
                                    Foreground="{StaticResource InkColor}"
                                    Text="{Binding SupportedAgentCount, StringFormat={}{0} 个 Agent}" />
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <!-- Search + agent filter — SkillSearchField and the Agent select. -->
-            <Grid Margin="0,12,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="SearchBox" VerticalAlignment="Center" Padding="8,5" FontSize="12"
-                         ToolTip="搜索技能名、描述或标识" TextChanged="Search_Changed" />
-                <ComboBox x:Name="AgentBox" Grid.Column="1" Width="170" Margin="8,0,0,0"
-                          VerticalAlignment="Center" Padding="6,3"
-                          SelectionChanged="Agent_Changed" />
+            <!-- Search field, full width — SkillSearchField. -->
+            <Grid Margin="0,16,0,0">
+                <TextBox x:Name="SearchBox" Style="{StaticResource MacField}"
+                         Padding="10,5" FontSize="12.5"
+                         TextChanged="Search_Changed" />
+                <TextBlock Text="搜索技能名、描述或标识" FontSize="12.5" IsHitTestVisible="False"
+                           Foreground="{StaticResource InkTertiaryColor}"
+                           Margin="13,0,0,0" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=SearchBox}"
+                                             Value="">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
 
-            <!-- Status chips with counts, mirroring SkillStatusFilterBar. -->
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <Button x:Name="FilterAll" Style="{StaticResource FilterChip}" Click="FilterAll_Click" />
-                <Button x:Name="FilterMissing" Margin="6,0,0,0" Style="{StaticResource FilterChip}"
-                        Click="FilterMissing_Click" />
-                <Button x:Name="FilterPartial" Margin="6,0,0,0" Style="{StaticResource FilterChip}"
-                        Click="FilterPartial_Click" />
-                <Button x:Name="FilterDone" Margin="6,0,0,0" Style="{StaticResource FilterChip}"
-                        Click="FilterDone_Click" />
-            </StackPanel>
+            <!-- Status chips left, agent select right — mirroring the macOS row. -->
+            <Grid Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="FilterAll" Style="{StaticResource FilterChip}" Click="FilterAll_Click" />
+                    <Button x:Name="FilterMissing" Margin="4,0,0,0" Style="{StaticResource FilterChip}"
+                            Click="FilterMissing_Click" />
+                    <Button x:Name="FilterPartial" Margin="4,0,0,0" Style="{StaticResource FilterChip}"
+                            Click="FilterPartial_Click" />
+                    <Button x:Name="FilterDone" Margin="4,0,0,0" Style="{StaticResource FilterChip}"
+                            Click="FilterDone_Click" />
+                </StackPanel>
+                <ComboBox x:Name="AgentBox" Width="170" HorizontalAlignment="Right"
+                          VerticalAlignment="Center" Style="{StaticResource MacCombo}"
+                          SelectionChanged="Agent_Changed">
+                    <!-- Items arrive as ready-made ComboBoxItem containers from the
+                         code-behind, so ItemContainerStyle never reaches them — an
+                         implicit style found through logical-tree lookup does. -->
+                    <ComboBox.Resources>
+                        <Style TargetType="{x:Type ComboBoxItem}" BasedOn="{StaticResource MacComboItem}" />
+                    </ComboBox.Resources>
+                </ComboBox>
+            </Grid>
 
             <!-- 安装全部缺失项 + the manual-path caveat. -->
-            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                <Button Style="{StaticResource SettingsButton}" IsEnabled="{Binding CanInstallAll}"
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button Style="{StaticResource PrimaryButton}" IsEnabled="{Binding CanInstallAll}"
+                        Padding="14,5" FontSize="12.5"
                         Click="InstallAll_Click">
                     安装全部缺失项
                 </Button>
-                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="11" TextWrapping="Wrap"
+                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource InkTertiaryColor}"
                            Text="仅处理支持直接安装的 Agent；其余仍需导出 ZIP。" />
             </StackPanel>
 
             <!-- Skill cards. -->
-            <ItemsControl x:Name="SkillList" Margin="0,12,0,0"
+            <ItemsControl x:Name="SkillList" Margin="0,16,0,0"
                           ItemTemplate="{StaticResource SkillCardTemplate}" />
 
             <!-- Empty state, mirroring the puzzlepiece placeholder. -->
             <StackPanel x:Name="EmptyState" Margin="0,40" Visibility="Collapsed">
-                <TextBlock FontSize="22" HorizontalAlignment="Center"
+                <TextBlock FontSize="26" HorizontalAlignment="Center"
                            Foreground="{StaticResource InkTertiaryColor}" Text="◇" />
-                <TextBlock Margin="0,8,0,0" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"
+                <TextBlock Margin="0,8,0,0" FontSize="13.5" FontWeight="Medium" HorizontalAlignment="Center"
                            Foreground="{StaticResource InkColor}" Text="没有找到匹配的技能。" />
             </StackPanel>
 
             <!-- Inline notice — the port of the macOS Notice banner. -->
-            <Border x:Name="NoticeBar" Margin="0,10,0,0" Padding="10,8" CornerRadius="6"
+            <Border x:Name="NoticeBar" Margin="0,12,0,0" Padding="12,10" CornerRadius="10"
                     Background="{StaticResource LiveFillColor}" Visibility="Collapsed">
                 <TextBlock x:Name="NoticeText" FontSize="12" Foreground="{StaticResource LiveInkColor}"
                            TextWrapping="Wrap" />

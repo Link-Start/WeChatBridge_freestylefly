@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using WeChatBridge.Windows.Panes;
 
@@ -16,6 +18,13 @@ public partial class MainWindow : Window
     private static readonly TimeSpan PlainToastDuration = TimeSpan.FromSeconds(1.8);
     /// <summary>Something to click has to outlive a glance.</summary>
     private static readonly TimeSpan ActionableToastDuration = TimeSpan.FromSeconds(8);
+    /// <summary>Motion.toastIn — alpha plus a 6 px drop, ease-out.</summary>
+    private static readonly TimeSpan ToastInDuration = TimeSpan.FromMilliseconds(160);
+    /// <summary>Motion.toastOut — leaving is slower than arriving here only
+    /// because the fade is the dismissal; nobody watches a window go.</summary>
+    private static readonly TimeSpan ToastOutDuration = TimeSpan.FromMilliseconds(200);
+    /// <summary>Metrics.toastDrop — the distance a fresh capsule falls.</summary>
+    private const double ToastDrop = 6.0;
 
     private readonly MainViewModel _model;
     private readonly string? _requestedBatch;
@@ -25,8 +34,11 @@ public partial class MainWindow : Window
     private Action? _toastAction;
     private bool _toastHovering;
     private bool _batchSelected;
+    /// <summary>Bumped on every show/hide so a replaced fade cannot retire a
+    /// capsule that a newer toast is still using.</summary>
+    private int _toastGeneration;
 
-    private readonly Dictionary<AppTab, (string Title, UIElement Pane)> _panes;
+    private readonly Dictionary<AppTab, (string Title, string Caption, UIElement Pane)> _panes;
 
     public MainWindow(MainViewModel model, string? requestedBatch)
     {
@@ -35,19 +47,20 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         var scenesPane = new ScenesPane();
-        _panes = new Dictionary<AppTab, (string, UIElement)>
+        _panes = new Dictionary<AppTab, (string, string, UIElement)>
         {
-            [AppTab.History] = ("记录", new HistoryPane()),
-            [AppTab.General] = ("通用", new GeneralPane()),
-            [AppTab.Entries] = ("入口", new EntriesPane()),
-            [AppTab.Scenes] = ("场景", scenesPane),
-            [AppTab.Skills] = ("技能", new SkillsPane()),
-            [AppTab.About] = ("关于", new AboutPane()),
+            [AppTab.History] = ("记录", "每一批转发的去向与结果", new HistoryPane()),
+            [AppTab.General] = ("通用", "运行状态、启动项与保留策略", new GeneralPane()),
+            [AppTab.Entries] = ("入口", "微信「转发到其他应用」里的可用操作", new EntriesPane()),
+            [AppTab.Scenes] = ("场景", "按群聊绑定提示词与适用 Agent", scenesPane),
+            [AppTab.Skills] = ("技能中心", "各 Agent 可安装与调用的技能包", new SkillsPane()),
+            [AppTab.About] = ("关于", "版本信息与项目链接", new AboutPane()),
         };
         scenesPane.Bind(model.Scenes);
 
         DataContext = _model;
         PaneHost.Content = _panes[AppTab.History].Pane;
+        PaneCaption.Text = _panes[AppTab.History].Caption;
         NavList.SelectedIndex = 0;
 
         _model.ToastRequested += ShowToast;
@@ -95,6 +108,7 @@ public partial class MainWindow : Window
         if (!_panes.TryGetValue(tab, out var pane))
             return;
         PaneTitle.Text = pane.Title;
+        PaneCaption.Text = pane.Caption;
         PaneHost.Content = pane.Pane;
         foreach (var item in NavList.Items.OfType<ListBoxItem>())
         {
@@ -143,14 +157,38 @@ public partial class MainWindow : Window
     private void ShowToast(string message, string? actionTitle, Action? action, bool warning)
     {
         _toastTimer.Stop();
+        // Retire any fade-out still in flight before this capsule re-enters.
+        _toastGeneration++;
         ToastText.Text = message;
         ToastText.Foreground = warning
-            ? (System.Windows.Media.Brush)FindResource("WarnInkColor")
-            : (System.Windows.Media.Brush)FindResource("InkColor");
+            ? (Brush)FindResource("WarningColor")
+            : (Brush)FindResource("OnBrandColor");
         _toastAction = action;
         ToastAction.Content = actionTitle;
         ToastAction.Visibility = action is null ? Visibility.Collapsed : Visibility.Visible;
+
+        // A replacement toast only regains opacity where it stands — replaying
+        // the drop for every file in a burst would read as flicker. A capsule
+        // that was away falls the last 6 px into place while it fades in.
+        var wasVisible = Toast.Visibility == Visibility.Visible;
         Toast.Visibility = Visibility.Visible;
+        var easeIn = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        var fadeIn = new DoubleAnimation
+        {
+            To = 1.0,
+            Duration = new Duration(ToastInDuration),
+            EasingFunction = easeIn,
+        };
+        var drop = new DoubleAnimation
+        {
+            To = 0.0,
+            Duration = new Duration(ToastInDuration),
+            EasingFunction = easeIn,
+        };
+        if (!wasVisible)
+            drop.From = -ToastDrop;
+        Toast.BeginAnimation(OpacityProperty, fadeIn);
+        ToastShift.BeginAnimation(TranslateTransform.YProperty, drop);
 
         _toastHovering = false;
         _toastRemaining = action is null ? PlainToastDuration : ActionableToastDuration;
@@ -169,8 +207,32 @@ public partial class MainWindow : Window
     private void HideToast()
     {
         _toastTimer.Stop();
-        Toast.Visibility = Visibility.Collapsed;
         _toastAction = null;
+        if (Toast.Visibility != Visibility.Visible)
+            return;
+        var generation = ++_toastGeneration;
+        var easeOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        var fadeOut = new DoubleAnimation
+        {
+            To = 0.0,
+            Duration = new Duration(ToastOutDuration),
+            EasingFunction = easeOut,
+        };
+        var lift = new DoubleAnimation
+        {
+            To = -ToastDrop,
+            Duration = new Duration(ToastOutDuration),
+            EasingFunction = easeOut,
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            // A toast raised during the fade has already turned the alpha back
+            // up; hiding here would bury a message nobody has read.
+            if (generation == _toastGeneration)
+                Toast.Visibility = Visibility.Collapsed;
+        };
+        Toast.BeginAnimation(OpacityProperty, fadeOut);
+        ToastShift.BeginAnimation(TranslateTransform.YProperty, lift);
     }
 
     /// <summary>The countdown stops while the pointer is on the toast.</summary>

@@ -36,7 +36,11 @@ public partial class OnboardingWindow : Window
         _store = store ?? new OnboardingStateStore();
         InitializeComponent();
         BuildStepBar();
-        EntriesList.ItemsSource = ShareActions.All.Select(a => a.EntryTitle()).ToList();
+        // One list feeds both menus — the pane's roster and the art column's
+        // drawing of it — for the same §11.2 reason macOS shares the probe.
+        var entries = ShareActions.All.Select(a => a.EntryTitle()).ToList();
+        EntriesList.ItemsSource = entries;
+        EntriesArtList.ItemsSource = entries;
         ShowAutoStart(LaunchAtLogin.IsRegistered());
         // Resume where a mid-run close stopped, like preferences.onboardingStep;
         // only 完成 returns the counter to the top.
@@ -90,6 +94,12 @@ public partial class OnboardingWindow : Window
         var panels = new UIElement[] { StepWelcome, StepEntries, StepResidency, StepDone };
         for (var i = 0; i < panels.Length; i++)
             panels[i].Visibility = i == step ? Visibility.Visible : Visibility.Collapsed;
+
+        // The art column draws what the step is about — the same switch the
+        // macOS `art` ZStack makes: brand mark, menu, note, menu again.
+        ArtWelcome.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ArtMenu.Visibility = step is 1 or 3 ? Visibility.Visible : Visibility.Collapsed;
+        ArtNote.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
 
         var ink = (Brush)FindResource("InkColor");
         var tertiary = (Brush)FindResource("InkTertiaryColor");

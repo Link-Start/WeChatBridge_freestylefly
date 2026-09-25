@@ -1,8 +1,10 @@
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using Microsoft.Win32;
 using WeChatBridge.Windows.Core;
 
@@ -149,4 +151,57 @@ public partial class EntriesPane : UserControl
             model.SetPastesPathOnly(row.Target, box.IsChecked == true);
         }
     }
+}
+
+/// <summary>
+/// Logo bindings for the 入口 rows: <see cref="AppLogos"/> resolves the PNG;
+/// the converters below only adapt the two row types so a DataTemplate can
+/// bind them, mirroring ShareEntryList's bundled-logo lookup.
+/// </summary>
+public sealed class RowLogoPathConverter : IValueConverter
+{
+    public static string? PathFor(object? row) => row switch
+    {
+        EntryRow entry => AppLogos.PathFor(entry.Action),
+        ForwardTargetRow target => AppLogos.PathFor(target.DisplayName),
+        _ => null,
+    };
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        PathFor(value);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Visible when the row has a logo; "missing" flips it for the letter badge.</summary>
+public sealed class RowLogoVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var hasLogo = RowLogoPathConverter.PathFor(value) is not null;
+        var visible = Equals(parameter, "missing") ? !hasLogo : hasLogo;
+        return visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>The badge letter: the destination's own name, not the entry verb — 发给 Codex → C.</summary>
+public sealed class RowLogoInitialConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var name = value switch
+        {
+            EntryRow entry => entry.Action.TargetDisplayName(),
+            ForwardTargetRow target => target.DisplayName,
+            _ => null,
+        };
+        return name is { Length: > 0 } ? name[..1].ToUpperInvariant() : "?";
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }

@@ -3,56 +3,116 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="选择场景" Width="290" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
-        WindowStartupLocation="Manual">
-    <Border Padding="10" Background="#F9FAFB" CornerRadius="10"
-            BorderBrush="#D0D5DD" BorderThickness="1">
+        Opacity="0" ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
+        WindowStartupLocation="Manual" Loaded="OnLoaded">
+    <!-- Same FloatingCapsule chrome as the target picker: Radius.panel=14,
+         SurfaceColor, hairline stroke, soft shadow in the margin. -->
+    <Border x:Name="Root" Margin="16" Padding="10" CornerRadius="14"
+            Background="{StaticResource SurfaceColor}"
+            BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.18" />
+        </Border.Effect>
         <StackPanel>
             <Grid Margin="4,0,4,8">
                 <StackPanel>
-                    <TextBlock Text="选择场景" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock Text="选择场景" FontWeight="SemiBold" FontSize="12.5"
+                               Foreground="{StaticResource InkColor}" />
                     <TextBlock Text="每次转发只加载一个场景，也可以直接转发。"
-                               Foreground="#667085" FontSize="11" />
+                               Foreground="{StaticResource InkSecondaryColor}" FontSize="11" />
                 </StackPanel>
                 <Button x:Name="CloseButton" HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Width="22" Height="22" Padding="0" Content="✕"
-                        BorderThickness="0" Background="Transparent" Foreground="#98A2B3"
+                        Width="22" Height="22" Padding="0" Content="✕" FontSize="10"
+                        BorderThickness="0" Background="Transparent" Cursor="Hand"
+                        Foreground="{StaticResource InkTertiaryColor}"
                         ToolTip="关闭" Click="OnCloseClicked" />
             </Grid>
             <ListBox x:Name="SceneList" Height="204" BorderThickness="0"
                      Background="Transparent" SelectionMode="Single"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      SelectionChanged="OnSelectionChanged">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="row" CornerRadius="8" Padding="8,0"
+                                            Background="Transparent">
+                                        <ContentPresenter VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="row" Property="Background"
+                                                    Value="{StaticResource HoverColor}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="row" Property="Background"
+                                                    Value="{StaticResource BrandTintColor}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Grid Height="32">
+                        <Grid Height="34">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="Mark" Text="○" Width="20" VerticalAlignment="Center"
-                                       Foreground="#98A2B3" FontSize="13" />
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" />
-                                <TextBlock Text="{Binding SummaryText}" Foreground="#667085"
-                                           FontSize="11" TextTrimming="CharacterEllipsis" />
+                            <!-- checkmark.circle / circle — the macOS row's
+                                 selection mark. -->
+                            <Border x:Name="Tick" Width="16" Height="16" CornerRadius="8"
+                                    VerticalAlignment="Center"
+                                    BorderBrush="{StaticResource StrokeStrongColor}"
+                                    BorderThickness="1">
+                                <TextBlock x:Name="TickMark" Text="✓" FontSize="9"
+                                           FontWeight="Bold" Visibility="Collapsed"
+                                           Foreground="{StaticResource OnBrandColor}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                           FontSize="12.5"
+                                           Foreground="{StaticResource InkColor}" />
+                                <TextBlock Text="{Binding SummaryText}" FontSize="11"
+                                           Foreground="{StaticResource InkSecondaryColor}"
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
+                            <TextBlock Grid.Column="2" Margin="8,0,0,0"
+                                       Text="{Binding Shortcut}" FontSize="10"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource InkTertiaryColor}" />
                         </Grid>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                          Value="True">
-                                <Setter TargetName="Mark" Property="Text" Value="●" />
-                                <Setter TargetName="Mark" Property="Foreground" Value="#2E7FD9" />
+                                <Setter TargetName="Tick" Property="Background"
+                                        Value="{StaticResource BrandColor}" />
+                                <Setter TargetName="Tick" Property="BorderBrush"
+                                        Value="{StaticResource BrandColor}" />
+                                <Setter TargetName="TickMark" Property="Visibility"
+                                        Value="Visible" />
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <Grid Margin="4,8,4,0">
+            <TextBlock Margin="8,8,8,0" FontSize="11"
+                       Foreground="{StaticResource InkTertiaryColor}"
+                       Text="Esc 取消 · 数字键选择 · 90 秒内有效" />
+            <Grid Margin="4,10,4,2">
                 <Button x:Name="DirectButton" Content="直接转发" HorizontalAlignment="Left"
-                        Padding="12,4" IsCancel="True" Click="OnDirectClicked" />
+                        Style="{StaticResource SettingsButton}" IsCancel="True"
+                        Click="OnDirectClicked" />
                 <Button x:Name="ConfirmButton" Content="使用此场景" HorizontalAlignment="Right"
-                        Padding="12,4" IsDefault="True" IsEnabled="False"
-                        Click="OnConfirmClicked" />
+                        Style="{StaticResource PrimaryButton}" IsDefault="True"
+                        IsEnabled="False" Click="OnConfirmClicked" />
             </Grid>
         </StackPanel>
     </Border>
