@@ -1,0 +1,581 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using Microsoft.Win32;
+using WeChatBridge.Windows.Core;
+using WeChatBridge.Windows.Services;
+
+namespace WeChatBridge.Windows.Panes;
+
+/// <summary>
+/// The 场景 pane — the Windows port of macOS <c>SceneSettingsView</c>: a scene
+/// library with create/edit/duplicate/delete, per-scene prompt text and
+/// compatible-agent selection on the left page, and per-group scene bindings on
+/// the right. The pane keeps no truth of its own: every mutation goes through
+/// <see cref="SceneService"/> and every refresh re-reads the stores, the same
+/// way the macOS view reads <c>preferences.scenes</c> / <c>groupMemory</c>.
+/// </summary>
+public partial class ScenesPane : UserControl
+{
+    private SceneService? _service;
+    private SceneSettings _settings = new();
+    private IReadOnlyDictionary<string, GroupMemory> _memories =
+        new Dictionary<string, GroupMemory>();
+    private string? _selectedSceneId;
+    private string? _selectedGroupKey;
+    private bool _loaded;
+
+    public ScenesPane()
+    {
+        InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            _loaded = true;
+            // The integrator may hand the service over through the DataContext
+            // (a ScenesPane sits in PaneHost alongside panes bound to
+            // MainViewModel, so it cannot inherit it — it must be set directly).
+            if (DataContext is SceneService service)
+                Bind(service);
+        };
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is SceneService service)
+                Bind(service);
+        };
+    }
+
+    /// <summary>Wire the pane to its service. Idempotent.</summary>
+    public void Bind(SceneService service)
+    {
+        if (ReferenceEquals(_service, service))
+        {
+            ReloadAll();
+            return;
+        }
+        if (_service is not null)
+            _service.Changed -= OnServiceChanged;
+        _service = service;
+        _service.Changed += OnServiceChanged;
+        ReloadAll();
+    }
+
+    private SceneService? Service =>
+        _service ?? DataContext as SceneService;
+
+    /// <summary>
+    /// Service writes can arrive from a background forward (a learned binding);
+    /// list rebuilds must happen on the dispatcher.
+    /// </summary>
+    private void OnServiceChanged() =>
+        Dispatcher.BeginInvoke(ReloadAll);
+
+    // MARK: - Row shapes
+
+    private sealed class SceneRow
+    {
+        public required WeChatScene Scene { get; init; }
+        public string? Hotkey { get; init; }
+        public bool Enabled => Scene.Enabled;
+        public string NameText =>
+            string.IsNullOrWhiteSpace(Scene.Name) ? "未命名场景" : Scene.Name;
+        public string SummaryText =>
+            string.IsNullOrWhiteSpace(Scene.Summary) ? "没有一句话说明" : Scene.Summary;
+    }
+
+    private sealed class GroupRow
+    {
+        public required string Key { get; init; }
+        public required GroupMemory Memory { get; init; }
+        public required IReadOnlyList<string> BoundNames { get; init; }
+        public bool Selected { get; init; }
+        public string NameText => Memory.DisplayName;
+        public string BindingText =>
+            BoundNames.Count == 0 ? "转发时选择或直接转发" : string.Join("、", BoundNames);
+    }
+
+    private sealed class AgentRow
+    {
+        public required AgentId Agent { get; init; }
+        public bool IsSelected { get; init; }
+        public bool Editable { get; init; }
+        public string Name => Agent.DisplayName();
+    }
+
+    private sealed class BoundSceneRow
+    {
+        public required WeChatScene Scene { get; init; }
+        public bool IsBound { get; init; }
+        public string NameText =>
+            string.IsNullOrWhiteSpace(Scene.Name) ? "未命名场景" : Scene.Name;
+        public string SummaryText =>
+            string.IsNullOrWhiteSpace(Scene.Summary) ? "没有一句话说明" : Scene.Summary;
+        public string AgentsText =>
+            string.Join(" · ", Scene.CompatibleAgents.Select(a => a.DisplayName()));
+    }
+
+    // MARK: - Reload
+
+    private void ReloadAll()
+    {
+        if (Service is not { } service || !_loaded)
+            return;
+        CommitEdits();
+        _settings = service.LoadSettings();
+        _memories = service.LoadMemories();
+
+        if (_selectedSceneId is null
+            || _settings.Scenes.All(s => s.Id != _selectedSceneId))
+            _selectedSceneId = _settings.Scenes.FirstOrDefault()?.Id;
+        if (_selectedGroupKey is null || !_memories.ContainsKey(_selectedGroupKey))
+            _selectedGroupKey = SortedGroupKeys().FirstOrDefault();
+
+        SceneCount.Text = $"{_settings.Scenes.Count} 个";
+        var boundCount = _memories.Values.Count(m => m.BoundSceneIDs.Count > 0);
+        GroupCount.Text = $"{boundCount} 个已绑定";
+
+        RebuildSceneList();
+        RebuildSceneEditor();
+        RebuildGroupLists();
+        RebuildGroupEditor();
+    }
+
+    private IEnumerable<string> SortedGroupKeys() =>
+        _memories.Keys.OrderBy(
+            key => _memories[key].DisplayName,
+            StringComparer.CurrentCulture);
+
+    private IEnumerable<string> FilteredGroupKeys()
+    {
+        var query = GroupSearch.Text.Trim();
+        var keys = SortedGroupKeys();
+        return query.Length == 0
+            ? keys
+            : keys.Where(key => _memories[key].DisplayName.Contains(
+                query, StringComparison.CurrentCultureIgnoreCase));
+    }
+
+    // MARK: - Scene page
+
+    private void RebuildSceneList()
+    {
+        if (Service is not { } service)
+            return;
+        var query = SceneSearch.Text.Trim();
+        var rows = _settings.Scenes
+            .Where(s => query.Length == 0
+                || s.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                || s.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            .Select(s => new SceneRow { Scene = s, Hotkey = service.ShortcutHint(s) })
+            .ToList();
+        SceneList.ItemsSource = rows;
+        SceneList.SelectedItem = rows.FirstOrDefault(r => r.Scene.Id == _selectedSceneId);
+    }
+
+    private void RebuildSceneEditor()
+    {
+        var scene = _settings.Scenes.FirstOrDefault(s => s.Id == _selectedSceneId);
+        if (scene is null)
+        {
+            EditorEmpty.Visibility = Visibility.Visible;
+            EditorContent.Visibility = Visibility.Collapsed;
+            return;
+        }
+        EditorEmpty.Visibility = Visibility.Collapsed;
+        EditorContent.Visibility = Visibility.Visible;
+
+        var name = string.IsNullOrWhiteSpace(scene.Name) ? "未命名场景" : scene.Name;
+        EditorTitle.Text = name;
+        EditorStatus.Text = scene.Enabled ? "已启用" : "已停用";
+        EditorStatus.Foreground = scene.Enabled
+            ? (Brush)FindResource("LiveInkColor")
+            : (Brush)FindResource("InkTertiaryColor");
+        EnableBox.IsChecked = scene.Enabled;
+
+        var prompt = PromptText(scene);
+
+        if (scene.IsOfficial)
+        {
+            EditFields.Visibility = Visibility.Collapsed;
+            ReadFields.Visibility = Visibility.Visible;
+            OfficialHint.Visibility = Visibility.Visible;
+            ReadName.Text = string.IsNullOrWhiteSpace(scene.Name) ? "无" : scene.Name;
+            ReadSummary.Text = string.IsNullOrWhiteSpace(scene.Summary) ? "无" : scene.Summary;
+            ReadPrompt.Text = string.IsNullOrWhiteSpace(prompt) ? "无" : prompt;
+        }
+        else
+        {
+            EditFields.Visibility = Visibility.Visible;
+            ReadFields.Visibility = Visibility.Collapsed;
+            OfficialHint.Visibility = Visibility.Collapsed;
+            EditName.Text = scene.Name;
+            EditSummary.Text = scene.Summary;
+            EditPrompt.Text = prompt;
+        }
+
+        AgentGrid.ItemsSource = AgentIds.All
+            .Select(agent => new AgentRow
+            {
+                Agent = agent,
+                IsSelected = scene.CompatibleAgents.Contains(agent),
+                Editable = !scene.IsOfficial,
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Writes pending field edits into the store — the merged 提示词 lands in
+    /// <see cref="WeChatScene.Instruction"/> and clears <see cref="WeChatScene.OutputSpec"/>,
+    /// matching the macOS <c>promptBinding</c> setter.
+    /// </summary>
+    private void CommitEdits()
+    {
+        if (Service is not { } service || EditFields.Visibility != Visibility.Visible)
+            return;
+        var scene = _settings.Scenes.FirstOrDefault(s => s.Id == _selectedSceneId);
+        if (scene is null || scene.IsOfficial)
+            return;
+        if (EditName.Text == scene.Name
+            && EditSummary.Text == scene.Summary
+            && EditPrompt.Text == PromptText(scene))
+            return;
+        scene.Name = EditName.Text;
+        scene.Summary = EditSummary.Text;
+        scene.Instruction = EditPrompt.Text;
+        scene.OutputSpec = "";
+        service.UpdateScene(scene);
+    }
+
+    private static string PromptText(WeChatScene scene) =>
+        string.Join("\n\n",
+            new[]
+            {
+                scene.Instruction,
+                string.IsNullOrWhiteSpace(scene.OutputSpec) ? "" : $"输出规范：\n{scene.OutputSpec}",
+            }.Where(part => part.Trim().Length > 0));
+
+    private void ShowScenesPage_Click(object sender, RoutedEventArgs e)
+    {
+        ScenesPage.Visibility = Visibility.Visible;
+        GroupsPage.Visibility = Visibility.Collapsed;
+        ScenesTab.Tag = "Selected";
+        GroupsTab.Tag = null;
+    }
+
+    private void ShowGroupsPage_Click(object sender, RoutedEventArgs e)
+    {
+        ScenesPage.Visibility = Visibility.Collapsed;
+        GroupsPage.Visibility = Visibility.Visible;
+        ScenesTab.Tag = null;
+        GroupsTab.Tag = "Selected";
+        ReloadAll();
+    }
+
+    private void SceneSearch_TextChanged(object sender, TextChangedEventArgs e) =>
+        RebuildSceneList();
+
+    private void SceneList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (SceneList.SelectedItem is not SceneRow row)
+            return;
+        CommitEdits();
+        _selectedSceneId = row.Scene.Id;
+        RebuildSceneEditor();
+    }
+
+    private void AddScene_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is not { } service)
+            return;
+        var scene = service.AddScene();
+        _selectedSceneId = scene.Id;
+        ReloadAll();
+    }
+
+    private void Enable_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is { } service && _selectedSceneId is { } id)
+            service.SetSceneEnabled(id, EnableBox.IsChecked == true);
+        // ReloadAll arrives through Changed.
+    }
+
+    private void EditField_LostFocus(object sender, RoutedEventArgs e) => CommitEdits();
+
+    private void AgentCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is not { } service
+            || sender is not CheckBox { DataContext: AgentRow row } box
+            || _settings.Scenes.FirstOrDefault(s => s.Id == _selectedSceneId) is not { } scene
+            || scene.IsOfficial)
+            return;
+        var agent = row.Agent;
+        if (box.IsChecked == true)
+        {
+            if (!scene.CompatibleAgents.Contains(agent))
+                scene.CompatibleAgents.Add(agent);
+        }
+        else
+        {
+            scene.CompatibleAgents.Remove(agent);
+        }
+        service.UpdateScene(scene);
+    }
+
+    private void Duplicate_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is not { } service || _selectedSceneId is null)
+            return;
+        var copy = service.DuplicateScene(_selectedSceneId);
+        if (copy is not null)
+        {
+            _selectedSceneId = copy.Id;
+            ShowNotice("已复制为我的场景。", good: true);
+        }
+        ReloadAll();
+    }
+
+    private void EditorMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is not { } service
+            || _settings.Scenes.FirstOrDefault(s => s.Id == _selectedSceneId) is not { } scene)
+            return;
+        var menu = new ContextMenu();
+        if (scene.IsOfficial)
+            AddItem(menu, "复制为我的场景", (_, _) => Duplicate_Click(sender, e));
+        AddItem(menu, "导出场景包", (_, _) => ExportScene(scene));
+        AddSeparator(menu);
+        if (scene.Enabled)
+        {
+            var isDefault = _settings.DefaultSceneID == scene.Id;
+            AddItem(menu, isDefault ? "取消默认场景" : "设为默认场景",
+                (_, _) => service.SetDefaultScene(isDefault ? null : scene.Id));
+        }
+        AddItem(menu, "上移", (_, _) => MoveSelected(-1));
+        AddItem(menu, "下移", (_, _) => MoveSelected(1));
+        if (!scene.IsOfficial)
+        {
+            AddSeparator(menu);
+            AddItem(menu, "删除场景", (_, _) => RemoveScene(scene));
+        }
+        menu.PlacementTarget = EditorMenu;
+        menu.IsOpen = true;
+    }
+
+    private static void AddItem(ContextMenu menu, string header, RoutedEventHandler onClick)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += onClick;
+        menu.Items.Add(item);
+    }
+
+    private static void AddSeparator(ContextMenu menu) => menu.Items.Add(new Separator());
+
+    private void MoveSelected(int offset)
+    {
+        if (Service is { } service && _selectedSceneId is { } id)
+            service.MoveScene(id, offset);
+    }
+
+    private void RemoveScene(WeChatScene scene)
+    {
+        if (Service is not { } service)
+            return;
+        service.RemoveScene(scene.Id);
+        _selectedSceneId = _settings.Scenes
+            .FirstOrDefault(s => s.Id != scene.Id)?.Id;
+        ReloadAll();
+    }
+
+    private void ExportScene(WeChatScene scene)
+    {
+        if (Service is not { } service)
+            return;
+        string json;
+        try
+        {
+            json = service.ExportPackageJson(scene);
+        }
+        catch (SceneService.ScenePackageException error)
+        {
+            ShowNotice(error.Message, good: false);
+            return;
+        }
+        var dialog = new SaveFileDialog
+        {
+            Title = "导出场景包",
+            Filter = "场景包 (*.json)|*.json",
+            FileName = $"{scene.Name}.wechatflow-scene.json",
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, json);
+            ShowNotice("场景包已导出。", good: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            ShowNotice(error.Message, good: false);
+        }
+    }
+
+    private void Import_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "导入场景包",
+            Filter = "场景包 (*.json)|*.json",
+            Multiselect = true,
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true)
+            ImportFiles(dialog.FileNames);
+    }
+
+    private void SceneList_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void SceneList_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] paths)
+            ImportFiles(paths);
+    }
+
+    private void ImportFiles(IEnumerable<string> paths)
+    {
+        if (Service is not { } service)
+            return;
+        var report = service.ImportScenePackages(paths, package =>
+            MessageBox.Show(
+                Window.GetWindow(this),
+                $"「{package.Name}」已安装同版本场景。覆盖将更新场景内容，本地的启用状态和群绑定会保留。",
+                "场景版本已存在",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question) == MessageBoxResult.OK);
+        if (report.Errors.Count > 0)
+        {
+            ShowNotice(report.Errors[0], good: false);
+        }
+        else if (report.Imported > 0)
+        {
+            var message = $"已导入 {report.Imported} 个场景。";
+            if (report.SkippedOlder > 0)
+                message += "已安装的场景版本更新，未导入较旧版本。";
+            ShowNotice(message, good: true);
+        }
+        else if (report.SkippedOlder > 0)
+        {
+            ShowNotice("已安装的场景版本更新，未导入较旧版本。", good: false);
+        }
+        else if (report.Declined > 0)
+        {
+            ShowNotice("已取消导入。", good: false);
+        }
+        ReloadAll();
+    }
+
+    // MARK: - Groups page
+
+    private void RebuildGroupLists()
+    {
+        var keys = FilteredGroupKeys().ToList();
+        var bound = keys.Where(k => _memories[k].BoundSceneIDs.Count > 0).ToList();
+        var unbound = keys.Where(k => _memories[k].BoundSceneIDs.Count == 0).ToList();
+
+        BoundHeader.Visibility = bound.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        UnboundHeader.Visibility = unbound.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        BoundGroupList.ItemsSource = bound.Select(ToRow).ToList();
+        UnboundGroupList.ItemsSource = unbound.Select(ToRow).ToList();
+    }
+
+    private GroupRow ToRow(string key) => new()
+    {
+        Key = key,
+        Memory = _memories[key],
+        BoundNames = _settings
+            .ScenesFor(_memories[key].BoundSceneIDs)
+            .Select(s => string.IsNullOrWhiteSpace(s.Name) ? "未命名场景" : s.Name)
+            .ToList(),
+        Selected = key == _selectedGroupKey,
+    };
+
+    private void RebuildGroupEditor()
+    {
+        if (_selectedGroupKey is not { } key
+            || !_memories.TryGetValue(key, out var memory))
+        {
+            GroupEmpty.Visibility = Visibility.Visible;
+            GroupEditor.Visibility = Visibility.Collapsed;
+            return;
+        }
+        GroupEmpty.Visibility = Visibility.Collapsed;
+        GroupEditor.Visibility = Visibility.Visible;
+
+        GroupTitle.Text = memory.DisplayName;
+        var bound = _settings.ScenesFor(memory.BoundSceneIDs);
+        GroupBoundCount.Text = $"已关联 {bound.Count} 个可选场景";
+        var boundIds = memory.BoundSceneIDs.ToHashSet(StringComparer.Ordinal);
+        BoundSceneList.ItemsSource = _settings.EnabledScenes
+            .Select(scene => new BoundSceneRow
+            {
+                Scene = scene,
+                IsBound = boundIds.Contains(scene.Id),
+            })
+            .ToList();
+
+        var disabled = _settings.Scenes.Where(s => !s.Enabled).Select(s => s.Name).ToList();
+        DisabledScenesNote.Visibility = disabled.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DisabledSceneNames.Text = string.Join("、", disabled);
+        ClearBindingButton.Visibility = bound.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void GroupSearch_TextChanged(object sender, TextChangedEventArgs e) =>
+        RebuildGroupLists();
+
+    private void GroupRow_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not GroupRow row)
+            return;
+        _selectedGroupKey = row.Key;
+        RebuildGroupLists();
+        RebuildGroupEditor();
+    }
+
+    private void BoundSceneCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is { } service
+            && _selectedGroupKey is { } key
+            && (sender as CheckBox)?.DataContext is BoundSceneRow row)
+        {
+            service.ToggleGroupBinding(key, row.Scene.Id);
+            // Changed → ReloadAll redraws the checkbox from the store.
+        }
+    }
+
+    private void ClearBinding_Click(object sender, RoutedEventArgs e)
+    {
+        if (Service is { } service && _selectedGroupKey is { } key)
+            service.ClearGroupBinding(key);
+    }
+
+    // MARK: - Notice
+
+    private void ShowNotice(string message, bool good)
+    {
+        NoticeText.Text = message;
+        NoticeBar.Background = good
+            ? (Brush)FindResource("LiveFillColor")
+            : (Brush)FindResource("WarnFillColor");
+        NoticeText.Foreground = good
+            ? (Brush)FindResource("LiveInkColor")
+            : (Brush)FindResource("WarnInkColor");
+        NoticeBar.Visibility = Visibility.Visible;
+    }
+}

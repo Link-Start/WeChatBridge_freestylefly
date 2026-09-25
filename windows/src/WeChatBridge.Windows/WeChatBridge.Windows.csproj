@@ -12,4 +12,14 @@
     <ProjectReference Include="..\WeChatBridge.Windows.Core\WeChatBridge.Windows.Core.csproj" />
   </ItemGroup>
 
+  <!-- The shared skill catalog ships next to the exe so
+       SkillService.FindResourcesRoot resolves <out>/Resources/Skills at
+       runtime — the same catalog.json macOS reads from its bundle. -->
+  <ItemGroup>
+    <None Include="..\..\..\Resources\Skills\**"
+          Link="Resources\Skills\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

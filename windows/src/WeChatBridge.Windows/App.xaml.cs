@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Windows;
 using WeChatBridge.Windows.Core;
+using WeChatBridge.Windows.Onboarding;
 
 namespace WeChatBridge.Windows;
 
@@ -21,6 +22,8 @@ public partial class App : Application
     private EventWaitHandle? _foregroundEvent;
     private CancellationTokenSource? _shutdown;
     private InboxPaths? _paths;
+    private MainViewModel? _model;
+    private TrayIconService? _tray;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -52,13 +55,25 @@ public partial class App : Application
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
         var model = new MainViewModel(_paths);
+        _model = model;
         var window = new MainWindow(model, requestedBatch);
         MainWindow = window;
+        // The tray exists in every instance — it is the resident process's
+        // only chrome when the window is hidden.
+        _tray = new TrayIconService(model, () => window, Shutdown);
+        // Closing the window hides it to the tray; the share relay must stay
+        // resident, so only the tray's 退出 really ends the process.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         // The share helper launches us with --background purely so the fresh
         // intent is consumed and the forward runs. Showing the window here
-        // would fight the target app for the foreground.
+        // would fight the target app for the foreground — and the guide must
+        // never pop mid-share either.
         if (!background)
+        {
             window.Show();
+            if (new OnboardingStateStore().NeedsOnboarding())
+                new OnboardingWindow { Owner = window }.Show();
+        }
         // MainWindow's inbox load rides the Loaded event — a hidden window
         // never raises it, so a background launch must load explicitly or it
         // would idle forever with intents unconsumed (seen live 2026-09-25:
@@ -73,6 +88,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _tray?.Dispose();
+        _model?.DisposeServices();
         _shutdown?.Cancel();
         _changeEvent?.Dispose();
         _foregroundEvent?.Dispose();

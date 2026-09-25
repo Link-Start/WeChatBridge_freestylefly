@@ -50,6 +50,8 @@
                     <ListBoxItem Tag="History">记录</ListBoxItem>
                     <ListBoxItem Tag="General">通用</ListBoxItem>
                     <ListBoxItem Tag="Entries">入口</ListBoxItem>
+                    <ListBoxItem Tag="Scenes">场景</ListBoxItem>
+                    <ListBoxItem Tag="Skills">技能</ListBoxItem>
                     <ListBoxItem Tag="About">关于</ListBoxItem>
                 </ListBox>
             </StackPanel>

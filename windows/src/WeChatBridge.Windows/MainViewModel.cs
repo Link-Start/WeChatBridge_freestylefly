@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using WeChatBridge.Windows.Core;
 using WeChatBridge.Windows.Core.Delivery;
+using WeChatBridge.Windows.Services;
 using WpfClipboard = System.Windows.Clipboard;
 
 namespace WeChatBridge.Windows;
@@ -16,6 +17,8 @@ public enum AppTab
     History,
     General,
     Entries,
+    Scenes,
+    Skills,
     About,
 }
 
@@ -154,6 +157,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private AppSettings _settings;
     private List<ReadyBatch> _batches = [];
     private DeliveryEngine? _delivery;
+    private SceneService? _scenes;
+    private CustomTargetService? _customTargets;
     private string _query = string.Empty;
     private string? _inboxFailure;
 
@@ -186,6 +191,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string InboxRoot => _paths.Root;
 
     /// <summary>Created lazily so constructing the view model never touches Win32.</summary>
+    /// <summary>
+    /// The scene pipeline, lazily built so nothing registers hotkeys or reads
+    /// stores for a process that never forwards. The picker callback always
+    /// lands on the UI dispatcher — ScenePickerWindow creates a Window.
+    /// </summary>
+    internal SceneService Scenes => _scenes ??= new SceneService(
+        picker: (scenes, ct) => System.Windows.Application.Current?.Dispatcher
+                .InvokeAsync(() => ScenePickerWindow.ChooseAsync(
+                    scenes, ct, System.Windows.Application.Current.MainWindow))
+                .Task.Unwrap()
+            ?? Task.FromResult(ScenePickerAnswer.Cancelled),
+        hotkeys: new WindowsSceneHotkeySource(),
+        notify: text => ToastRequested?.Invoke(text, null, null, false));
+
+    internal CustomTargetService CustomTargets =>
+        _customTargets ??= CustomTargetService.CreateWindowed(_targetStore);
+
+    /// <summary>
+    /// Releases whatever was lazily built — App.OnExit is the only caller.
+    /// Touching the lazy accessors here must not create them.
+    /// </summary>
+    internal void DisposeServices() => _scenes?.Dispose();
+
     private DeliveryEngine Delivery => _delivery ??= new DeliveryEngine(
         DeliveryEnvironment.Create(message => InboxLogger.Write(_paths, message)),
         _reader);
@@ -326,7 +354,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 // Fire-and-forget: delivery rewrites the clipboard, activates
                 // the target and records its own outcome — Reload at its end
                 // publishes the result, so nothing is recorded here.
-                _ = PerformForward(batch, intent.Action, ResolveTarget(intent));
+                _ = PerformForward(batch, intent.Action, ResolveTarget(intent), freshShare: true);
                 return false;
             case { Kind: ConsumedIntentKind.Expired, Intent: { } intent }:
                 // Only a paste can go stale. A copy was finished by the helper
@@ -419,9 +447,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// Clipboard copies are still done here; real forwards go through
     /// <see cref="DeliveryEngine"/>, which writes the manual payload first so
     /// every failure leaves the user one Ctrl+V away, and records its own
-    /// outcome into state.json.
+    /// outcome into state.json. <paramref name="freshShare"/> is set only for
+    /// the intent-driven path — the one moment reading the WeChat window title
+    /// is honest — while resends and 「发给…」 reuse what the batch recorded.
     /// </summary>
-    public async Task PerformForward(ReadyBatch batch, ShareAction action, ForwardTarget? target)
+    public async Task PerformForward(ReadyBatch batch, ShareAction action, ForwardTarget? target, bool freshShare = false)
     {
         var pathsOnly = action == ShareAction.Custom
             && target is not null
@@ -474,10 +504,56 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+        // 「发送到自定义」 without a bundle id — the share helper cannot carry
+        // one — resolves through the picker: zero targets prompts toward the
+        // 入口 page, one forwards straight away, many pop the floating panel.
+        if (target is null && action == ShareAction.Custom)
+        {
+            var resolution = await CustomTargets.ResolveAsync();
+            switch (resolution.Kind)
+            {
+                case CustomTargetResolutionKind.Picked when resolution.Target is { } picked:
+                    target = picked;
+                    break;
+                case CustomTargetResolutionKind.NoTargets:
+                    Record(BatchOutcomeKind.Failed, batch.Id, "还没有添加自定义应用。");
+                    ToastRequested?.Invoke("还没有添加自定义应用。", "去入口页添加", () => Navigate(AppTab.Entries), true);
+                    Reload();
+                    return;
+                case CustomTargetResolutionKind.Expired:
+                    Record(BatchOutcomeKind.Expired, batch.Id);
+                    Reload();
+                    return;
+                default:
+                    Record(BatchOutcomeKind.Failed, batch.Id, "已取消选择目标。");
+                    Reload();
+                    return;
+            }
+        }
+
+        // The scene decision — pending shortcut → group binding → picker →
+        // optional default. Null means the picker let the share expire; macOS
+        // records that as expired rather than forwarding it bare.
+        var choice = await Scenes.ResolveForShareAsync(
+            batch.Items.Select(i => i.FullPath).ToList(), captureTitle: freshShare);
+        if (choice is null)
+        {
+            Record(BatchOutcomeKind.Expired, batch.Id);
+            Reload();
+            return;
+        }
+        if (choice.GroupName is not null || choice.Scene is not null)
+            _reader.RecordContext(batch.Id, choice.GroupName, choice.Scene?.Id, choice.Scene?.Name);
+        var prompt = Scenes.RenderPrompt(choice, AgentIds.Matching(action));
+
         var name = target?.DisplayName ?? action.TargetDisplayName();
         try
         {
-            var result = await Delivery.DeliverAsync(batch, target);
+            var result = await Delivery.DeliverAsync(batch, target, prompt);
+            // advance only on a real landing — the scene watermark must not
+            // swallow a batch that never reached its app.
+            if (result.Delivered)
+                Scenes.CompleteForward(choice);
             ToastRequested?.Invoke(
                 result.Delivered
                     ? $"已发给 {name}"

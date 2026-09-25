@@ -34,13 +34,17 @@ public partial class MainWindow : Window
         _requestedBatch = requestedBatch;
         InitializeComponent();
 
+        var scenesPane = new ScenesPane();
         _panes = new Dictionary<AppTab, (string, UIElement)>
         {
             [AppTab.History] = ("记录", new HistoryPane()),
             [AppTab.General] = ("通用", new GeneralPane()),
             [AppTab.Entries] = ("入口", new EntriesPane()),
+            [AppTab.Scenes] = ("场景", scenesPane),
+            [AppTab.Skills] = ("技能", new SkillsPane()),
             [AppTab.About] = ("关于", new AboutPane()),
         };
+        scenesPane.Bind(model.Scenes);
 
         DataContext = _model;
         PaneHost.Content = _panes[AppTab.History].Pane;
@@ -55,6 +59,15 @@ public partial class MainWindow : Window
             _model.RebuildEntries();
             RefreshBatches();
             SelectRequestedBatch();
+        };
+
+        // Close hides to the tray, mirroring the macOS menu-bar app — the
+        // resident process must keep consuming shares. The tray's 退出 calls
+        // Application.Shutdown, which proceeds despite this cancel.
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            Hide();
         };
     }
 
