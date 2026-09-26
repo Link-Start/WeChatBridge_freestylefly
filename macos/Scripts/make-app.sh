@@ -34,6 +34,10 @@ IDENTITY="${IDENTITY:-$(select_identity)}"
 DISTRIBUTION="${DISTRIBUTION:-0}"
 ARCHS="${ARCHS:-$(uname -m)}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo root is one level further up since the macOS package moved under macos/;
+# assets both platforms consume live in shared/, not Resources/.
+REPO_ROOT="$(cd "$ROOT/.." && pwd)"
+SHARED="$REPO_ROOT/shared"
 source "$ROOT/Scripts/share-slots.sh"
 APP="${APP_PATH:-$ROOT/dist/$APP_BUNDLE_NAME}"
 BUILD_ROOT="${BUILD_ROOT:-$ROOT/.build/wechatbridge-bundle}"
@@ -163,7 +167,7 @@ for SLOT_ROW in "${SHARE_SLOTS[@]}"; do
 
 	LOGO_NAME="$(share_logo_name "$SLOT")"
 	if [ -n "$LOGO_NAME" ]; then
-		LOGO="$ROOT/Resources/AppLogos/$LOGO_NAME"
+		LOGO="$SHARED/AppLogos/$LOGO_NAME"
 		ASSET_CATALOG="$BUILD_ROOT/icon-$SLOT.xcassets"
 		APP_ICONSET="$ASSET_CATALOG/AppIcon.appiconset"
 		LEGACY_ICONSET="$BUILD_ROOT/icon-$SLOT.iconset"
@@ -262,11 +266,11 @@ shopt -u nullglob
 if [ -f "$ROOT/Resources/AppIcon.icns" ]; then
 	cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 fi
-cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE"
-cp "$ROOT/THIRD-PARTY-NOTICES.md" "$APP/Contents/Resources/THIRD-PARTY-NOTICES.md"
+cp "$REPO_ROOT/LICENSE" "$APP/Contents/Resources/LICENSE"
+cp "$REPO_ROOT/THIRD-PARTY-NOTICES.md" "$APP/Contents/Resources/THIRD-PARTY-NOTICES.md"
 ditto "$ROOT/Resources/Licenses" "$APP/Contents/Resources/Licenses"
-ditto "$ROOT/Resources/AppLogos" "$APP/Contents/Resources/AppLogos"
-ditto "$ROOT/Resources/Skills" "$APP/Contents/Resources/Skills"
+ditto "$SHARED/AppLogos" "$APP/Contents/Resources/AppLogos"
+ditto "$SHARED/Skills" "$APP/Contents/Resources/Skills"
 
 # Repository fallbacks are useful for `swift run`, but a distributable binary
 # must never reveal the builder's absolute checkout path.

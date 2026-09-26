@@ -5,7 +5,7 @@
 //
 //   swift Scripts/make-icon.swift Resources/AppIcon-artwork.png \
 //     Resources/AppIcon.png Resources/AppIcon.icns \
-//     Resources/Screenshots/app-icon-rounded.png
+//     ../shared/Screenshots/app-icon-rounded.png
 //
 // The optional last argument exports the rounded body at 512 px without margins.
 import AppKit

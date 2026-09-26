@@ -20,11 +20,17 @@
        SkillService.FindResourcesRoot resolves <out>/Resources/Skills at
        runtime — the same catalog.json macOS reads from its bundle. -->
   <ItemGroup>
-    <None Include="..\..\..\Resources\Skills\**"
+    <None Include="..\..\..\shared\Skills\**"
           Link="Resources\Skills\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
-    <None Include="Assets\**"
+    <!-- shared/AppLogos is the single source — AppLogos.PathFor resolves
+         <out>/Assets/AppLogos, so keep the linked layout identical. -->
+    <None Include="..\..\..\shared\AppLogos\*.png"
+          Link="Assets\AppLogos\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Assets\**" Exclude="Assets\AppLogos\**"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

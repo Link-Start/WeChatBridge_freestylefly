@@ -20,13 +20,15 @@ jobs:
         run: swift --version
 
       - name: Run tests
+        working-directory: macos
         run: swift test
 
       - name: Check localizations
+        working-directory: macos
         run: swift Scripts/check-localizations.swift
 
       - name: Check release configuration
-        run: Scripts/check-release-config.sh
+        run: macos/Scripts/check-release-config.sh
 
   windows:
     runs-on: windows-latest

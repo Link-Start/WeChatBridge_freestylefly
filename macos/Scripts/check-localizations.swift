@@ -8,11 +8,13 @@
 // unreferenced. The fourth check is the one that crashes at runtime rather than
 // merely reading badly: format specifiers must match across languages.
 //
-//   swift Scripts/check-localizations.swift
+//   swift Scripts/check-localizations.swift   (from macos/, or any cwd —
+//   paths resolve against the script location, not the working directory)
 //
 import Foundation
 
-let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+let scriptURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardized
+let root = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
 let localizations = root.appendingPathComponent("Resources/Localizations")
 let shareLocalizations = root.appendingPathComponent("Resources/ShareLocalizations")
 let sources = root.appendingPathComponent("Sources")

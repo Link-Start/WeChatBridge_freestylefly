@@ -9,6 +9,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo root is one level further up since the macOS package moved under macos/;
+# assets both platforms consume live in shared/, not Resources/.
+REPO_ROOT="$(cd "$ROOT/.." && pwd)"
+SHARED="$REPO_ROOT/shared"
 source "$ROOT/Scripts/share-slots.sh"
 APP_INFO="$ROOT/Resources/Info.plist"
 SHARE_INFO="$ROOT/Resources/Share-Info.plist"
@@ -17,7 +21,7 @@ SHARE_ENTITLEMENTS="$ROOT/Resources/WeChatBridgeShare.entitlements"
 
 plutil -lint "$APP_INFO" "$SHARE_INFO" "$APP_ENTITLEMENTS" "$SHARE_ENTITLEMENTS" >/dev/null
 plutil -lint "$ROOT"/Resources/Localizations/*/*.strings "$ROOT"/Resources/ShareLocalizations/*/*/*.strings >/dev/null
-python3 -m json.tool "$ROOT/Resources/Skills/catalog.json" >/dev/null
+python3 -m json.tool "$SHARED/Skills/catalog.json" >/dev/null
 
 if [ "${#SHARE_SLOTS[@]}" -ne 9 ]; then
 	echo "expected 9 Share-menu entries, found ${#SHARE_SLOTS[@]}" >&2
@@ -85,7 +89,7 @@ for SLOT_ROW in "${SHARE_SLOTS[@]}"; do
 		exit 1
 	fi
 	LOGO_NAME="$(share_logo_name "$SLOT")"
-	if [ -n "$LOGO_NAME" ] && [ ! -s "$ROOT/Resources/AppLogos/$LOGO_NAME" ]; then
+	if [ -n "$LOGO_NAME" ] && [ ! -s "$SHARED/AppLogos/$LOGO_NAME" ]; then
 		echo "share slot $SLOT is missing artwork $LOGO_NAME" >&2
 		exit 1
 	fi
@@ -207,7 +211,7 @@ if [ ! -x "$ROOT/Scripts/make-app.sh" ] || [ ! -x "$ROOT/Scripts/install-dev-bui
 	echo "build scripts must stay executable" >&2
 	exit 1
 fi
-for REQUIRED in "$ROOT/LICENSE" "$ROOT/Resources/AppIcon.icns"; do
+for REQUIRED in "$REPO_ROOT/LICENSE" "$ROOT/Resources/AppIcon.icns"; do
 	if [ ! -s "$REQUIRED" ]; then
 		echo "missing required distribution resource: $REQUIRED" >&2
 		exit 1
@@ -217,9 +221,9 @@ done
 # Skill resources ship inside the app. The catalogue may keep a package as
 # null until the author supplies it, but every declared package must be a real
 # directory with SKILL.md, and no symlink may escape the bundle.
-SKILLS_ROOT="$ROOT/Resources/Skills"
+SKILLS_ROOT="$SHARED/Skills"
 if find "$SKILLS_ROOT" -type l | grep -q .; then
-	echo "Resources/Skills contains symbolic links" >&2
+	echo "shared/Skills contains symbolic links" >&2
 	exit 1
 fi
 while IFS= read -r PACKAGE; do
@@ -243,7 +247,7 @@ for AGENT_ROOT in ".codex/skills" ".qwenworkcn/skills" ".workbuddy/skills"; do
 	fi
 done
 for LOGO in doubao qwen claude chatgpt obsidian workbuddy; do
-	if ! find "$ROOT/Resources/AppLogos" -maxdepth 1 -iname "*$LOGO*" -type f | grep -q .; then
+	if ! find "$SHARED/AppLogos" -maxdepth 1 -iname "*$LOGO*" -type f | grep -q .; then
 		echo "missing Agent logo: $LOGO" >&2
 		exit 1
 	fi
@@ -295,7 +299,7 @@ if [ ! -x "$ROOT/Scripts/make-dmg.sh" ] || [ ! -x "$ROOT/Scripts/release.sh" ]; 
 	echo "release scripts must stay executable" >&2
 	exit 1
 fi
-for REQUIRED in "$ROOT/THIRD-PARTY-NOTICES.md" "$ROOT/Resources/Licenses/Sparkle-LICENSE.txt"; do
+for REQUIRED in "$REPO_ROOT/THIRD-PARTY-NOTICES.md" "$ROOT/Resources/Licenses/Sparkle-LICENSE.txt"; do
 	if [ ! -s "$REQUIRED" ]; then
 		echo "missing required distribution resource: $REQUIRED" >&2
 		exit 1

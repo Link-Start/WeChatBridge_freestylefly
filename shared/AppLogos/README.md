@@ -14,6 +14,7 @@ Doubao, Qwen, Obsidian, and WorkBuddy use the China App Store listing.
 Claude and ChatGPT have no China App Store listing, so their official
 international artwork is used.
 
-`Scripts/make-app.sh` turns these into one `.icns` per matching Share
+`macos/Scripts/make-app.sh` turns these into one `.icns` per matching Share
 Extension. The settings pane uses the same files when the destination app is
-not installed.
+not installed. On Windows they are published to `Resources/AppLogos` and used
+by the Entries pane and target pickers.

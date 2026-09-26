@@ -18,7 +18,7 @@ run = "swift run WeChatBridge"
 
 [tasks.icon]
 description = "Package AppIcon-artwork.png as the macOS PNG, ICNS and README icon"
-run = "swift Scripts/make-icon.swift Resources/AppIcon-artwork.png Resources/AppIcon.png Resources/AppIcon.icns Resources/Screenshots/app-icon-rounded.png"
+run = "swift Scripts/make-icon.swift Resources/AppIcon-artwork.png Resources/AppIcon.png Resources/AppIcon.icns ../shared/Screenshots/app-icon-rounded.png"
 
 [tasks.bundle]
 description = "Assemble and sign a host-architecture dist/微信流.app"

@@ -5,6 +5,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# site/ (the Sparkle feed + release notes GitHub Pages serves) lives at the
+# repository root, one level above this macOS package.
+REPO_ROOT="$(cd "$ROOT/.." && pwd)"
 # shellcheck source=share-slots.sh
 source "$ROOT/Scripts/share-slots.sh"
 VERSION="${VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Resources/Info.plist")}"
@@ -116,14 +119,14 @@ if [ "$GENERATE_APPCAST" = "1" ]; then
 	mkdir -p "$UPDATES_DIR"
 	# The previous feed is the input, so the new appcast keeps every older
 	# item and only appends this release.
-	if [ -f "$ROOT/site/appcast.xml" ]; then
-		cp "$ROOT/site/appcast.xml" "$UPDATES_DIR/appcast.xml"
+	if [ -f "$REPO_ROOT/site/appcast.xml" ]; then
+		cp "$REPO_ROOT/site/appcast.xml" "$UPDATES_DIR/appcast.xml"
 	fi
 	cp "$DMG" "$UPDATES_DIR/"
 	# Release notes ride along under the archive's own name: generate_appcast
 	# signs them and links the copy GitHub Pages serves from site/.
-	if [ -f "$ROOT/site/WeChatBridge-$VERSION.md" ]; then
-		cp "$ROOT/site/WeChatBridge-$VERSION.md" "$UPDATES_DIR/"
+	if [ -f "$REPO_ROOT/site/WeChatBridge-$VERSION.md" ]; then
+		cp "$REPO_ROOT/site/WeChatBridge-$VERSION.md" "$UPDATES_DIR/"
 	fi
 	"$SPARKLE_TOOLS/generate_appcast" \
 		--download-url-prefix "https://github.com/$REPOSITORY_SLUG/releases/download/$TAG/" \

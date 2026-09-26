@@ -19,10 +19,10 @@ DerivedData/
 /DUKOU_MACOS_IMPLEMENTATION_RESEARCH.md
 
 # One-off probes used to recover WeChat's export behaviour. The verified
-# implementation lives in Sources/ and Tests/; shipping these would ship a
-# second, unmaintained automation client beside the app.
-/Scripts/wechat-*
-/Scripts/verify-wechat-export.py
+# implementation lives in macos/Sources/ and macos/Tests/; shipping these would
+# ship a second, unmaintained automation client beside the app.
+/macos/Scripts/wechat-*
+/macos/Scripts/verify-wechat-export.py
 
 # macOS
 .DS_Store
