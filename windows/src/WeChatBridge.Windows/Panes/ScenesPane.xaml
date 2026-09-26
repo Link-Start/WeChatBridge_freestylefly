@@ -418,13 +418,23 @@
                                     <TextBox x:Name="EditSummary" Margin="0,5,0,0"
                                              Style="{StaticResource MacField}"
                                              LostFocus="EditField_LostFocus" />
-                                    <TextBlock Margin="0,16,0,0" Text="提示词"
-                                               Style="{StaticResource FieldLabel}" />
+                                    <Grid Margin="0,16,0,0">
+                                        <TextBlock Text="提示词" VerticalAlignment="Center"
+                                                   Style="{StaticResource FieldLabel}" />
+                                        <!-- Not focusable: the prompt keeps focus and its caret. -->
+                                        <Button x:Name="InsertSkillButton" HorizontalAlignment="Right"
+                                                Style="{StaticResource SettingsButton}" Focusable="False"
+                                                Padding="10,2" FontSize="11.5" Content="插入技能"
+                                                ToolTip="在光标处插入 {{skill:id}} 技能引用"
+                                                Click="InsertSkill_Click" />
+                                    </Grid>
                                     <TextBox x:Name="EditPrompt" Margin="0,5,0,0" Padding="10,8"
                                              Style="{StaticResource MacField}" FontSize="12.5"
                                              MinHeight="120" AcceptsReturn="True"
                                              TextWrapping="Wrap"
                                              VerticalScrollBarVisibility="Auto"
+                                             TextChanged="EditPrompt_TextChanged"
+                                             SelectionChanged="EditPrompt_SelectionChanged"
                                              LostFocus="EditField_LostFocus" />
                                 </StackPanel>
 
@@ -451,6 +461,48 @@
                                             Background="{StaticResource SunkenColor}">
                                         <!-- Read-only TextBox: selectable text like macOS .textSelection(.enabled). -->
                                         <TextBox x:Name="ReadPrompt" FontSize="13" IsReadOnly="True"
+                                                 TextWrapping="Wrap" BorderThickness="0"
+                                                 Background="Transparent" Padding="0"
+                                                 Foreground="{StaticResource InkColor}" />
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- 引用的技能 + 提示词预览: how each {{skill:id}}
+                                     reaches the chosen agent, and the exact text it gets. -->
+                                <StackPanel x:Name="SkillPanel" Margin="0,16,0,0" Visibility="Collapsed">
+                                    <TextBlock Text="引用的技能" Style="{StaticResource FieldLabel}" />
+                                    <TextBlock x:Name="SkillRefsText" Margin="0,5,0,0" FontSize="12"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource InkSecondaryColor}" />
+                                    <Border x:Name="SkillWarnBar" Margin="0,8,0,0" Padding="10,6"
+                                            CornerRadius="8" Background="{StaticResource WarnFillColor}"
+                                            Visibility="Collapsed">
+                                        <TextBlock x:Name="SkillWarnText" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource WarnInkColor}" />
+                                    </Border>
+
+                                    <Grid Margin="0,16,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="提示词预览" VerticalAlignment="Center"
+                                                   Style="{StaticResource FieldLabel}" />
+                                        <ComboBox x:Name="PreviewAgentBox" Grid.Column="1" Width="190"
+                                                  Style="{StaticResource MacCombo}"
+                                                  SelectionChanged="PreviewAgent_Changed">
+                                            <ComboBox.Resources>
+                                                <Style TargetType="{x:Type ComboBoxItem}"
+                                                       BasedOn="{StaticResource MacComboItem}" />
+                                            </ComboBox.Resources>
+                                        </ComboBox>
+                                    </Grid>
+                                    <TextBlock Margin="0,3,0,8" FontSize="12"
+                                               Foreground="{StaticResource InkTertiaryColor}"
+                                               Text="转发到所选目标时，粘贴在文件之前的提示词（不含续聊要求）。" />
+                                    <Border Padding="10,8" CornerRadius="8"
+                                            Background="{StaticResource SunkenColor}">
+                                        <TextBox x:Name="PreviewPrompt" FontSize="12.5" IsReadOnly="True"
                                                  TextWrapping="Wrap" BorderThickness="0"
                                                  Background="Transparent" Padding="0"
                                                  Foreground="{StaticResource InkColor}" />

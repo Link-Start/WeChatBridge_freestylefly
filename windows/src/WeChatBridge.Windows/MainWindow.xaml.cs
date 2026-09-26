@@ -47,16 +47,22 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         var scenesPane = new ScenesPane();
+        var skillsPane = new SkillsPane();
         _panes = new Dictionary<AppTab, (string, string, UIElement)>
         {
             [AppTab.History] = ("记录", "每一批转发的去向与结果", new HistoryPane()),
             [AppTab.General] = ("通用", "运行状态、启动项与保留策略", new GeneralPane()),
             [AppTab.Entries] = ("入口", "微信「转发到其他应用」里的可用操作", new EntriesPane()),
             [AppTab.Scenes] = ("场景", "按群聊绑定提示词与适用 Agent", scenesPane),
-            [AppTab.Skills] = ("技能中心", "各 Agent 可安装与调用的技能包", new SkillsPane()),
+            [AppTab.Skills] = ("技能中心", "各 Agent 可安装与调用的技能包", skillsPane),
             [AppTab.About] = ("关于", "版本信息与项目链接", new AboutPane()),
         };
-        scenesPane.Bind(model.Scenes);
+        scenesPane.Bind(model.Scenes, model.Skills);
+        skillsPane.ScenesRequested += skillId =>
+        {
+            SelectTab(AppTab.Scenes);
+            scenesPane.ShowScenesReferencing(skillId);
+        };
 
         DataContext = _model;
         PaneHost.Content = _panes[AppTab.History].Pane;

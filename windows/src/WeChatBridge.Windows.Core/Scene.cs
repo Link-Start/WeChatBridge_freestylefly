@@ -28,6 +28,17 @@ public sealed class WeChatScene : IJsonOnDeserialized
     public List<AgentId> CompatibleAgents { get; set; } = new(AgentIds.All);
     public bool IsOfficial { get; set; }
 
+    /// <summary>
+    /// Every skill the scene depends on: inline <c>{{skill:id}}</c> references
+    /// in the prompt first, then declared ids not referenced inline.
+    /// </summary>
+    public IReadOnlyList<string> EffectiveSkillIDs() =>
+        SkillReference.Parse(Instruction)
+            .Concat(SkillReference.Parse(OutputSpec))
+            .Concat(RequiredSkillIDs)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
     void IJsonOnDeserialized.OnDeserialized()
     {
         // macOS decodes a missing isOfficial from the official id prefix.
@@ -42,7 +53,8 @@ public sealed class WeChatScene : IJsonOnDeserialized
 /// </summary>
 public sealed class ScenePackage
 {
-    public const int CurrentSchemaVersion = 2;
+    /// <summary>3 adds inline <c>{{skill:id}}</c> references inside the prompt text.</summary>
+    public const int CurrentSchemaVersion = 3;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public required string Id { get; set; }
@@ -67,7 +79,7 @@ public sealed class ScenePackage
         Keywords = new(scene.Keywords),
         Instruction = scene.Instruction,
         OutputSpec = scene.OutputSpec,
-        RequiredSkillIDs = new(scene.RequiredSkillIDs),
+        RequiredSkillIDs = new(scene.EffectiveSkillIDs()),
         CompatibleAgents = new(scene.CompatibleAgents),
         IsOfficial = scene.IsOfficial,
     };
@@ -187,12 +199,12 @@ public sealed class SceneSettings
             Id = "wechatflow.official.article-extract",
             Name = "公众号文章提取",
             Summary = "从聊天记录中找出公众号文章，提取正文并整理成 Markdown。",
-            Instruction = "读取附件中的聊天记录，找出公众号文章链接或分享卡片，提取标题、公众号、发布时间、正文和图片，并保留原文链接。",
+            Instruction = "读取附件中的聊天记录，找出公众号文章链接或分享卡片，用 {{skill:wechat-article-extract}} 提取标题、公众号、发布时间、正文和图片，并保留原文链接。",
             OutputSpec = "按文章逐篇输出 Markdown：标题、公众号、发布时间、核心摘要、正文、图片、原文链接。无法访问的文章明确标记。",
             Keywords = ["公众号", "文章"],
             Author = "微信流",
             Applicability = "适合包含公众号文章分享的群聊和收藏群。",
-            RequiredSkillIDs = ["wechatbridge.wechat-article-extract"],
+            RequiredSkillIDs = ["wechat-article-extract"],
             IsOfficial = true,
         },
         new WeChatScene
@@ -200,12 +212,12 @@ public sealed class SceneSettings
             Id = "wechatflow.official.video-reading",
             Name = "视频信息读取",
             Summary = "读取聊天里的视频链接或文件，提炼逐字稿、摘要和关键时间点。",
-            Instruction = "读取附件中的聊天记录，找出视频链接或本地视频文件，提取可获得的逐字稿、摘要、关键结论和时间点，并保留来源。",
+            Instruction = "读取附件中的聊天记录，找出视频链接或本地视频文件，用 {{skill:video-information-reading}} 提取可获得的逐字稿、摘要、关键结论和时间点，并保留来源。",
             OutputSpec = "输出来源、时长、逐字稿或摘要、关键结论、关键时间点和无法读取的部分。",
             Keywords = ["视频", "抖音", "B站"],
             Author = "微信流",
             Applicability = "适合经常分享视频链接或视频文件的群聊。",
-            RequiredSkillIDs = ["wechatbridge.video-information-reading"],
+            RequiredSkillIDs = ["video-information-reading"],
             IsOfficial = true,
         },
     ];
@@ -220,9 +232,17 @@ public sealed class SceneSettings
         foreach (var starter in StarterScenes())
         {
             var index = Scenes.FindIndex(s => s.Id == starter.Id && s.IsOfficial);
-            if (index >= 0)
-                Scenes[index].CompatibleAgents = new(starter.CompatibleAgents);
+            if (index < 0)
+                continue;
+            // Official scenes are read-only templates, so their prompt and skill
+            // wiring follow the shipped version rather than a stale stored copy.
+            Scenes[index].CompatibleAgents = new(starter.CompatibleAgents);
+            Scenes[index].Instruction = starter.Instruction;
+            Scenes[index].OutputSpec = starter.OutputSpec;
+            Scenes[index].RequiredSkillIDs = new(starter.RequiredSkillIDs);
         }
+        foreach (var scene in Scenes)
+            SkillId.Migrate(scene);
         Normalize();
     }
 
@@ -509,15 +529,20 @@ public static class GroupFingerprint
 /// <summary>Renders the prompt pasted ahead of the files, ported from ScenePrompt.</summary>
 public static class ScenePrompt
 {
+    /// <param name="skills">
+    /// Resolves each <c>{{skill:id}}</c> for the destination. Null (no skill
+    /// service available) still renders every reference, naming skills by id.
+    /// </param>
     public static string? Render(
         WeChatScene scene,
         DateTimeOffset? previousSummaryAt,
         DateTimeOffset? currentEnd = null,
-        IReadOnlyDictionary<string, string>? skillNames = null,
+        SkillRenderContext? skills = null,
         CultureInfo? culture = null)
     {
-        var instruction = scene.Instruction.Trim();
-        var output = scene.OutputSpec.Trim();
+        skills ??= new SkillRenderContext(null, id => new SkillResolution(id, id, SkillRenderMode.Missing));
+        var instruction = SkillReference.Replace(scene.Instruction, skills.Phrase).Trim();
+        var output = SkillReference.Replace(scene.OutputSpec, skills.Phrase).Trim();
         if (instruction.Length == 0 && output.Length == 0)
             return null;
 
@@ -526,14 +551,21 @@ public static class ScenePrompt
             parts.Add(instruction);
         if (output.Length > 0)
             parts.Add($"输出规范：\n{output}");
-        if (scene.RequiredSkillIDs.Count > 0)
+        if (scene.EffectiveSkillIDs().Count > 0)
         {
-            var names = scene.RequiredSkillIDs
-                .Select(id => skillNames is not null && skillNames.TryGetValue(id, out var n) ? n : id);
-            parts.Add(
-                "技能要求：\n如果当前 Agent 已安装以下 Skill，请优先使用："
-                + string.Join("、", names)
-                + "。\n如果 Skill 不可用，请继续执行该场景，并明确说明哪些部分未使用 Skill、未完成或未验证。");
+            // Inline references already carry their phrase; only declared-only
+            // skills (official or legacy scenes) are listed here.
+            var inline = SkillReference.Parse(scene.Instruction)
+                .Concat(SkillReference.Parse(scene.OutputSpec))
+                .ToHashSet(StringComparer.Ordinal);
+            var listed = scene.RequiredSkillIDs
+                .Where(id => !inline.Contains(id))
+                .Distinct(StringComparer.Ordinal)
+                .Select(id => $"- 使用{skills.Phrase(id)}");
+            parts.Add(string.Join("\n",
+                new[] { "技能要求：" }
+                    .Concat(listed)
+                    .Append("如果技能不可用，请继续执行该场景，并明确说明哪些部分未使用技能、未完成或未验证。")));
         }
         if (previousSummaryAt is { } prev && currentEnd is { } end && end > prev)
         {

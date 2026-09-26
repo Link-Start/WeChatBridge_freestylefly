@@ -23,6 +23,8 @@ namespace WeChatBridge.Windows.Panes;
 public partial class ScenesPane : UserControl
 {
     private SceneService? _service;
+    private SkillService? _skills;
+    private int _promptCaret;
     private SceneSettings _settings = new();
     private IReadOnlyDictionary<string, GroupMemory> _memories =
         new Dictionary<string, GroupMemory>();
@@ -49,9 +51,17 @@ public partial class ScenesPane : UserControl
         };
     }
 
-    /// <summary>Wire the pane to its service. Idempotent.</summary>
-    public void Bind(SceneService service)
+    /// <summary>
+    /// Wire the pane to its service. Idempotent. <paramref name="skills"/>
+    /// powers 插入技能 and the prompt preview; without it both stay hidden.
+    /// </summary>
+    public void Bind(SceneService service, SkillService? skills = null)
     {
+        if (skills is not null && !ReferenceEquals(_skills, skills))
+        {
+            _skills = skills;
+            BuildPreviewAgents();
+        }
         if (ReferenceEquals(_service, service))
         {
             ReloadAll();
@@ -220,8 +230,12 @@ public partial class ScenesPane : UserControl
             OfficialHint.Visibility = Visibility.Collapsed;
             EditName.Text = scene.Name;
             EditSummary.Text = scene.Summary;
-            EditPrompt.Text = prompt;
+            // Reassigning identical text would reset the caret 插入技能 relies on.
+            if (EditPrompt.Text != prompt)
+                EditPrompt.Text = prompt;
         }
+        InsertSkillButton.Visibility = _skills is null ? Visibility.Collapsed : Visibility.Visible;
+        RebuildSkillPanel(scene);
 
         AgentGrid.ItemsSource = AgentIds.All
             .Select(agent => new AgentRow
@@ -269,6 +283,148 @@ public partial class ScenesPane : UserControl
                 scene.Instruction,
                 string.IsNullOrWhiteSpace(scene.OutputSpec) ? "" : $"输出规范：\n{scene.OutputSpec}",
             }.Where(part => part.Trim().Length > 0));
+
+    /// <summary>
+    /// Opens the scene page on the first scene that references
+    /// <paramref name="skillId"/> — the target of the skills page's 用于 N 个场景.
+    /// </summary>
+    public void ShowScenesReferencing(string skillId)
+    {
+        ShowScenesPage_Click(this, new RoutedEventArgs());
+        if (Service is not { } service)
+            return;
+        SceneSearch.Text = "";
+        var match = service.LoadSettings().Scenes
+            .FirstOrDefault(s => s.EffectiveSkillIDs().Contains(skillId));
+        if (match is null)
+            return;
+        CommitEdits();
+        _selectedSceneId = match.Id;
+        ReloadAll();
+    }
+
+    // MARK: - Skill references & preview
+
+    private WeChatScene? SelectedScene =>
+        _settings.Scenes.FirstOrDefault(s => s.Id == _selectedSceneId);
+
+    private AgentId? PreviewAgent =>
+        (PreviewAgentBox.SelectedItem as ComboBoxItem)?.Tag is AgentId agent ? agent : null;
+
+    private void BuildPreviewAgents()
+    {
+        PreviewAgentBox.Items.Clear();
+        PreviewAgentBox.Items.Add(new ComboBoxItem { Content = "无 Agent（剪贴板 / 自定义）" });
+        foreach (var agent in AgentIds.All)
+            PreviewAgentBox.Items.Add(new ComboBoxItem { Content = agent.DisplayName(), Tag = agent });
+        PreviewAgentBox.SelectedIndex = 1;
+    }
+
+    /// <summary>
+    /// The scene as it would be saved right now: user scenes take the unsaved
+    /// prompt text (merged into Instruction, like <see cref="CommitEdits"/>).
+    /// </summary>
+    private WeChatScene Draft(WeChatScene scene)
+    {
+        if (scene.IsOfficial || EditFields.Visibility != Visibility.Visible)
+            return scene;
+        return new WeChatScene
+        {
+            Id = scene.Id,
+            Instruction = EditPrompt.Text,
+            RequiredSkillIDs = SkillReference.Parse(EditPrompt.Text).ToList(),
+            CompatibleAgents = scene.CompatibleAgents,
+        };
+    }
+
+    private void RebuildSkillPanel(WeChatScene scene)
+    {
+        if (_skills is not { } skills)
+        {
+            SkillPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+        SkillPanel.Visibility = Visibility.Visible;
+        var draft = Draft(scene);
+        var agent = PreviewAgent;
+        var context = skills.PromptContext(agent);
+
+        var resolved = draft.EffectiveSkillIDs().Select(context.Resolve).ToList();
+        SkillRefsText.Text = resolved.Count == 0
+            ? "没有引用技能。点「插入技能」可在光标处插入 {{skill:id}}。"
+            : string.Join("\n", resolved.Select(r => $"• {r.DisplayName}（{r.Id}）：{ModeText(r.Mode, agent)}"));
+
+        var warnings = SkillReference.Invalid(draft.Instruction)
+            .Select(id => $"「{id}」不是有效的技能 ID（只能使用小写字母、数字和连字符）。")
+            .Concat(resolved.Where(r => r.Mode == SkillRenderMode.Unknown)
+                .Select(r => $"未找到技能「{r.Id}」，转发时会提示 Agent 该技能不存在。"))
+            .ToList();
+        SkillWarnText.Text = string.Join("\n", warnings);
+        SkillWarnBar.Visibility = warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        PreviewPrompt.Text = agent is { } target && !draft.CompatibleAgents.Contains(target)
+            ? $"这个场景不适用于 {target.DisplayName()}，转发时不会附加提示词。"
+            : ScenePrompt.Render(draft, null, skills: context) ?? "（提示词为空）";
+    }
+
+    private static string ModeText(SkillRenderMode mode, AgentId? agent) => mode switch
+    {
+        SkillRenderMode.Native => "已安装到该 Agent",
+        SkillRenderMode.Path => "通过技能库中的 SKILL.md 引用",
+        SkillRenderMode.Missing when agent is null => "技能库中暂无技能包",
+        SkillRenderMode.Missing => "该 Agent 无法使用，转发时会要求说明未完成部分",
+        _ => "未找到该技能",
+    };
+
+    private void EditPrompt_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loaded && SelectedScene is { } scene)
+            RebuildSkillPanel(scene);
+    }
+
+    private void EditPrompt_SelectionChanged(object sender, RoutedEventArgs e)
+    {
+        if (EditPrompt.IsKeyboardFocusWithin)
+            _promptCaret = EditPrompt.CaretIndex;
+    }
+
+    private void PreviewAgent_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loaded && SelectedScene is { } scene)
+            RebuildSkillPanel(scene);
+    }
+
+    /// <summary>插入技能 — a menu of referenceable skills; the pick lands at the caret.</summary>
+    private void InsertSkill_Click(object sender, RoutedEventArgs e)
+    {
+        if (_skills is not { } skills)
+            return;
+        var menu = new ContextMenu();
+        var choices = skills.ReferenceableSkills();
+        if (choices.Count == 0)
+            menu.Items.Add(new MenuItem { Header = "没有可引用的技能", IsEnabled = false });
+        foreach (var (id, name) in choices)
+        {
+            var state = skills.Library.State(id) switch
+            {
+                SkillLibraryState.Ready => "",
+                SkillLibraryState.Conflict => " · 技能库中已被修改",
+                _ => " · 暂无技能包",
+            };
+            AddItem(menu, $"{name}（{id}）{state}", (_, _) => InsertToken(SkillReference.Token(id)));
+        }
+        menu.PlacementTarget = InsertSkillButton;
+        menu.IsOpen = true;
+    }
+
+    private void InsertToken(string token)
+    {
+        var caret = Math.Clamp(_promptCaret, 0, EditPrompt.Text.Length);
+        EditPrompt.Text = EditPrompt.Text.Insert(caret, token);
+        EditPrompt.Focus();
+        EditPrompt.CaretIndex = caret + token.Length;
+        _promptCaret = EditPrompt.CaretIndex;
+    }
 
     private void ShowScenesPage_Click(object sender, RoutedEventArgs e)
     {

@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using WeChatBridge.Windows.Core;
 using WeChatBridge.Windows.Services;
 
@@ -96,12 +96,12 @@ public sealed class SkillServiceTests : IDisposable
     public void CatalogProducesOneRowPerSkillWithPerAgentStatus()
     {
         WriteCatalog(
-            Skill("wechatbridge.packaged", "pkg",
+            Skill("wechatbridge-packaged", "pkg",
                 [AgentId.ChatGptCodex, AgentId.Doubao, AgentId.WorkBuddy]),
-            Skill("wechatbridge.unshipped", null, [AgentId.ChatGptCodex, AgentId.Claude]));
+            Skill("wechatbridge-unshipped", null, [AgentId.ChatGptCodex, AgentId.Claude]));
         WritePackage("pkg");
         var service = MakeService(scenes:
-            [new WeChatScene { RequiredSkillIDs = ["wechatbridge.packaged"] }]);
+            [new WeChatScene { RequiredSkillIDs = ["wechatbridge-packaged"] }]);
 
         Assert.Equal(2, service.Rows.Count);
         Assert.Equal(2, service.SkillCount);
@@ -134,7 +134,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task InstallMarksTheAgentRowAndRefreshesTheCard()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.ChatGptCodex, AgentId.Doubao]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.ChatGptCodex, AgentId.Doubao]);
         WriteCatalog(skill);
         WritePackage("pkg");
         var service = MakeService();
@@ -165,7 +165,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task VersionBumpsReportUpdateThenInstall()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.ChatGptCodex]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.ChatGptCodex]);
         WriteCatalog(skill);
         WritePackage("pkg", "# v1\n");
         var service = MakeService();
@@ -193,7 +193,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task ForeignDirectoryConflictsUntilExplicitlyReplaced()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.ChatGptCodex]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.ChatGptCodex]);
         WriteCatalog(skill);
         WritePackage("pkg");
         var target = Path.Combine(_home, ".codex", "skills", skill.Id);
@@ -218,7 +218,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task ExternalEditsReadAsConflict()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.ChatGptCodex]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.ChatGptCodex]);
         WriteCatalog(skill);
         WritePackage("pkg");
         var service = MakeService();
@@ -239,7 +239,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task ManualAgentsRoundTripConfirmations()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.Doubao]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.Doubao]);
         WriteCatalog(skill);
         WritePackage("pkg");
         var service = MakeService();
@@ -264,7 +264,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public void UninstalledManualAgentReadsAsUnavailable()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.ChatGptCodex, AgentId.Claude]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.ChatGptCodex, AgentId.Claude]);
         WriteCatalog(skill);
         WritePackage("pkg");
         var service = MakeService(agentInstalled: agent => agent != AgentId.Claude);
@@ -285,7 +285,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task InstallAllMissingOnlyTouchesDirectAgents()
     {
-        WriteCatalog(Skill("wechatbridge.test", "pkg",
+        WriteCatalog(Skill("wechatbridge-test", "pkg",
             [AgentId.ChatGptCodex, AgentId.WorkBuddy, AgentId.Doubao]));
         WritePackage("pkg");
         var service = MakeService();
@@ -305,7 +305,7 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public async Task ManualArchiveIsAValidZipWithSkillRoot()
     {
-        var skill = Skill("wechatbridge.test", "pkg", [AgentId.Claude]);
+        var skill = Skill("wechatbridge-test", "pkg", [AgentId.Claude]);
         WriteCatalog(skill);
         WritePackage("pkg");
         var service = MakeService();
@@ -344,11 +344,11 @@ public sealed class SkillServiceTests : IDisposable
     [Fact]
     public void SceneBadgeCountsOnlyMatchingScenes()
     {
-        WriteCatalog(Skill("wechatbridge.test", null, [AgentId.Doubao]));
+        WriteCatalog(Skill("wechatbridge-test", null, [AgentId.Doubao]));
         var service = MakeService(scenes:
         [
-            new WeChatScene { RequiredSkillIDs = ["wechatbridge.test"] },
-            new WeChatScene { RequiredSkillIDs = ["other", "wechatbridge.test"] },
+            new WeChatScene { RequiredSkillIDs = ["wechatbridge-test"] },
+            new WeChatScene { RequiredSkillIDs = ["other", "wechatbridge-test"] },
             new WeChatScene { RequiredSkillIDs = ["other"] },
         ]);
         Assert.Equal(2, Assert.Single(service.Rows).SceneCount);

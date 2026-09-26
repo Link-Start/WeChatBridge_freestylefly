@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using WeChatBridge.Windows.Core;
 
 namespace WeChatBridge.Windows.Tests;
@@ -235,7 +235,7 @@ public sealed class SkillInstallerTests : IDisposable
     private OfficialSkill MakeSkill(string version = "1.0.0")
     {
         var skill = new OfficialSkill(
-            Id: "dev.wechatbridge.test",
+            Id: "dev-wechatbridge-test",
             Name: "测试技能",
             Summary: "测试",
             Version: version,

@@ -85,4 +85,16 @@ public static class AgentSkillGuides
         AgentId.QwenWork or AgentId.WorkBuddy or AgentId.WeSight => null,
         _ => null,
     };
+
+    /// <summary>
+    /// Whether the agent can open an arbitrary local file named in the prompt —
+    /// the gate for pointing it at the library's SKILL.md. Desktop agents with
+    /// a local workspace can; chat-first apps generally cannot. 待实测: these
+    /// defaults are conservative until each agent is verified on a real machine.
+    /// </summary>
+    public static bool CanReadLocalFiles(this AgentId id) => id switch
+    {
+        AgentId.ChatGptCodex or AgentId.QwenWork or AgentId.WorkBuddy => true,
+        _ => false,
+    };
 }

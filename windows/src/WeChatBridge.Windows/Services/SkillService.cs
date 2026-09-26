@@ -193,11 +193,16 @@ public sealed class SkillRow : INotifyPropertyChanged
     private bool _isExpanded;
     private bool _isBusy;
 
-    internal SkillRow(OfficialSkill skill, int sceneCount, IReadOnlyList<AgentSkillRow> states)
+    internal SkillRow(
+        OfficialSkill skill,
+        int sceneCount,
+        IReadOnlyList<AgentSkillRow> states,
+        SkillLibraryState libraryState = SkillLibraryState.Missing)
     {
         Skill = skill;
         SceneCount = sceneCount;
         States = states;
+        LibraryState = libraryState;
         foreach (var state in states)
             state.Parent = this;
     }
@@ -206,6 +211,22 @@ public sealed class SkillRow : INotifyPropertyChanged
 
     /// <summary>How many stored scenes reference this skill id (用于 N 个场景 badge).</summary>
     public int SceneCount { get; }
+
+    /// <summary>The badge links to the scenes page only when something references the skill.</summary>
+    public bool HasScenes => SceneCount > 0;
+
+    /// <summary>Where the app-owned library copy stands — what path references point at.</summary>
+    public SkillLibraryState LibraryState { get; }
+
+    /// <summary>Library badge text; null hides it (a missing package already has its explainer).</summary>
+    public string? LibraryText => LibraryState switch
+    {
+        SkillLibraryState.Ready => "技能库已就绪",
+        SkillLibraryState.Conflict => "技能库副本已被修改",
+        _ => null,
+    };
+
+    public bool LibraryConflict => LibraryState == SkillLibraryState.Conflict;
 
     public IReadOnlyList<AgentSkillRow> States { get; }
 
@@ -350,6 +371,7 @@ public sealed class SkillService : INotifyPropertyChanged
     private OfficialSkillCatalog _catalog =
         new(OfficialSkillCatalog.CurrentSchemaVersion, []);
     private string? _loadError;
+    private string? _libraryIssue;
     private bool _isBusy;
 
     /// <param name="resourcesRoot">
@@ -364,22 +386,44 @@ public sealed class SkillService : INotifyPropertyChanged
     /// and exe candidates through <see cref="WindowsTargetResolver"/>.
     /// </param>
     /// <param name="scenes">Scene library read for the 用于 N 个场景 badge; null reads the store.</param>
+    /// <param name="library">
+    /// The app-owned skill library. Null uses the real profile location, or —
+    /// when <paramref name="stateDirectory"/> is injected (tests) — Skills and
+    /// SkillBackups folders beside it, so nothing escapes the sandbox.
+    /// </param>
     public SkillService(
         string? resourcesRoot = null,
         string? homeDirectory = null,
         string? stateDirectory = null,
         Func<AgentId, bool>? agentInstalled = null,
-        Func<IReadOnlyList<WeChatScene>>? scenes = null)
+        Func<IReadOnlyList<WeChatScene>>? scenes = null,
+        SkillStore? library = null)
     {
         ResourcesRoot = resourcesRoot ?? FindResourcesRoot();
         _installer = new SkillInstaller(homeDirectory, stateDirectory);
         _agentInstalled = agentInstalled ?? DetectAgentInstalled;
         _scenes = scenes ?? LoadScenes;
+        Library = library ?? (stateDirectory is null
+            ? new SkillStore()
+            : new SkillStore(
+                root: Path.Combine(stateDirectory, "Skills"),
+                configDirectory: stateDirectory,
+                backupRoot: Path.Combine(stateDirectory, "SkillBackups")));
         Reload();
     }
 
     /// <summary>Where <c>Skills/catalog.json</c> was found; null means the build shipped none.</summary>
     public string? ResourcesRoot { get; }
+
+    /// <summary>The app-owned skill library scene prompts point agents at.</summary>
+    public SkillStore Library { get; }
+
+    /// <summary>Last library sync problem (a conflict or I/O failure); null when clean.</summary>
+    public string? LibraryIssue
+    {
+        get => _libraryIssue;
+        private set => Set(ref _libraryIssue, value);
+    }
 
     /// <summary>One card per catalog skill, in catalog order.</summary>
     public ObservableCollection<SkillRow> Rows { get; } = [];
@@ -431,6 +475,7 @@ public sealed class SkillService : INotifyPropertyChanged
                 _catalog = new OfficialSkillCatalog(OfficialSkillCatalog.CurrentSchemaVersion, []);
                 LoadError = error.Message;
             }
+            SyncLibrary(root);
         }
 
         var expanded = Rows.Where(r => r.IsExpanded).Select(r => r.Skill.Id).ToHashSet();
@@ -440,10 +485,11 @@ public sealed class SkillService : INotifyPropertyChanged
         {
             var row = new SkillRow(
                 skill,
-                scenes.Count(s => s.RequiredSkillIDs.Contains(skill.Id)),
+                scenes.Count(s => s.EffectiveSkillIDs().Contains(skill.Id)),
                 skill.SupportedAgents
                     .Select(agent => new AgentSkillRow(agent, Status(skill, agent)))
-                    .ToList());
+                    .ToList(),
+                Library.State(skill.Id));
             row.IsExpanded = expanded.Contains(skill.Id);
             Rows.Add(row);
         }
@@ -453,6 +499,40 @@ public sealed class SkillService : INotifyPropertyChanged
         OnPropertyChanged(nameof(AnyAutomaticMissing));
         OnPropertyChanged(nameof(CanInstallAll));
     }
+
+    /// <summary>Every skill a scene can reference: catalog order, then library-only ids.</summary>
+    public IReadOnlyList<(string Id, string Name)> ReferenceableSkills() =>
+        _catalog.Skills.Select(s => (s.Id, s.Name))
+            .Concat(Library.Entries().Keys
+                .Where(id => _catalog.Skills.All(s => s.Id != id))
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .Select(id => (id, id)))
+            .ToList();
+
+    /// <summary>
+    /// How <paramref name="id"/> reaches <paramref name="agent"/>: native when the
+    /// agent already has it, a pointer to the library's SKILL.md when the agent
+    /// can read local files (or the destination is unknown, e.g. a terminal),
+    /// otherwise missing. Ids nobody knows resolve as unknown.
+    /// </summary>
+    public SkillResolution Resolve(string id, AgentId? agent)
+    {
+        var skill = _catalog.Skills.FirstOrDefault(s => s.Id == id);
+        var file = Library.SkillFile(id);
+        if (skill is null && file is null)
+            return new SkillResolution(id, id, SkillRenderMode.Unknown);
+        var name = skill?.Name ?? id;
+        if (agent is { } target && skill is not null && skill.SupportedAgents.Contains(target)
+            && Status(skill, target) is SkillAgentStatus.Installed
+                or SkillAgentStatus.UpdateAvailable or SkillAgentStatus.ManualConfirmed)
+            return new SkillResolution(id, name, SkillRenderMode.Native);
+        if (file is not null && (agent is null || agent.Value.CanReadLocalFiles()))
+            return new SkillResolution(id, name, SkillRenderMode.Path, file);
+        return new SkillResolution(id, name, SkillRenderMode.Missing);
+    }
+
+    /// <summary>The render context the forward path and the scene preview hand to <see cref="ScenePrompt"/>.</summary>
+    public SkillRenderContext PromptContext(AgentId? agent) => new(agent, id => Resolve(id, agent));
 
     /// <summary>The SHA-verified status of one (skill, agent) pair.</summary>
     public SkillAgentStatus Status(OfficialSkill skill, AgentId agent) =>
@@ -624,6 +704,26 @@ public sealed class SkillService : INotifyPropertyChanged
             // path (导出 ZIP / 我已安装) stays reachable.
         }
         return true;
+    }
+
+    /// <summary>
+    /// Copies shipped official packages into the library. A failure here must
+    /// not take the pane down — it is surfaced through <see cref="LibraryIssue"/>.
+    /// </summary>
+    private void SyncLibrary(string resourcesRoot)
+    {
+        try
+        {
+            var report = Library.SyncOfficial(_catalog, resourcesRoot);
+            LibraryIssue = report.Conflicts.Count == 0
+                ? null
+                : $"技能库中的 {string.Join("、", report.Conflicts)} 被外部修改，未自动更新。";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or SkillInstallException)
+        {
+            LibraryIssue = error.Message;
+        }
     }
 
     private static IReadOnlyList<WeChatScene> LoadScenes()

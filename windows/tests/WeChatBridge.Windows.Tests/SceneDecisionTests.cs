@@ -466,13 +466,14 @@ public sealed class SceneDecisionTests
             Name = "提取文章",
             Instruction = "整理",
             OutputSpec = "输出",
-            RequiredSkillIDs = ["skill.id"],
+            RequiredSkillIDs = ["skill-id"],
             IsOfficial = true,
         };
         var prompt = ScenePrompt.Render(scene, null,
-            skillNames: new Dictionary<string, string> { ["skill.id"] = "文章提取" });
+            skills: new SkillRenderContext(AgentId.Claude,
+                id => new SkillResolution(id, "文章提取", SkillRenderMode.Missing)));
         Assert.Contains("文章提取", prompt);
-        Assert.Contains("如果 Skill 不可用", prompt);
+        Assert.Contains("如果技能不可用", prompt);
     }
 
     [Fact]

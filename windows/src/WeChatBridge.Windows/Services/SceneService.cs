@@ -221,19 +221,19 @@ public sealed class SceneService : IDisposable
     /// <param name="agent">The destination's agent, via
     /// <see cref="AgentIds.Matching"/>; null for destinations without one
     /// (clipboard, Obsidian, most custom targets) attaches the prompt as-is.</param>
-    /// <param name="skillNames">Skill id → display name for the 技能要求
-    /// paragraph; null names skills by id.</param>
+    /// <param name="skills">Resolves inline <c>{{skill:id}}</c> references and
+    /// the 技能要求 section for this destination; null names skills by id.</param>
     public string? RenderPrompt(
         SceneChoice choice,
         AgentId? agent,
-        IReadOnlyDictionary<string, string>? skillNames = null)
+        SkillRenderContext? skills = null)
     {
         if (choice.Scene is not { } scene)
             return null;
         if (agent is { } id && !scene.CompatibleAgents.Contains(id))
             return null;
         return ScenePrompt.Render(
-            scene, choice.PreviousSummaryAt, choice.BatchEnd, skillNames);
+            scene, choice.PreviousSummaryAt, choice.BatchEnd, skills);
     }
 
     // MARK: - Library management (the pane's verbs)
@@ -276,6 +276,15 @@ public sealed class SceneService : IDisposable
         var settings = Scenes.Load();
         if (settings.Scenes.All(s => s.Id != edited.Id))
             return;
+        // User scenes declare skills by referencing them inline; the stored list
+        // follows the prompt so removing a {{skill:id}} drops the dependency.
+        if (!edited.IsOfficial)
+        {
+            edited.RequiredSkillIDs = SkillReference.Parse(edited.Instruction)
+                .Concat(SkillReference.Parse(edited.OutputSpec))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }
         settings.Replace(edited);
         Scenes.Save(settings);
         RaiseChanged();
@@ -512,6 +521,7 @@ public sealed class SceneService : IDisposable
                 continue;
             }
             var scene = package.ToScene();
+            SkillId.Migrate(scene);
             scene.Enabled = true; // a new import starts enabled; Replace keeps a stored switch
             settings.Replace(scene);
             imported++;

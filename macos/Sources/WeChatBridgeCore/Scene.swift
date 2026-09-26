@@ -286,7 +286,7 @@ public struct SceneSettings: Codable, Hashable, Sendable {
                 packageVersion: "1.0.0",
                 author: "微信流",
                 applicability: L10n.text("适合包含公众号文章分享的群聊和收藏群。"),
-                requiredSkillIDs: ["wechatbridge.wechat-article-extract"],
+                requiredSkillIDs: ["wechat-article-extract"],
                 isOfficial: true
             ),
             WeChatScene(
@@ -300,7 +300,7 @@ public struct SceneSettings: Codable, Hashable, Sendable {
                 packageVersion: "1.0.0",
                 author: "微信流",
                 applicability: L10n.text("适合经常分享视频链接或视频文件的群聊。"),
-                requiredSkillIDs: ["wechatbridge.video-information-reading"],
+                requiredSkillIDs: ["video-information-reading"],
                 isOfficial: true
             ),
         ]
@@ -357,6 +357,7 @@ public struct SceneSettings: Codable, Hashable, Sendable {
         for starter in Self.starterScenes {
             guard let index = scenes.firstIndex(where: { $0.id == starter.id && $0.isOfficial }) else { continue }
             scenes[index].compatibleAgents = starter.compatibleAgents
+            scenes[index].requiredSkillIDs = starter.requiredSkillIDs
         }
     }
 

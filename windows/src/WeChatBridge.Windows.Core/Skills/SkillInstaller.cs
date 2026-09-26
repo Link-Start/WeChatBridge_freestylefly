@@ -1,7 +1,6 @@
 using System.IO.Compression;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
+using static WeChatBridge.Windows.Core.SkillPackage;
 
 namespace WeChatBridge.Windows.Core;
 
@@ -26,8 +25,6 @@ public sealed class SkillInstaller
     private const string ConfirmationsFileName = "SkillConfirmations.json";
     private const string NotManagedMessage = "这个技能不是由微信流安装的，不能由微信流删除。";
 
-    private static readonly byte[] DigestSeparator = [0];
-
     private sealed record Metadata(string Id, string Version, string Digest);
 
     /// <remarks>
@@ -40,12 +37,6 @@ public sealed class SkillInstaller
         string Agent,
         string Version,
         DateTimeOffset ConfirmedAt);
-
-    /// <summary>
-    /// A package member. <see cref="RelativePath"/> is always '/'-joined —
-    /// macOS derives it from POSIX paths and the digest bytes must match.
-    /// </summary>
-    private sealed record PackageFile(string FullPath, string RelativePath);
 
     private readonly string _homeDirectory;
     private readonly string _stateDirectory;
@@ -339,10 +330,23 @@ public sealed class SkillInstaller
     private static string ConfirmationKey(string skillId, AgentId agent) =>
         $"{skillId}|{agent.RawValue()}";
 
-    /// <summary>A corrupt or missing file reads as empty, matching the macOS try? decode.</summary>
-    private Dictionary<string, Confirmation> Confirmations() =>
-        ConfigStore.Load<Dictionary<string, Confirmation>>(_stateDirectory, ConfirmationsFileName)
-        ?? new Dictionary<string, Confirmation>(StringComparer.Ordinal);
+    /// <summary>
+    /// A corrupt or missing file reads as empty, matching the macOS try? decode.
+    /// Records written under a legacy dotted skill id are re-keyed on read.
+    /// </summary>
+    private Dictionary<string, Confirmation> Confirmations()
+    {
+        var stored = ConfigStore.Load<Dictionary<string, Confirmation>>(_stateDirectory, ConfirmationsFileName);
+        var result = new Dictionary<string, Confirmation>(StringComparer.Ordinal);
+        if (stored is null)
+            return result;
+        foreach (var confirmation in stored.Values)
+        {
+            var migrated = confirmation with { SkillID = SkillId.Migrate(confirmation.SkillID) };
+            result[$"{migrated.SkillID}|{migrated.Agent}"] = migrated;
+        }
+        return result;
+    }
 
     private void WriteConfirmations(Dictionary<string, Confirmation> values) =>
         ConfigStore.Save(
@@ -385,125 +389,4 @@ public sealed class SkillInstaller
         File.WriteAllText(
             Path.Combine(directory, MetadataFileName),
             JsonSerializer.Serialize(metadata, BatchManifest.JsonOptions));
-
-    private static string ValidatePackage(string root)
-    {
-        if (!Directory.Exists(root))
-            throw new SkillInstallException("技能包目录不存在。");
-        if (!File.Exists(Path.Combine(root, "SKILL.md")))
-            throw new SkillInstallException("技能包缺少 SKILL.md。");
-        return PackageDigest(root);
-    }
-
-    /// <summary>
-    /// Byte-identical digest stream to macOS: per file, the UTF-8 '/'-joined
-    /// relative path, one NUL byte, the file bytes, one NUL byte — enumerated in
-    /// sorted order with the install sidecar skipped.
-    /// </summary>
-    private static string PackageDigest(string root)
-    {
-        using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var file in EnumeratePackageFiles(root))
-        {
-            if (file.RelativePath == MetadataFileName)
-                continue;
-            hasher.AppendData(Encoding.UTF8.GetBytes(file.RelativePath));
-            hasher.AppendData(DigestSeparator);
-            hasher.AppendData(File.ReadAllBytes(file.FullPath));
-            hasher.AppendData(DigestSeparator);
-        }
-        return Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
-    }
-
-    private static void CopyPackage(string source, string destination)
-    {
-        Directory.CreateDirectory(destination);
-        foreach (var file in EnumeratePackageFiles(source))
-        {
-            var target = Path.Combine(
-                destination, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file.FullPath, target);
-        }
-    }
-
-    /// <summary>
-    /// Sorted file enumeration with the macOS safety checks preserved verbatim:
-    /// the root or any member being a symlink/junction (reparse point) rejects
-    /// the package, as does any member that is neither file nor directory.
-    /// The walk recurses manually so a linked directory can never be entered —
-    /// Directory.Enumerate with AllDirectories could follow a junction before
-    /// we had a chance to reject it.
-    /// </summary>
-    private static List<PackageFile> EnumeratePackageFiles(string root)
-    {
-        var rootFull = Path.GetFullPath(root);
-        FileAttributes rootAttributes;
-        try
-        {
-            rootAttributes = File.GetAttributes(rootFull);
-        }
-        catch (Exception error) when (IsFileSystemError(error))
-        {
-            throw new SkillInstallException("技能包目录不存在。");
-        }
-        if (rootAttributes.HasFlag(FileAttributes.ReparsePoint))
-            throw new SkillInstallException("技能包不能包含符号链接。");
-        if (!rootAttributes.HasFlag(FileAttributes.Directory))
-            throw new SkillInstallException("技能包目录无效。");
-
-        var files = new List<PackageFile>();
-        var pending = new Stack<string>();
-        pending.Push(rootFull);
-        while (pending.Count > 0)
-        {
-            var directory = pending.Pop();
-            foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
-            {
-                var attributes = File.GetAttributes(entry);
-                if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                    throw new SkillInstallException("技能包不能包含符号链接。");
-                if (attributes.HasFlag(FileAttributes.Directory))
-                {
-                    pending.Push(entry);
-                    continue;
-                }
-                if (!File.Exists(entry))
-                    throw new SkillInstallException("技能包只能包含普通文件和目录。");
-
-                var relative = Path.GetRelativePath(rootFull, entry).Replace('\\', '/');
-                if (relative.StartsWith("..", StringComparison.Ordinal))
-                    throw new SkillInstallException("技能包包含越界路径。");
-                files.Add(new PackageFile(entry, relative));
-            }
-        }
-
-        // Ordinal ordering is deterministic and matches the macOS relativePath
-        // sort for every path a package can realistically contain.
-        files.Sort(static (a, b) => string.CompareOrdinal(a.RelativePath, b.RelativePath));
-        return files;
-    }
-
-    /// <summary>File OR directory — the analogue of Cocoa fileExists(atPath:).</summary>
-    private static bool PathExists(string path) => File.Exists(path) || Directory.Exists(path);
-
-    private static void MoveAny(string source, string destination)
-    {
-        if (Directory.Exists(source))
-            Directory.Move(source, destination);
-        else
-            File.Move(source, destination);
-    }
-
-    private static void DeleteAny(string path)
-    {
-        if (Directory.Exists(path))
-            Directory.Delete(path, recursive: true);
-        else if (File.Exists(path))
-            File.Delete(path);
-    }
-
-    private static bool IsFileSystemError(Exception error) =>
-        error is IOException or UnauthorizedAccessException or NotSupportedException
-            or System.Security.SecurityException;
 }

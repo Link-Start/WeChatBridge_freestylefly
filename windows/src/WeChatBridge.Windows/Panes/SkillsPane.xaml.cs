@@ -42,6 +42,9 @@ public partial class SkillsPane : UserControl
     /// <summary>The service the pane binds to — exposed for the integrator.</summary>
     public SkillService Service => _service;
 
+    /// <summary>用于 N 个场景 was clicked: the host shows the scenes referencing this skill id.</summary>
+    public event Action<string>? ScenesRequested;
+
     private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshView();
 
     // MARK: - Filtering (the port of scopedRecords + the status/agent filters)
@@ -53,6 +56,8 @@ public partial class SkillsPane : UserControl
         _viewReady = true;
         RebuildAgentChoices();
         ApplyFilter();
+        if (_service.LibraryIssue is { } issue)
+            ShowNotice(issue, warning: true);
     }
 
     private void ApplyFilter()
@@ -153,6 +158,12 @@ public partial class SkillsPane : UserControl
 
     private static AgentSkillRow? AgentOf(object sender) =>
         (sender as FrameworkElement)?.DataContext as AgentSkillRow;
+
+    private void SceneBadge_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardOf(sender) is { HasScenes: true } row)
+            ScenesRequested?.Invoke(row.Skill.Id);
+    }
 
     private void ToggleDetails_Click(object sender, RoutedEventArgs e)
     {

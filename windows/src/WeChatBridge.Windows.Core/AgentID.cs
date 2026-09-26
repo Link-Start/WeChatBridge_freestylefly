@@ -149,6 +149,9 @@ public sealed record OfficialSkillCatalog(int SchemaVersion, IReadOnlyList<Offic
         if (catalog.Skills.Select(s => s.Id).Distinct().Count() != catalog.Skills.Count
             || catalog.Skills.Any(s => string.IsNullOrEmpty(s.Id)))
             throw new SkillInstallException("技能清单内容无效。");
+        if (catalog.Skills.FirstOrDefault(s => !SkillId.IsValid(s.Id)) is { } invalid)
+            throw new SkillInstallException(
+                $"技能 ID「{invalid.Id}」不符合规范：只能包含小写字母、数字和连字符。");
         return catalog;
     }
 }

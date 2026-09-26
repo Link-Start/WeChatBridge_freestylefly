@@ -600,7 +600,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _reader.RecordContext(batch.Id, choice.GroupName, choice.Scene?.Id, choice.Scene?.Name);
         var agent = AgentIds.Matching(action)
             ?? AgentIds.MatchingBundleId(target?.BundleIdentifier);
-        var prompt = Scenes.RenderPrompt(choice, agent);
+        var prompt = Scenes.RenderPrompt(choice, agent,
+            choice.Scene?.EffectiveSkillIDs().Count > 0 ? Skills.PromptContext(agent) : null);
 
         var name = target?.DisplayName ?? action.TargetDisplayName();
         try
@@ -618,7 +619,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 var missing = MissingSkills(choice.Scene, agent);
                 if (missing.Count > 0)
                 {
-                    var names = string.Join("、", missing.Select(s => s.Name));
+                    var names = string.Join("、", missing);
                     ToastRequested?.Invoke(
                         $"场景「{choice.Scene!.Name}」还可安装技能：{names}",
                         "去安装", () => Navigate(AppTab.Skills), true);
@@ -642,26 +643,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// The macOS <c>missingSkills</c> port: the skills a delivered scene
-    /// requires that this agent does not have installed or confirmed yet.
-    /// Touches <see cref="Skills"/> lazily — a share with no scene never
-    /// builds the catalog.
+    /// The macOS <c>missingSkills</c> port: display names of the skills a
+    /// delivered scene references that this agent can use neither natively nor
+    /// through the library's SKILL.md. Touches <see cref="Skills"/> lazily — a
+    /// share with no scene never builds the catalog.
     /// </summary>
-    private List<OfficialSkill> MissingSkills(WeChatScene? scene, AgentId? agent)
+    private List<string> MissingSkills(WeChatScene? scene, AgentId? agent)
     {
-        if (scene is null || agent is null || scene.RequiredSkillIDs.Count == 0)
+        if (scene is null || agent is null || scene.EffectiveSkillIDs().Count == 0)
             return [];
-        var missing = new List<OfficialSkill>();
-        foreach (var skillId in scene.RequiredSkillIDs)
-        {
-            var skill = Skills.Rows.FirstOrDefault(r => r.Skill.Id == skillId)?.Skill;
-            if (skill is null || !skill.SupportedAgents.Contains(agent.Value))
-                continue;
-            if (Skills.Status(skill, agent.Value)
-                    is not (SkillAgentStatus.Installed or SkillAgentStatus.ManualConfirmed))
-                missing.Add(skill);
-        }
-        return missing;
+        return scene.EffectiveSkillIDs()
+            .Select(id => Skills.Resolve(id, agent))
+            .Where(skill => skill.Mode == SkillRenderMode.Missing)
+            .Select(skill => skill.DisplayName)
+            .ToList();
     }
 
     /// <summary>发给… menu contents: built-ins first, then the user's own order.</summary>
