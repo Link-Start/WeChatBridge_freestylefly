@@ -402,7 +402,7 @@
                         <Border Grid.Row="2" Height="1" Background="{StaticResource StrokeColor}" />
 
                         <ListBox x:Name="SceneList" Grid.Row="3" BorderThickness="0"
-                                 Background="Transparent" MinHeight="240" MaxHeight="430"
+                                 Background="Transparent" MinHeight="240"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  ItemContainerStyle="{StaticResource RowItem}"
                                  SelectionChanged="SceneList_SelectionChanged">
@@ -706,8 +706,7 @@
                         </Grid>
                         <Border Grid.Row="2" Height="1" Background="{StaticResource StrokeColor}" />
 
-                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto"
-                                      MaxHeight="430">
+                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="0,4,0,8">
                                 <TextBlock x:Name="BoundHeader" Margin="12,8,12,4" FontSize="12"
                                            Foreground="{StaticResource InkTertiaryColor}"
