@@ -133,7 +133,12 @@
             </StackPanel>
 
             <Border Grid.Row="1" Margin="24,14,24,24">
-                <ContentControl x:Name="PaneHost" />
+                <!-- ContentControl defaults to Left/Top alignment: panes would
+                     keep their desired width and leave dead space on a wide
+                     window — stretch them to fill instead. -->
+                <ContentControl x:Name="PaneHost"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch" />
             </Border>
 
             <!-- Transient status capsule — the in-window port of ToastPresenter:
