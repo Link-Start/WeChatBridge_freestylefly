@@ -43,6 +43,10 @@ public partial class ScenesPane : UserControl
             // MainViewModel, so it cannot inherit it — it must be set directly).
             if (DataContext is SceneService service)
                 Bind(service);
+            else if (_service is not null)
+                // Bind ran before the pane was in the visual tree, when
+                // ReloadAll skipped everything on !_loaded — catch up now.
+                ReloadAll();
         };
         DataContextChanged += (_, _) =>
         {
