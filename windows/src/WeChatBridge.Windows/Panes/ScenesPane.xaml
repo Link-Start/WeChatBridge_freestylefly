@@ -323,11 +323,23 @@
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel>
-            <!-- 场景管理 / 群聊匹配 — the segmented pagePicker: sunken capsule,
+    <!-- Outer container is a Grid, not ScrollViewer+StackPanel: the page
+         grids must fill the viewport so their star rows bound the inner
+         lists. A StackPanel measures children with infinite height, which
+         made the scene list claim every item's height and pushed the page
+         past the window. The inner cards scroll themselves; on a very
+         small window the pane can still overflow — MinHeight keeps that sane. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 场景管理 / 群聊匹配 — the segmented pagePicker: sunken capsule,
                  radius 10, 2px inset, white raised slice for the active page. -->
-            <Border Width="300" Margin="0,4,0,0" Padding="2" CornerRadius="10"
+            <Border x:Name="PageTabs" Grid.Row="0" Width="300" Margin="0,4,0,0"
+                    HorizontalAlignment="Center" Padding="2" CornerRadius="10"
                     Background="{StaticResource SunkenColor}"
                     BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
                 <Grid>
@@ -343,7 +355,7 @@
             </Border>
 
             <!-- =============== 场景管理 page =============== -->
-            <Grid x:Name="ScenesPage" Margin="0,16,0,0" MinHeight="480">
+            <Grid x:Name="ScenesPage" Grid.Row="1" Margin="0,16,0,0" MinHeight="480">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="250" />
                     <ColumnDefinition Width="*" />
@@ -659,7 +671,7 @@
             </Grid>
 
             <!-- =============== 群聊匹配 page =============== -->
-            <Grid x:Name="GroupsPage" Margin="0,16,0,0" MinHeight="480" Visibility="Collapsed">
+            <Grid x:Name="GroupsPage" Grid.Row="1" Margin="0,16,0,0" MinHeight="480" Visibility="Collapsed">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="300" />
                     <ColumnDefinition Width="*" />
@@ -706,7 +718,7 @@
                         </Grid>
                         <Border Grid.Row="2" Height="1" Background="{StaticResource StrokeColor}" />
 
-                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="GroupList" Grid.Row="3" VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="0,4,0,8">
                                 <TextBlock x:Name="BoundHeader" Margin="12,8,12,4" FontSize="12"
                                            Foreground="{StaticResource InkTertiaryColor}"
@@ -918,11 +930,10 @@
             </Grid>
 
             <!-- Notice bar — the macOS SceneNotice line. -->
-            <Border x:Name="NoticeBar" Margin="0,16,0,0" Padding="12,10" CornerRadius="10"
+            <Border x:Name="NoticeBar" Grid.Row="2" Margin="0,16,0,0" Padding="12,10" CornerRadius="10"
                     Background="{StaticResource LiveFillColor}" Visibility="Collapsed">
                 <TextBlock x:Name="NoticeText" FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource LiveInkColor}" />
             </Border>
-        </StackPanel>
-    </ScrollViewer>
+    </Grid>
 </UserControl>
