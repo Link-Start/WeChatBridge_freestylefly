@@ -4,13 +4,14 @@
 的包目录；包目录必须至少包含 `SKILL.md`，也可以包含 `scripts/`、`references/`
 和 `assets/`。
 
-当前两个官方场景已经引用稳定技能 ID，但技能包尚未放入仓库，因此 `package`
-保持为 `null`。把用户提供的技能目录放到本目录后，将 `package` 改为目录名即可：
+当前已随仓库发布两个官方包：
 
 ```text
 shared/Skills/wechat-article-extract/SKILL.md
 shared/Skills/video-information-reading/SKILL.md
 ```
+
+新增官方技能时，把目录放进本目录并把 `package` 写成目录名即可。
 
 技能 ID 必须符合 Agent Skills 命名规范：只含小写字母、数字和单个连字符，最长 64
 个字符，并且与包目录名、`SKILL.md` frontmatter 中的 `name` 完全一致。场景提示词用

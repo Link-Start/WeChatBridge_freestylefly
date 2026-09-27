@@ -180,6 +180,103 @@
             </Setter>
         </Style>
 
+        <!-- The preview-agent dropdown, drawn like the settings chrome: white
+             rounded face, hairline border, chevron, white popup. Scoped here —
+             each pane keeps its own combo style. -->
+        <Style x:Key="MacCombo" TargetType="ComboBox">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{StaticResource InkColor}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Chrome"
+                                    Background="{StaticResource SurfaceColor}"
+                                    BorderBrush="{StaticResource ButtonBorderColor}"
+                                    BorderThickness="1" CornerRadius="10" />
+                            <Grid Margin="{TemplateBinding Padding}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter VerticalAlignment="Center"
+                                                  Content="{TemplateBinding SelectionBoxItem}" />
+                                <TextBlock Grid.Column="1" Margin="10,0,0,0"
+                                           VerticalAlignment="Center" FontSize="11"
+                                           Foreground="{StaticResource InkSecondaryColor}"
+                                           Text="▾" />
+                            </Grid>
+                            <ToggleButton x:Name="DropDownToggle" ClickMode="Press"
+                                          Focusable="False" Background="Transparent"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" />
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup Placement="Bottom" Focusable="False" AllowsTransparency="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}">
+                                <Border MinWidth="{Binding ActualWidth, ElementName=Chrome}"
+                                        Background="{StaticResource SurfaceColor}"
+                                        BorderBrush="{StaticResource StrokeColor}"
+                                        BorderThickness="1" CornerRadius="10"
+                                        Margin="0,4,0,0" Padding="4">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.12" />
+                                    </Border.Effect>
+                                    <ScrollViewer MaxHeight="260" CanContentScroll="False"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background"
+                                        Value="{StaticResource HoverColor}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Padding" Value="10,6" />
+                        <Setter Property="FontSize" Value="12.5" />
+                        <Setter Property="Foreground" Value="{StaticResource InkColor}" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="row" Margin="1" CornerRadius="6"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="Transparent">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="row" Property="Background"
+                                                    Value="{StaticResource HoverColor}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource BrandColor}" />
+                                            <Setter TargetName="row" Property="Background"
+                                                    Value="{StaticResource BrandTintColor}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- The drawn square checkbox macOS uses for the bound-scene list:
              15px rounded box, brand fill + white tick when on. -->
         <Style x:Key="MacCheck" TargetType="CheckBox">
@@ -490,12 +587,7 @@
                                                    Style="{StaticResource FieldLabel}" />
                                         <ComboBox x:Name="PreviewAgentBox" Grid.Column="1" Width="190"
                                                   Style="{StaticResource MacCombo}"
-                                                  SelectionChanged="PreviewAgent_Changed">
-                                            <ComboBox.Resources>
-                                                <Style TargetType="{x:Type ComboBoxItem}"
-                                                       BasedOn="{StaticResource MacComboItem}" />
-                                            </ComboBox.Resources>
-                                        </ComboBox>
+                                                  SelectionChanged="PreviewAgent_Changed" />
                                     </Grid>
                                     <TextBlock Margin="0,3,0,8" FontSize="12"
                                                Foreground="{StaticResource InkTertiaryColor}"
