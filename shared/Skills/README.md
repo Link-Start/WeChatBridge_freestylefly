@@ -38,5 +38,13 @@ shared/Skills/video-information-reading/SKILL.md
   Native（目标 Agent 已安装/已确认）→ Path（技能库 `SKILL.md` 路径，要求
   `AgentSkillGuides.CanReadLocalFiles` 或目标未知）→ Missing → Unknown。
   `CanReadLocalFiles` 目前是保守默认值（Codex、千问、WorkBuddy 为 true），待真机实测。
+- **用户导入（ZIP）**：`SkillArchive.ExtractToStaging` 解包用户选中的压缩包——接受
+  `<id>/SKILL.md` 单层包裹（即「导出 ZIP」写出的形状）和 `SKILL.md` 平铺根目录两种形态；
+  路径越界/绝对路径/多个 SKILL.md 直接拒绝。frontmatter 取 `name`（缺失时回退到包裹目录名）、
+  `description`、`version` 或 `metadata.version`，首个 `# ` 标题作显示名。`SkillStore.Import`
+  把包写进技能库并记 `Source="import"`，旧副本（含冲突/外来目录）先移入备份；`Remove`
+  同样移入备份而非直接删除。导入技能与官方 ID 冲突会被拒绝。导入技能以
+  `AgentIds.All` 呈现、从技能库目录直接安装到各 Agent（`SkillInstaller` 的
+  `packageDirectory` 覆盖参数）。
 - **测试**：构造 `SkillService` 必须注入 `stateDirectory`，技能库会放在它下面；
   否则会写入真实用户目录。

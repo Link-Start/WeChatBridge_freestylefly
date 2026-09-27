@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -191,6 +192,69 @@ public partial class SkillsPane : UserControl
     }
 
     private void InstallAll_Click(object sender, RoutedEventArgs e) => _ = InstallAllMissing();
+
+    /// <summary>导入 ZIP… — the user picks one skill package archive.</summary>
+    private void Import_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "导入技能包",
+            Filter = "ZIP 压缩包 (*.zip)|*.zip",
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            return;
+        _ = ImportArchive(dialog.FileName);
+    }
+
+    private async Task ImportArchive(string path)
+    {
+        try
+        {
+            var info = await _service.ImportArchiveAsync(path);
+            ShowNotice(
+                $"已导入技能「{info.DisplayName}」，场景提示词里可用 {{{{skill:{info.Id}}}}} 引用。",
+                warning: false);
+        }
+        catch (Exception error) when (error is SkillInstallException or IOException
+            or UnauthorizedAccessException or InvalidDataException)
+        {
+            ShowNotice(error.Message, warning: true);
+        }
+        ApplyFilter();
+    }
+
+    /// <summary>从技能库移除 — imported skills only; the package moves to the backups.</summary>
+    private void RemoveSkill_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardOf(sender) is not { } row)
+            return;
+        var scenes = row.SceneCount > 0
+            ? $"\n仍有 {row.SceneCount} 个场景引用它，移除后这些场景的提示词将找不到技能文件。"
+            : "";
+        var answer = MessageBox.Show(
+            Window.GetWindow(this),
+            $"技能包会先移入备份目录，不会直接删除。{scenes}",
+            $"移除技能「{row.Skill.Name}」？",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning);
+        if (answer == MessageBoxResult.OK)
+            _ = RemoveSkill(row);
+    }
+
+    private async Task RemoveSkill(SkillRow row)
+    {
+        try
+        {
+            await _service.RemoveSkillAsync(row);
+            ShowNotice("技能已从技能库移除，原包在备份目录中可恢复。", warning: false);
+        }
+        catch (Exception error)
+        {
+            ShowNotice(error.Message, warning: true);
+        }
+        ApplyFilter();
+    }
 
     private void AgentInstall_Click(object sender, RoutedEventArgs e)
     {

@@ -54,19 +54,25 @@ public sealed class SkillInstaller
         _stateDirectory = stateDirectory ?? ConfigStore.DefaultDirectory;
     }
 
+    /// <param name="packageDirectory">
+    /// An already-resolved package directory — used for user-imported skills,
+    /// whose canonical copy lives in the app-owned library rather than under
+    /// <c>Resources/Skills</c>. When set it wins over <paramref name="resourcesRoot"/>.
+    /// </param>
     public SkillInstallPlan Plan(
         OfficialSkill skill,
         AgentId agent,
         string resourcesRoot,
-        bool agentInstalled = true)
+        bool agentInstalled = true,
+        string? packageDirectory = null)
     {
-        if (skill.Package is not { } package)
+        var source = packageDirectory ?? SourceDirectory(skill, resourcesRoot);
+        if (source is null)
         {
             return new SkillInstallPlan(
                 skill.Id, agent, agentInstalled, new SkillInstallMethod.Unavailable());
         }
 
-        var source = PackagePath(package, resourcesRoot);
         if (agent.DirectSkillRoot() is { } root)
         {
             return new SkillInstallPlan(
@@ -90,17 +96,16 @@ public sealed class SkillInstaller
         OfficialSkill skill,
         AgentId agent,
         string resourcesRoot,
-        bool agentInstalled = true)
+        bool agentInstalled = true,
+        string? packageDirectory = null)
     {
-        if (skill.Package is null)
-            return new SkillAgentStatus.PackageUnavailable();
-        var source = PackagePath(skill.Package, resourcesRoot);
-        if (!File.Exists(Path.Combine(source, "SKILL.md")))
+        var source = packageDirectory ?? SourceDirectory(skill, resourcesRoot);
+        if (source is null || !File.Exists(Path.Combine(source, "SKILL.md")))
             return new SkillAgentStatus.PackageUnavailable();
         if (!agentInstalled && agent.DirectSkillRoot() is null)
             return new SkillAgentStatus.AgentUnavailable();
 
-        switch (Plan(skill, agent, resourcesRoot, agentInstalled).Method)
+        switch (Plan(skill, agent, resourcesRoot, agentInstalled, source).Method)
         {
             case SkillInstallMethod.Unavailable:
                 return new SkillAgentStatus.PackageUnavailable();
@@ -162,11 +167,14 @@ public sealed class SkillInstaller
         OfficialSkill skill,
         AgentId agent,
         string resourcesRoot,
-        bool replacingExisting = false)
+        bool replacingExisting = false,
+        string? packageDirectory = null)
     {
-        if (skill.Package is null)
+        var source = packageDirectory ?? SourceDirectory(skill, resourcesRoot);
+        if (source is null)
             throw new SkillInstallException("技能包尚未随当前构建提供。");
-        if (Plan(skill, agent, resourcesRoot).Method is not SkillInstallMethod.Direct direct)
+        if (Plan(skill, agent, resourcesRoot, packageDirectory: source).Method
+            is not SkillInstallMethod.Direct direct)
             throw new SkillInstallException("这个应用只支持手动导入技能包。");
 
         var digest = ValidatePackage(direct.Source);
@@ -286,11 +294,14 @@ public sealed class SkillInstaller
     /// UI receives the same shape macOS produces with its hand-rolled writer:
     /// entries "<c>{id}/{relativePath}</c>", stored uncompressed.
     /// </summary>
-    public void MakeManualArchive(OfficialSkill skill, string resourcesRoot, string destination)
+    public void MakeManualArchive(
+        OfficialSkill skill,
+        string resourcesRoot,
+        string destination,
+        string? packageDirectory = null)
     {
-        if (skill.Package is null)
-            throw new SkillInstallException("技能包尚未随当前构建提供。");
-        var source = PackagePath(skill.Package, resourcesRoot);
+        var source = packageDirectory ?? SourceDirectory(skill, resourcesRoot)
+            ?? throw new SkillInstallException("技能包尚未随当前构建提供。");
         ValidatePackage(source);
         var files = EnumeratePackageFiles(source);
 
@@ -324,8 +335,8 @@ public sealed class SkillInstaller
         }
     }
 
-    private static string PackagePath(string package, string resourcesRoot) =>
-        Path.Combine(resourcesRoot, "Skills", package);
+    private static string? SourceDirectory(OfficialSkill skill, string resourcesRoot) =>
+        skill.Package is { } package ? Path.Combine(resourcesRoot, "Skills", package) : null;
 
     private static string ConfirmationKey(string skillId, AgentId agent) =>
         $"{skillId}|{agent.RawValue()}";

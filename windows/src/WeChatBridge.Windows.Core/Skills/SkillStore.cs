@@ -47,6 +47,10 @@ public sealed class SkillStore
 {
     public const string RegistryFileName = "skill-library.json";
     public const string OfficialSource = "official";
+
+    /// <summary>Registry source for user-imported packages — not touched by official sync.</summary>
+    public const string ImportedSource = "import";
+
     public const int MaxBackups = 20;
 
     private const string BackupStampFormat = "yyyyMMddHHmmssfff";
@@ -157,11 +161,70 @@ public sealed class SkillStore
         }
 
         if (added + updated > 0)
-            ConfigStore.Save(_configDirectory, RegistryFileName,
-                new SortedDictionary<string, SkillLibraryEntry>(registry, StringComparer.Ordinal));
+            SaveRegistry(registry);
         if (updated > 0)
             PruneBackups();
         return new SkillSyncReport(added, updated, conflicts);
+    }
+
+    /// <summary>
+    /// Registers a user-supplied package directory (already extracted and
+    /// validated by <see cref="SkillArchive"/>). Whatever currently occupies
+    /// the slot — a ready copy, a conflicted one or a foreign directory — is
+    /// moved into the backups first, so an explicit import never destroys
+    /// bytes; a byte-identical re-import is a no-op that refreshes the stamp.
+    /// </summary>
+    public SkillLibraryEntry Import(string source, string id, string version)
+    {
+        var digest = ValidatePackage(source);
+        var registry = Registry();
+        var target = SkillDirectory(id);
+        var exists = PathExists(target);
+
+        if (exists
+            && registry.TryGetValue(id, out var current)
+            && State(id) == SkillLibraryState.Ready
+            && current.Digest == digest)
+        {
+            var refreshed = current with { SyncedAt = _clock() };
+            registry[id] = refreshed;
+            SaveRegistry(registry);
+            return refreshed;
+        }
+
+        Write(source, target,
+            backupAs: exists
+                ? $"{id}-{(registry.TryGetValue(id, out var old) ? old.Version : "replaced")}"
+                : null);
+        var entry = new SkillLibraryEntry(id, version, digest, ImportedSource, _clock());
+        registry[id] = entry;
+        SaveRegistry(registry);
+        if (exists)
+            PruneBackups();
+        return entry;
+    }
+
+    /// <summary>
+    /// Removes a library copy: the directory moves into the backups (still
+    /// recoverable) and the registry entry is dropped. Returns false when the
+    /// id was neither on disk nor registered.
+    /// </summary>
+    public bool Remove(string id)
+    {
+        var target = SkillDirectory(id);
+        var found = PathExists(target);
+        if (found)
+        {
+            Directory.CreateDirectory(BackupRoot);
+            MoveAny(target, Path.Combine(BackupRoot,
+                $"{id}-removed-{_clock().ToString(BackupStampFormat, CultureInfo.InvariantCulture)}"));
+            PruneBackups();
+        }
+        var registry = Registry();
+        var removed = registry.Remove(id);
+        if (removed)
+            SaveRegistry(registry);
+        return found || removed;
     }
 
     private SkillLibraryEntry Entry(OfficialSkill skill, string digest) =>
@@ -171,6 +234,10 @@ public sealed class SkillStore
         ConfigStore.Load<Dictionary<string, SkillLibraryEntry>>(_configDirectory, RegistryFileName) is { } stored
             ? new Dictionary<string, SkillLibraryEntry>(stored, StringComparer.Ordinal)
             : new Dictionary<string, SkillLibraryEntry>(StringComparer.Ordinal);
+
+    private void SaveRegistry(Dictionary<string, SkillLibraryEntry> registry) =>
+        ConfigStore.Save(_configDirectory, RegistryFileName,
+            new SortedDictionary<string, SkillLibraryEntry>(registry, StringComparer.Ordinal));
 
     /// <summary>
     /// Staging copy, then an all-or-nothing swap: the target path only ever

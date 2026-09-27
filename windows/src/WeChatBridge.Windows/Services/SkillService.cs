@@ -197,17 +197,25 @@ public sealed class SkillRow : INotifyPropertyChanged
         OfficialSkill skill,
         int sceneCount,
         IReadOnlyList<AgentSkillRow> states,
-        SkillLibraryState libraryState = SkillLibraryState.Missing)
+        SkillLibraryState libraryState = SkillLibraryState.Missing,
+        bool isUserSkill = false)
     {
         Skill = skill;
         SceneCount = sceneCount;
         States = states;
         LibraryState = libraryState;
+        IsUserSkill = isUserSkill;
         foreach (var state in states)
             state.Parent = this;
     }
 
     public OfficialSkill Skill { get; }
+
+    /// <summary>True for skills the user imported themselves — the card offers 移除 and a different badge.</summary>
+    public bool IsUserSkill { get; }
+
+    /// <summary>The source capsule text under the card title.</summary>
+    public string OriginText => IsUserSkill ? "导入的技能" : "官方技能";
 
     /// <summary>How many stored scenes reference this skill id (用于 N 个场景 badge).</summary>
     public int SceneCount { get; }
@@ -307,6 +315,11 @@ public sealed class SkillRow : INotifyPropertyChanged
     /// <summary>Shows the 技能包尚未随当前构建提供 explainer inside the details.</summary>
     public bool PackageMissing => Kind == SkillCoverage.PackageUnavailable;
 
+    /// <summary>The explainer wording — imported skills fail differently than unshipped ones.</summary>
+    public string PackageMissingText => IsUserSkill
+        ? "技能库中的副本不可用或被外部修改，重新导入压缩包可恢复。"
+        : "技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。";
+
     public SkillRowAction PrimaryAction => Kind switch
     {
         SkillCoverage.PackageUnavailable or SkillCoverage.Conflict or SkillCoverage.Installed
@@ -370,6 +383,12 @@ public sealed class SkillService : INotifyPropertyChanged
 
     private OfficialSkillCatalog _catalog =
         new(OfficialSkillCatalog.CurrentSchemaVersion, []);
+    /// <summary>
+    /// User-imported skills, synthesized into catalog-shaped records on every
+    /// reload so imported packages get the same card/status/install treatment
+    /// as official ones. Keyed by id; never contains catalog ids.
+    /// </summary>
+    private readonly Dictionary<string, OfficialSkill> _userSkills = new(StringComparer.Ordinal);
     private string? _loadError;
     private string? _libraryIssue;
     private bool _isBusy;
@@ -446,10 +465,10 @@ public sealed class SkillService : INotifyPropertyChanged
         }
     }
 
-    public int SkillCount => _catalog.Skills.Count;
+    public int SkillCount => Rows.Count;
     public int PendingInstallCount => Rows.Count(r => r.HasAutomaticMissing);
     public int SupportedAgentCount =>
-        _catalog.Skills.SelectMany(s => s.SupportedAgents).Distinct().Count();
+        Rows.SelectMany(r => r.States.Select(s => s.Agent)).Distinct().Count();
     public bool AnyAutomaticMissing => Rows.Any(r => r.HasAutomaticMissing);
     public bool CanInstallAll => AnyAutomaticMissing && !IsBusy;
 
@@ -477,11 +496,12 @@ public sealed class SkillService : INotifyPropertyChanged
             }
             SyncLibrary(root);
         }
+        LoadUserSkills();
 
         var expanded = Rows.Where(r => r.IsExpanded).Select(r => r.Skill.Id).ToHashSet();
         var scenes = _scenes();
         Rows.Clear();
-        foreach (var skill in _catalog.Skills)
+        foreach (var skill in _catalog.Skills.Concat(_userSkills.Values))
         {
             var row = new SkillRow(
                 skill,
@@ -489,7 +509,8 @@ public sealed class SkillService : INotifyPropertyChanged
                 skill.SupportedAgents
                     .Select(agent => new AgentSkillRow(agent, Status(skill, agent)))
                     .ToList(),
-                Library.State(skill.Id));
+                Library.State(skill.Id),
+                isUserSkill: _userSkills.ContainsKey(skill.Id));
             row.IsExpanded = expanded.Contains(skill.Id);
             Rows.Add(row);
         }
@@ -500,11 +521,12 @@ public sealed class SkillService : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanInstallAll));
     }
 
-    /// <summary>Every skill a scene can reference: catalog order, then library-only ids.</summary>
+    /// <summary>Every skill a scene can reference: catalog + imported, then stray library ids.</summary>
     public IReadOnlyList<(string Id, string Name)> ReferenceableSkills() =>
-        _catalog.Skills.Select(s => (s.Id, s.Name))
+        _catalog.Skills.Concat(_userSkills.Values).Select(s => (s.Id, s.Name))
             .Concat(Library.Entries().Keys
-                .Where(id => _catalog.Skills.All(s => s.Id != id))
+                .Where(id => _catalog.Skills.All(s => s.Id != id)
+                    && !_userSkills.ContainsKey(id))
                 .OrderBy(id => id, StringComparer.Ordinal)
                 .Select(id => (id, id)))
             .ToList();
@@ -517,7 +539,8 @@ public sealed class SkillService : INotifyPropertyChanged
     /// </summary>
     public SkillResolution Resolve(string id, AgentId? agent)
     {
-        var skill = _catalog.Skills.FirstOrDefault(s => s.Id == id);
+        var skill = _catalog.Skills.FirstOrDefault(s => s.Id == id)
+            ?? (_userSkills.TryGetValue(id, out var user) ? user : null);
         var file = Library.SkillFile(id);
         if (skill is null && file is null)
             return new SkillResolution(id, id, SkillRenderMode.Unknown);
@@ -536,14 +559,16 @@ public sealed class SkillService : INotifyPropertyChanged
 
     /// <summary>The SHA-verified status of one (skill, agent) pair.</summary>
     public SkillAgentStatus Status(OfficialSkill skill, AgentId agent) =>
-        ResourcesRoot is { } root
-            ? _installer.Status(skill, agent, root, AgentInstalled(agent))
+        PackageDirectory(skill) is { } source
+            ? _installer.Status(skill, agent, ResourcesRoot ?? Library.Root,
+                AgentInstalled(agent), packageDirectory: source)
             : new SkillAgentStatus.PackageUnavailable();
 
     /// <summary>Where an install would land — direct target, manual guide, or unavailable.</summary>
     public SkillInstallPlan? Plan(OfficialSkill skill, AgentId agent) =>
-        ResourcesRoot is { } root
-            ? _installer.Plan(skill, agent, root, AgentInstalled(agent))
+        PackageDirectory(skill) is { } source
+            ? _installer.Plan(skill, agent, ResourcesRoot ?? Library.Root,
+                AgentInstalled(agent), packageDirectory: source)
             : null;
 
     /// <summary>
@@ -553,10 +578,11 @@ public sealed class SkillService : INotifyPropertyChanged
     /// </summary>
     public async Task InstallAsync(SkillRow row, AgentSkillRow agent, bool replacingExisting = false)
     {
-        var root = ResourcesRoot
-            ?? throw new SkillInstallException("没有找到内置技能清单。");
+        var source = PackageDirectory(row.Skill)
+            ?? throw new SkillInstallException("技能包不可用。");
         await RunAgentOp(row, agent, () =>
-            _installer.Install(row.Skill, agent.Agent, root, replacingExisting));
+            _installer.Install(row.Skill, agent.Agent, ResourcesRoot ?? Library.Root,
+                replacingExisting, packageDirectory: source));
     }
 
     /// <summary>移除 — deletes our install, or forgets a manual confirmation on manual agents.</summary>
@@ -574,9 +600,54 @@ public sealed class SkillService : INotifyPropertyChanged
     /// <summary>手动安装包 — writes the validated package as a zip the agent's import UI takes.</summary>
     public async Task ExportManualArchiveAsync(SkillRow row, string destination)
     {
-        var root = ResourcesRoot
-            ?? throw new SkillInstallException("没有找到内置技能资源。");
-        await RunRowOp(row, () => _installer.MakeManualArchive(row.Skill, root, destination));
+        var source = PackageDirectory(row.Skill)
+            ?? throw new SkillInstallException("技能包不可用。");
+        await RunRowOp(row, () => _installer.MakeManualArchive(
+            row.Skill, ResourcesRoot ?? Library.Root, destination, packageDirectory: source));
+    }
+
+    /// <summary>
+    /// 导入技能 — unpacks a user-picked zip into the library and reloads so
+    /// the new card, scene references and agent installs pick it up. Errors
+    /// (corrupt archive, unsafe paths, invalid frontmatter, an id that an
+    /// official skill already owns) surface as <see cref="SkillInstallException"/>
+    /// for the pane to display.
+    /// </summary>
+    public async Task<SkillPackageInfo> ImportArchiveAsync(string archivePath)
+    {
+        var info = await Task.Run(() =>
+        {
+            var (staging, parsed) = SkillArchive.ExtractToStaging(
+                archivePath, Path.Combine(Path.GetTempPath(), "WeChatBridge"));
+            try
+            {
+                if (_catalog.Skills.Any(s => s.Id == parsed.Id))
+                    throw new SkillInstallException(
+                        $"「{parsed.Id}」是内置技能，请修改 SKILL.md 的 name 后再导入。");
+                Library.Import(staging, parsed.Id, parsed.Version);
+                return parsed;
+            }
+            finally
+            {
+                try { Directory.Delete(staging, recursive: true); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            }
+        });
+        Reload();
+        return info;
+    }
+
+    /// <summary>
+    /// 从技能库移除 — the package moves into the backups and the card drops
+    /// out. Installs already delivered to agents are left alone (the agent
+    /// rows are per-skill bookkeeping, not files we can reach).
+    /// </summary>
+    public async Task RemoveSkillAsync(SkillRow row)
+    {
+        if (!row.IsUserSkill)
+            throw new SkillInstallException("内置技能不能移除。");
+        await Task.Run(() => Library.Remove(row.Skill.Id));
+        Reload();
     }
 
     /// <summary>安装缺失项 — every automatically-installable gap on one card.</summary>
@@ -705,6 +776,60 @@ public sealed class SkillService : INotifyPropertyChanged
         }
         return true;
     }
+
+    /// <summary>
+    /// Rebuilds <see cref="_userSkills"/> from the library registry: every
+    /// imported id that still has a package on disk becomes a catalog-shaped
+    /// record (Package = null; the library copy is supplied through
+    /// <see cref="PackageDirectory"/>). Ids that a shipped catalog later
+    /// claims stay official — the catalog wins.
+    /// </summary>
+    private void LoadUserSkills()
+    {
+        _userSkills.Clear();
+        var catalogIds = _catalog.Skills.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var entry in Library.Entries().Values)
+        {
+            if (entry.Source != SkillStore.ImportedSource
+                || catalogIds.Contains(entry.Id)
+                || Library.State(entry.Id) == SkillLibraryState.Missing)
+                continue;
+            var info = TryReadInfo(Library.SkillDirectory(entry.Id));
+            _userSkills[entry.Id] = new OfficialSkill(
+                entry.Id,
+                info?.DisplayName ?? entry.Id,
+                info?.Summary ?? "",
+                entry.Version,
+                Package: null,
+                AgentIds.All);
+        }
+    }
+
+    /// <summary>A library SKILL.md read for display metadata — failure just loses the pretty name.</summary>
+    private static SkillPackageInfo? TryReadInfo(string directory)
+    {
+        try
+        {
+            return SkillArchive.ReadInfo(directory);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or SkillInstallException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The directory installs read from: <c>Resources/Skills/&lt;package&gt;</c>
+    /// for shipped skills, the library copy for imported ones. Null means no
+    /// usable package exists (unshipped, or the imported copy is conflicted).
+    /// </summary>
+    private string? PackageDirectory(OfficialSkill skill) =>
+        _userSkills.ContainsKey(skill.Id)
+            ? (Library.State(skill.Id) == SkillLibraryState.Ready
+                ? Library.SkillDirectory(skill.Id) : null)
+            : ResourcesRoot is { } root && skill.Package is { } package
+                ? Path.Combine(root, "Skills", package) : null;
 
     /// <summary>
     /// Copies shipped official packages into the library. A failure here must

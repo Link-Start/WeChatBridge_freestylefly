@@ -261,7 +261,7 @@
                             <Border Style="{StaticResource SkillBadge}">
                                 <TextBlock FontSize="11" FontWeight="Medium"
                                            Foreground="{StaticResource InkSecondaryColor}"
-                                           Text="官方技能" />
+                                           Text="{Binding OriginText}" />
                             </Border>
                             <!-- Clicking jumps to the first scene that references this skill. -->
                             <Button Padding="0" Margin="0" Background="Transparent" BorderThickness="0"
@@ -308,7 +308,7 @@
                                 Background="{StaticResource WarnFillColor}"
                                 Visibility="{Binding PackageMissing, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource WarnInkColor}"
-                                       Text="技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。" />
+                                       Text="{Binding PackageMissingText}" />
                         </Border>
 
                         <ItemsControl ItemsSource="{Binding States}">
@@ -391,6 +391,14 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!-- Imported skills are the user's to keep or drop. -->
+                        <Button Margin="0,10,0,0" HorizontalAlignment="Left"
+                                Style="{StaticResource SettingsButton}" Padding="10,3" FontSize="11.5"
+                                IsEnabled="{Binding Ready}"
+                                Content="从技能库移除"
+                                Visibility="{Binding IsUserSkill, Converter={StaticResource BoolToVisibility}}"
+                                Click="RemoveSkill_Click" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -493,9 +501,14 @@
                 </ComboBox>
             </Grid>
 
-            <!-- 安装全部缺失项 + the manual-path caveat. -->
+            <!-- 导入 + 安装全部缺失项 + the manual-path caveat. -->
             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                <Button Style="{StaticResource PrimaryButton}" IsEnabled="{Binding CanInstallAll}"
+                <Button Style="{StaticResource SettingsButton}" Padding="14,5" FontSize="12.5"
+                        Click="Import_Click">
+                    导入 ZIP…
+                </Button>
+                <Button Margin="8,0,0,0" Style="{StaticResource PrimaryButton}"
+                        IsEnabled="{Binding CanInstallAll}"
                         Padding="14,5" FontSize="12.5"
                         Click="InstallAll_Click">
                     安装全部缺失项
