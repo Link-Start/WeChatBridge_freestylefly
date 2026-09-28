@@ -472,3 +472,8 @@
 "查看技能" = "View skills";
 "场景「%@」引用的技能不可用：%@" = "Scene "%@" references skills that are unavailable: %@";
 "在光标处插入 {{skill:id}} 技能引用" = "Insert a {{skill:id}} skill reference at the caret";
+"保存更改" = "Save changes";
+"删除" = "Delete";
+"已保存更改。" = "Changes saved.";
+"快捷键：⌃⌥1–9 把对应的启用场景用于下次转发；可把场景包 JSON 拖进此列表导入。" = "Shortcut: Ctrl+Option+1-9 uses the matching enabled scene for the next forward; you can also drop scene package JSON files onto this list to import.";
+"「%@」已安装同版本场景。覆盖将更新场景内容，本地的启用状态和群绑定会保留。" = ""%@" is already installed at the same version. Overwriting updates the scene; its local enabled state and group bindings are kept.";

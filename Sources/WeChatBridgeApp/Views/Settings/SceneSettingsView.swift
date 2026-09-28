@@ -68,7 +68,10 @@ struct SceneSettingsView: View {
                 importDeferredPackages()
             }
         } message: {
-            Text(L10n.text("同版本包将覆盖场景内容，本地的启用状态和群绑定会保留。"))
+            Text(L10n.format(
+                "「%@」已安装同版本场景。覆盖将更新场景内容，本地的启用状态和群绑定会保留。",
+                pendingImport?.name ?? ""
+            ))
         }
         .onAppear {
             selectedSceneID = selectedSceneID ?? preferences.scenes.scenes.first?.id
@@ -138,7 +141,8 @@ struct SceneSettingsView: View {
                     moveUp: { move(scene.wrappedValue, by: -1) },
                     moveDown: { move(scene.wrappedValue, by: 1) },
                     export: { export(scene.wrappedValue) },
-                    remove: { remove(scene.wrappedValue) }
+                    remove: { remove(scene.wrappedValue) },
+                    save: { notice = SceneNotice(L10n.text("已保存更改。"), tone: .good) }
                 )
                 .id(scene.wrappedValue.id)
             } else {
@@ -187,9 +191,15 @@ struct SceneSettingsView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             Spacer(minLength: Space.s)
-            Button(L10n.text("导入 JSON")) { importing = true }
-                .buttonStyle(.link)
-                .padding(Space.m)
+            VStack(alignment: .leading, spacing: 6) {
+                Button(L10n.text("导入 JSON")) { importing = true }
+                    .buttonStyle(.link)
+                Text(L10n.text("快捷键：⌃⌥1–9 把对应的启用场景用于下次转发；可把场景包 JSON 拖进此列表导入。"))
+                    .font(Typo.micro)
+                    .foregroundStyle(Theme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(Space.m)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
@@ -576,6 +586,9 @@ private struct SceneEditor: View {
     let moveDown: () -> Void
     let export: () -> Void
     let remove: () -> Void
+    /// 保存更改 — fields already save through bindings; the button just shows
+    /// the notice, mirroring the Windows Save_Click nudge.
+    let save: () -> Void
 
     /// Which destination the prompt preview renders for — defaults to the
     /// first agent, mirroring the Windows preview; `.none` means clipboard /
@@ -621,6 +634,8 @@ private struct SceneEditor: View {
                 }
             }
 
+            skillPanel
+
             VStack(alignment: .leading, spacing: Space.s) {
                 Text(L10n.text("适用 Agent"))
                     .font(Typo.captionStrong)
@@ -641,8 +656,6 @@ private struct SceneEditor: View {
                 }
             }
 
-            skillPanel
-
             if scene.isOfficial {
                 HStack {
                     Text(L10n.text("官方模板保持只读，复制后可以修改。"))
@@ -650,6 +663,18 @@ private struct SceneEditor: View {
                         .foregroundStyle(Theme.inkSecondary)
                     Spacer(minLength: Space.s)
                     Button(L10n.text("复制并编辑"), action: duplicate)
+                        .buttonStyle(SettingsActionButtonStyle(primary: true, width: nil))
+                }
+            } else {
+                // Windows EditorActions — duplicate / delete / save. Fields
+                // save live through bindings, so 保存更改 is just a nudge.
+                HStack(spacing: Space.s) {
+                    Spacer(minLength: 0)
+                    Button(L10n.text("复制"), action: duplicate)
+                        .buttonStyle(SettingsActionButtonStyle(width: nil))
+                    Button(L10n.text("删除"), role: .destructive, action: remove)
+                        .buttonStyle(SettingsActionButtonStyle(width: nil))
+                    Button(L10n.text("保存更改"), action: save)
                         .buttonStyle(SettingsActionButtonStyle(primary: true, width: nil))
                 }
             }
