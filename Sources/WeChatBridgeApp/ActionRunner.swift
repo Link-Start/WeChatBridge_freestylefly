@@ -103,7 +103,8 @@ final class ActionRunner {
                     return
                 }
                 let context = await self.sceneCoordinator.prepare(
-                    enabled: !self.preferences.scenes.enabledScenes.isEmpty,
+                    enabled: arrival.action != .obsidian
+                        && !self.preferences.scenes.enabledScenes.isEmpty,
                     groupName: nil,
                     captureTitle: arrival.capturesGroupName,
                     urls: arrival.urls,
