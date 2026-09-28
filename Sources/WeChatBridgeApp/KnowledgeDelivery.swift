@@ -64,6 +64,29 @@ enum KnowledgeDelivery {
                 archiveName: archive.lastPathComponent,
                 attachments: media
             )
+            let preferred = root.appendingPathComponent(DisplayName.sanitize(title) + ".md")
+            if let transcript,
+               let existing = try? String(contentsOf: preferred, encoding: .utf8) {
+                switch ObsidianNote.merge(
+                    existingMarkdown: existing,
+                    transcript: transcript,
+                    attachments: media,
+                    archiveName: archive.lastPathComponent,
+                    chatName: chatName,
+                    sceneName: sceneName,
+                    mergedAt: Date()
+                ) {
+                case .merged(let merged):
+                    try Data(merged.utf8).write(to: preferred, options: .atomic)
+                    written.append(preferred)
+                    continue
+                case .nothingNew:
+                    written.append(preferred)
+                    continue
+                case .notApplicable:
+                    break
+                }
+            }
             let note = uniqueURL(
                 in: root,
                 name: DisplayName.sanitize(title) + ".md"

@@ -140,4 +140,97 @@ final class ObsidianNoteTests: XCTestCase {
         XCTAssertTrue(note.contains("title: \"a \\\"quoted\\\" title\""))
         XCTAssertTrue(note.contains("未能从原始归档中解析聊天文本"))
     }
+
+    func testMergeKeepsOneNoteAndAppendsOnlyNewMessages() throws {
+        let zone = TimeZone(secondsFromGMT: 0)!
+        func transcript(_ body: String) throws -> WeChatNativeArchive.Transcript {
+            WeChatNativeArchive.Transcript(
+                path: "聊天记录.txt",
+                body: body,
+                records: try WeChatTranscriptRecord.parse(body, timeZone: zone)
+            )
+        }
+        let first = try transcript("·甲\n2026年9月20日 09:10\n在吗\n")
+        let second = try transcript("·甲\n2026年9月20日 09:10\n在吗\n\n·甲\n2026年9月20日 09:10\n看到了吗\n")
+        let third = try transcript("·甲\n2026年9月20日 09:10\n在吗\n\n·甲\n2026年9月20日 09:10\n看到了吗\n\n·乙\n2026年9月20日 09:11\n看到了\n")
+        let original = ObsidianNote.render(
+            title: "群的聊天",
+            chatName: nil,
+            sceneName: nil,
+            createdAt: Date(timeIntervalSince1970: 0),
+            transcript: first,
+            archiveName: "a.zip",
+            timeZone: zone
+        )
+
+        guard case .merged(let twice) = ObsidianNote.merge(
+            existingMarkdown: original,
+            transcript: second,
+            archiveName: "b.zip",
+            chatName: "群",
+            sceneName: "项目周会",
+            mergedAt: Date(timeIntervalSince1970: 60),
+            timeZone: zone
+        ), case .merged(let thrice) = ObsidianNote.merge(
+            existingMarkdown: twice,
+            transcript: third,
+            archiveName: "c.zip",
+            chatName: "群",
+            sceneName: "项目周会",
+            mergedAt: Date(timeIntervalSince1970: 120),
+            timeZone: zone
+        ) else { return XCTFail("应连续续写同一篇笔记") }
+
+        XCTAssertEqual(thrice.components(separatedBy: "在吗").count - 1, 1)
+        XCTAssertEqual(thrice.components(separatedBy: "看到了吗").count - 1, 1)
+        XCTAssertTrue(thrice.contains("\n---\n# 群的聊天"))
+        XCTAssertTrue(thrice.contains("messages: 3"))
+        XCTAssertTrue(thrice.contains("chat: \"群\""))
+        XCTAssertTrue(thrice.contains("scene: \"项目周会\""))
+        XCTAssertTrue(thrice.contains("[[附件/c.zip]]"))
+    }
+
+    func testMergeLeavesUnrelatedAndUnchangedNotesAlone() throws {
+        let zone = TimeZone(secondsFromGMT: 0)!
+        let body = "·甲\n2026年9月20日 09:10\n第一条\n"
+        let transcript = WeChatNativeArchive.Transcript(
+            path: "聊天记录.txt",
+            body: body,
+            records: try WeChatTranscriptRecord.parse(body, timeZone: zone)
+        )
+        let generated = ObsidianNote.render(
+            title: "群的聊天",
+            chatName: "群",
+            sceneName: nil,
+            createdAt: Date(timeIntervalSince1970: 0),
+            transcript: transcript,
+            archiveName: "a.zip",
+            timeZone: zone
+        )
+
+        XCTAssertEqual(
+            ObsidianNote.merge(
+                existingMarkdown: generated,
+                transcript: transcript,
+                archiveName: "b.zip",
+                chatName: "群",
+                sceneName: nil,
+                mergedAt: Date(),
+                timeZone: zone
+            ),
+            .nothingNew
+        )
+        XCTAssertEqual(
+            ObsidianNote.merge(
+                existingMarkdown: "---\ntitle: \"群的聊天\"\n---\n# 用户笔记\n",
+                transcript: transcript,
+                archiveName: "b.zip",
+                chatName: "群",
+                sceneName: nil,
+                mergedAt: Date(),
+                timeZone: zone
+            ),
+            .notApplicable
+        )
+    }
 }

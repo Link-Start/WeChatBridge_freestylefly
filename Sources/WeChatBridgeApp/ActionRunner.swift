@@ -231,13 +231,14 @@ final class ActionRunner {
         }
 
         do {
-            _ = try KnowledgeDelivery.deliver(
+            let notes = try KnowledgeDelivery.deliver(
                 urls: arrival.urls,
                 vaultPath: vaultPath,
                 subfolder: preferences.obsidianSubfolder,
                 chatName: context.groupName,
                 sceneName: context.scene?.name
             )
+            openInObsidian(notes, vaultPath: vaultPath)
             model.recordDelivery(urls: arrival.urls, action: .obsidian)
             sceneCoordinator.advance(context)
         } catch {
@@ -245,6 +246,23 @@ final class ActionRunner {
                 arrival,
                 message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             )
+        }
+    }
+
+    private func openInObsidian(_ notes: [URL], vaultPath: String) {
+        let vault = URL(fileURLWithPath: vaultPath, isDirectory: true).standardizedFileURL
+        let prefix = vault.path.hasSuffix("/") ? vault.path : vault.path + "/"
+        for note in notes {
+            let path = note.standardizedFileURL.path
+            guard path.hasPrefix(prefix) else { continue }
+            var components = URLComponents()
+            components.scheme = "obsidian"
+            components.host = "open"
+            components.queryItems = [
+                URLQueryItem(name: "vault", value: vault.lastPathComponent),
+                URLQueryItem(name: "file", value: String(path.dropFirst(prefix.count))),
+            ]
+            if let url = components.url { NSWorkspace.shared.open(url) }
         }
     }
 
