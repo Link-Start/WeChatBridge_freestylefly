@@ -14,6 +14,7 @@ struct SkillsPane: View {
     @State private var expandedSkillIDs: Set<String> = []
     @State private var notice: SkillNotice?
     @State private var replaceRequest: ReplaceRequest?
+    @State private var removeRequest: RemoveSkillRequest?
     @State private var importing = false
 
     var body: some View {
@@ -29,6 +30,10 @@ struct SkillsPane: View {
             metrics(records)
             controls(allRecords: records, scopedRecords: scopedRecords)
 
+            if let error = skills.loadError {
+                Notice(error, tone: .warn)
+            }
+
             if let issue = skills.libraryIssue {
                 Notice(issue, tone: .warn)
             }
@@ -41,9 +46,7 @@ struct SkillsPane: View {
                         SkillCard(
                             record: record,
                             resourcesRoot: skills.resourcesRoot,
-                            sceneCount: preferences.scenes.scenes.filter {
-                                $0.effectiveSkillIDs.contains(record.skill.id)
-                            }.count,
+                            sceneCount: sceneCount(for: record.skill),
                             showScenes: { showScenes(referencing: record.skill.id) },
                             expanded: expandedSkillIDs.contains(record.id),
                             toggleDetails: { toggleDetails(record.id) },
@@ -73,7 +76,12 @@ struct SkillsPane: View {
                                 skills.revokeManual(record.skill, agent: agent)
                                 notice = SkillNotice(L10n.text("已撤销本地确认。"), tone: .good)
                             },
-                            removeSkill: { removeSkill(record.skill) }
+                            removeSkill: {
+                                removeRequest = RemoveSkillRequest(
+                                    skill: record.skill,
+                                    sceneCount: sceneCount(for: record.skill)
+                                )
+                            }
                         )
                     }
                 }
@@ -111,6 +119,26 @@ struct SkillsPane: View {
         } message: {
             Text(L10n.text("微信流会先备份旧目录再替换；外部安装目录也会被替换。"))
         }
+        // Windows RemoveSkill_Click: warn before the copy moves to backups,
+        // naming the scenes that would lose their skill file.
+        .alert(
+            removeRequest.map { L10n.format("移除技能「%@」？", $0.skill.name) } ?? "",
+            isPresented: Binding(
+                get: { removeRequest != nil },
+                set: { if !$0 { removeRequest = nil } }
+            )
+        ) {
+            Button(L10n.text("取消"), role: .cancel) { removeRequest = nil }
+            Button(L10n.text("移除"), role: .destructive) {
+                guard let request = removeRequest else { return }
+                removeRequest = nil
+                removeSkill(request.skill)
+            }
+        } message: {
+            if let request = removeRequest {
+                Text(request.warningText)
+            }
+        }
     }
 
     private func metrics(_ records: [SkillRecord]) -> some View {
@@ -121,16 +149,34 @@ struct SkillsPane: View {
                 tone: Theme.brandPrimary
             )
             SkillMetricCard(
-                systemImage: "exclamationmark.circle",
-                value: L10n.format("%d 项待安装", records.filter(\.hasAutomaticMissing).count),
+                systemImage: "square.and.arrow.down",
+                value: L10n.format("%d 个导入", records.filter(\.isUserSkill).count),
+                tone: Theme.systemBlue
+            )
+            SkillMetricCard(
+                systemImage: "square.stack.3d.up",
+                value: L10n.format("被 %d 个场景引用", referencedSkillCount),
                 tone: Theme.warning
             )
             SkillMetricCard(
-                systemImage: "person.2",
-                value: L10n.format("%d 个 Agent", supportedAgentCount),
-                tone: Theme.systemBlue
+                systemImage: "exclamationmark.circle",
+                value: L10n.format("%d 项待安装", records.filter(\.hasAutomaticMissing).count),
+                tone: Theme.inkTertiary
             )
         }
+    }
+
+    /// How many stored scenes reference `id` — the 用于 N 个场景 badge.
+    private func sceneCount(for skill: OfficialSkill) -> Int {
+        preferences.scenes.scenes.filter {
+            $0.effectiveSkillIDs.contains(skill.id)
+        }.count
+    }
+
+    /// How many skills at least one scene references — the 被 N 个场景引用 metric.
+    private var referencedSkillCount: Int {
+        let referenced = Set(preferences.scenes.scenes.flatMap(\.effectiveSkillIDs))
+        return skills.allSkills.filter { referenced.contains($0.id) }.count
     }
 
     private func controls(
@@ -167,10 +213,15 @@ struct SkillsPane: View {
                 Button(L10n.text("导入 ZIP…")) { importing = true }
                     .buttonStyle(SettingsActionButtonStyle(width: nil))
 
-                Text(L10n.text("仅处理支持直接安装的 Agent；其余仍需导出 ZIP。"))
-                    .font(Typo.paneCaption)
-                    .foregroundStyle(Theme.inkTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.text("技能由微信流统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。"))
+                        .font(Typo.paneCaption)
+                        .foregroundStyle(Theme.inkTertiary)
+                    Text(L10n.text("仅处理支持直接安装的 Agent；其余仍需导出 ZIP。"))
+                        .font(Typo.paneCaption)
+                        .foregroundStyle(Theme.inkTertiary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -186,10 +237,6 @@ struct SkillsPane: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 54)
-    }
-
-    private var supportedAgentCount: Int {
-        Set(skills.skills.flatMap(\.supportedAgents)).count
     }
 
     private var agentChoices: [SettingsChoice<SkillAgentFilter>] {
@@ -349,7 +396,11 @@ struct SkillsPane: View {
         do {
             let info = try skills.importArchive(at: url)
             notice = SkillNotice(
-                L10n.format("已导入技能「%@」。", info.displayName),
+                L10n.format(
+                    "已导入技能「%@」，场景提示词里可用 %@ 引用。",
+                    info.displayName,
+                    SkillReference.token(info.id)
+                ),
                 tone: .good
             )
         } catch {
@@ -366,7 +417,10 @@ struct SkillsPane: View {
         do {
             try skills.removeSkill(skill)
             expandedSkillIDs.remove(skill.id)
-            notice = SkillNotice(L10n.text("已从技能库移除。"), tone: .good)
+            notice = SkillNotice(
+                L10n.text("技能已从技能库移除，原包在备份目录中可恢复。"),
+                tone: .good
+            )
         } catch {
             notice = SkillNotice(
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
@@ -416,7 +470,7 @@ private struct SkillSearchField: View {
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(Theme.inkTertiary)
                 .accessibilityHidden(true)
-            TextField(L10n.text("搜索技能"), text: $text)
+            TextField(L10n.text("搜索技能名、描述或标识"), text: $text)
                 .textFieldStyle(.plain)
                 .font(SettingsControlMetrics.font)
                 .foregroundStyle(Theme.ink)
@@ -437,7 +491,7 @@ private struct SkillSearchField: View {
                 )
         )
         .onHover { hovering = $0 }
-        .accessibilityLabel(Text(L10n.text("搜索技能")))
+        .accessibilityLabel(Text(L10n.text("搜索技能名、描述或标识")))
     }
 }
 
@@ -592,6 +646,16 @@ private struct SkillCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: Space.s) {
+                        Text(L10n.text("技能 ID"))
+                            .font(Typo.paneCaption)
+                            .foregroundStyle(Theme.inkTertiary)
+                            .frame(width: 64, alignment: .leading)
+                        Text(record.skill.id)
+                            .font(Typo.paneCaption.monospaced())
+                            .foregroundStyle(Theme.inkSecondary)
+                            .textSelection(.enabled)
+                    }
                     HStack(spacing: Space.s) {
                         Text(L10n.text("场景引用"))
                             .font(Typo.paneCaption)
@@ -1034,6 +1098,24 @@ private enum SkillAgentFilter: Hashable {
 private struct ReplaceRequest {
     let skill: OfficialSkill
     let agent: AgentID
+}
+
+/// The 移除 confirmation's payload: the skill plus how many scenes still
+/// reference it, so the dialog can warn about prompts losing the file.
+private struct RemoveSkillRequest {
+    let skill: OfficialSkill
+    let sceneCount: Int
+
+    var warningText: String {
+        var text = L10n.text("技能包会先移入备份目录，不会直接删除。")
+        if sceneCount > 0 {
+            text += "\n" + L10n.format(
+                "仍有 %d 个场景引用它，移除后这些场景的提示词将找不到技能文件。",
+                sceneCount
+            )
+        }
+        return text
+    }
 }
 
 private struct SkillNotice {

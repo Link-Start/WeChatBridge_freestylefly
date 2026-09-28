@@ -454,3 +454,16 @@
 "「%@」是内置技能，请修改 SKILL.md 的 name 后再导入。" = "“%@” is a built-in skill; change the SKILL.md name field before importing.";
 "技能 ID「%@」不符合规范：只能包含小写字母、数字和连字符。" = "Skill ID “%@” is invalid: only lowercase letters, digits and hyphens are allowed.";
 "技能库中的 %@ 被外部修改，未自动更新。" = "%@ in the skill library was modified externally and was not updated.";
+"设为默认场景" = "Set as default scene";
+"取消默认场景" = "Unset as default scene";
+"已取消导入。" = "Import canceled.";
+"移除技能「%@」？" = "Remove skill “%@”?";
+"技能包会先移入备份目录，不会直接删除。" = "The package moves into the backup directory first; it is not deleted outright.";
+"仍有 %d 个场景引用它，移除后这些场景的提示词将找不到技能文件。" = "%d scene(s) still reference it; after removal their prompts will not find the skill file.";
+"已导入技能「%@」，场景提示词里可用 %@ 引用。" = "Skill “%@” imported; reference it in scene prompts with %@.";
+"%d 个导入" = "%d imported";
+"被 %d 个场景引用" = "Referenced by %d scenes";
+"搜索技能名、描述或标识" = "Search skills by name, description or id";
+"技能由微信流统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。" = "Skills are managed by WeChatBridge; scenes reference them with {{skill:id}} and the destination Agent reads them on forward.";
+"技能 ID" = "Skill ID";
+"技能已从技能库移除，原包在备份目录中可恢复。" = "The skill was removed from the library; the original package can be recovered from the backup directory.";

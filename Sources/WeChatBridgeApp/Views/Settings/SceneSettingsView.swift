@@ -58,6 +58,7 @@ struct SceneSettingsView: View {
         )) {
             Button(L10n.text("取消"), role: .cancel) {
                 pendingImport = nil
+                notice = SceneNotice(L10n.text("已取消导入。"), tone: .bad)
                 importDeferredPackages()
             }
             Button(L10n.text("覆盖")) {
@@ -130,6 +131,8 @@ struct SceneSettingsView: View {
                 SceneEditor(
                     scene: scene,
                     enabled: enabledBinding(for: scene.wrappedValue.id),
+                    isDefault: preferences.scenes.defaultSceneID == scene.wrappedValue.id,
+                    toggleDefault: { toggleDefault(sceneID: scene.wrappedValue.id) },
                     skills: skills,
                     duplicate: { duplicate(scene.wrappedValue) },
                     moveUp: { move(scene.wrappedValue, by: -1) },
@@ -174,6 +177,7 @@ struct SceneSettingsView: View {
                         let scene = preferences.scenes.scenes[index]
                         SceneListRow(
                             scene: scene,
+                            hotkey: shortcutHint(for: scene.id),
                             selected: selectedSceneID == scene.id,
                             select: { selectedSceneID = scene.id }
                         )
@@ -319,6 +323,23 @@ struct SceneSettingsView: View {
               let index = preferences.scenes.scenes.firstIndex(where: { $0.id == selectedSceneID })
         else { return nil }
         return $preferences.scenes.scenes[index]
+    }
+
+    /// The ⌃⌥-digit a scene answers to, by position among enabled scenes —
+    /// nil for disabled scenes and anything past the ninth.
+    private func shortcutHint(for sceneID: String) -> String? {
+        guard let index = preferences.scenes.enabledScenes
+            .firstIndex(where: { $0.id == sceneID }),
+              index < 9
+        else { return nil }
+        return "⌃⌥\(index + 1)"
+    }
+
+    /// 设为默认场景 / 取消默认场景 — only an enabled scene may hold the slot;
+    /// the resolver falls back to it when no binding, keyword or pick answers.
+    private func toggleDefault(sceneID: String) {
+        preferences.scenes.defaultSceneID =
+            preferences.scenes.defaultSceneID == sceneID ? nil : sceneID
     }
 
     private func enabledBinding(for id: String) -> Binding<Bool> {
@@ -501,6 +522,8 @@ private enum ScenePage: String, CaseIterable, Identifiable {
 
 private struct SceneListRow: View {
     let scene: WeChatScene
+    /// The ⌃⌥N badge for scenes reachable by a global shortcut.
+    let hotkey: String?
     let selected: Bool
     let select: () -> Void
 
@@ -523,6 +546,12 @@ private struct SceneListRow: View {
                         .multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)
+                if let hotkey {
+                    Text(hotkey)
+                        .font(Typo.paneCaption.monospaced())
+                        .foregroundStyle(Theme.inkTertiary)
+                        .padding(.top, 2)
+                }
             }
             .padding(.horizontal, Space.m)
             .padding(.vertical, 11)
@@ -538,6 +567,9 @@ private struct SceneListRow: View {
 private struct SceneEditor: View {
     @Binding var scene: WeChatScene
     @Binding var enabled: Bool
+    /// Whether this scene is the library's default — the menu offers 设为默认场景.
+    let isDefault: Bool
+    let toggleDefault: () -> Void
     let skills: SkillLibrary
     let duplicate: () -> Void
     let moveUp: () -> Void
@@ -545,9 +577,10 @@ private struct SceneEditor: View {
     let export: () -> Void
     let remove: () -> Void
 
-    /// Which destination the prompt preview renders for — nil means
-    /// clipboard / a custom app with no known agent.
-    @State private var previewTarget: SkillPreviewTarget = .none
+    /// Which destination the prompt preview renders for — defaults to the
+    /// first agent, mirroring the Windows preview; `.none` means clipboard /
+    /// a custom app with no known agent.
+    @State private var previewTarget: SkillPreviewTarget = .agent(AgentID.allCases[0])
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
@@ -623,6 +656,12 @@ private struct SceneEditor: View {
             if scene.isOfficial { Button(L10n.text("复制为我的场景"), action: duplicate) }
             Button(L10n.text("导出场景包"), action: export)
             Divider()
+            if enabled {
+                Button(
+                    isDefault ? L10n.text("取消默认场景") : L10n.text("设为默认场景"),
+                    action: toggleDefault
+                )
+            }
             Button(L10n.text("上移"), action: moveUp)
             Button(L10n.text("下移"), action: moveDown)
             if !scene.isOfficial {
