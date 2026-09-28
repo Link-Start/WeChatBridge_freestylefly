@@ -84,7 +84,7 @@ public sealed class SkillReferenceTests
         Directory.CreateDirectory(Path.Combine(root, "Skills"));
         File.WriteAllText(Path.Combine(root, "Skills", "catalog.json"),
             """{"schema_version":1,"skills":[{"id":"bad.id","name":"A","summary":"","version":"1.0.0","package":null,"supported_agents":["doubao"]}]}""");
-        var error = Assert.Throws<SkillInstallException>(() => OfficialSkillCatalog.LoadFrom(root));
+        var error = Assert.Throws<SkillException>(() => OfficialSkillCatalog.LoadFrom(root));
         Assert.Contains("bad.id", error.Message);
     }
 
@@ -251,29 +251,4 @@ public sealed class SkillReferenceTests
         Assert.Equal(["wechat-article-extract"], scenes.Single(s => s.Id == "legacy.scene").RequiredSkillIDs);
     }
 
-    [Fact]
-    public void LegacyManualConfirmationsAreReKeyed()
-    {
-        var root = TempDirectory();
-        var resources = Path.Combine(root, "resources");
-        var state = Path.Combine(root, "state");
-        Directory.CreateDirectory(Path.Combine(resources, "Skills", "pkg"));
-        File.WriteAllText(Path.Combine(resources, "Skills", "pkg", "SKILL.md"), "# skill\n");
-        Directory.CreateDirectory(state);
-        File.WriteAllText(Path.Combine(state, "SkillConfirmations.json"), """
-            {
-              "wechatbridge.wechat-article-extract|doubao": {
-                "skillID": "wechatbridge.wechat-article-extract",
-                "agent": "doubao",
-                "version": "1.0.0",
-                "confirmedAt": "2026-09-01T00:00:00Z"
-              }
-            }
-            """);
-        var installer = new SkillInstaller(Path.Combine(root, "home"), state);
-        var skill = new OfficialSkill("wechat-article-extract", "文章", "", "1.0.0", "pkg", [AgentId.Doubao]);
-
-        Assert.Equal(new SkillAgentStatus.ManualConfirmed("1.0.0"),
-            installer.Status(skill, AgentId.Doubao, resources));
-    }
 }

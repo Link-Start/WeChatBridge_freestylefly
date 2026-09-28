@@ -28,6 +28,10 @@ public partial class ScenePickerWindow : Window
     public ScenePickerWindow(IReadOnlyList<WeChatScene> scenes)
     {
         _scenes = scenes;
+        // Same merge the entry picker does — the theme dictionary also ships
+        // with the share-target helper, which has no App.xaml.
+        Resources.MergedDictionaries.Add(
+            new ResourceDictionary { Source = EntryPickerWindow.ThemeSource });
         InitializeComponent();
         Root.RenderTransformOrigin = new Point(0.5, 0.5);
         Root.RenderTransform = _entranceScale;

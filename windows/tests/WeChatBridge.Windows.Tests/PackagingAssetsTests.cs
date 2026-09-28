@@ -98,9 +98,11 @@ public sealed class PackagingAssetsTests
     }
 
     /// <summary>
-    /// The helper tells entries apart from its own AUMID suffix, so every
-    /// Application Id in the manifest must be a <c>ShareEntryId</c> of a known
-    /// action — an Id that resolves to nothing silently degrades to clipboard.
+    /// The manifest registers a single façade entry — Share.Hub, the 「微信流」
+    /// row WeChat shows — whose Application Id the helper resolves through
+    /// <see cref="Core.ShareActions.ShareEntryId"/> just like the retired
+    /// per-app ids. Asserting the singleton rather than <c>All</c> keeps this
+    /// a contract test: adding an Application back must be a deliberate act.
     /// </summary>
     [Fact]
     public void EveryShareEntryMapsToAKnownAction()
@@ -113,11 +115,7 @@ public sealed class PackagingAssetsTests
             .Select(a => a.Attribute("Id")!.Value)
             .ToList();
 
-        var expected = Core.ShareActions.All
-            .Select(Core.ShareActions.ShareEntryId)
-            .OrderBy(id => id, StringComparer.Ordinal)
-            .ToList();
-        Assert.Equal(expected, ids.OrderBy(id => id, StringComparer.Ordinal).ToList());
+        Assert.Equal([Core.ShareActions.ShareEntryId(Core.ShareAction.Hub)], ids);
 
         // The Windows schema rejects Ids with underscores; keep the pattern pinned.
         foreach (var id in ids)

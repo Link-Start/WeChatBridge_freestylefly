@@ -242,7 +242,7 @@
                         <StackPanel x:Name="StepEntries" Visibility="Collapsed" Margin="40,28,40,24">
                             <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkColor}"
-                                       Text="转发菜单里已经备好了 9 个入口" />
+                                       Text="转发菜单里的「微信流」入口已备好" />
                             <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkSecondaryColor}"
                                        Text="它们就在微信「转发到其他应用」里，看到即可用。" />
@@ -336,7 +336,7 @@
                                        Foreground="{StaticResource InkColor}" Text="好了" />
                             <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap" MaxWidth="460"
                                        Foreground="{StaticResource InkSecondaryColor}"
-                                       Text="去微信多选聊天记录 → 转发到其他应用，就能看到这些入口了。" />
+                                       Text="去微信多选聊天记录 → 转发到其他应用 → 微信流，就能挑一个入口了。" />
                             <Button x:Name="DoneButton" Margin="0,26,0,0" HorizontalAlignment="Left"
                                     Style="{StaticResource PrimaryButton}" Content="完成"
                                     Click="OnDoneClicked" />

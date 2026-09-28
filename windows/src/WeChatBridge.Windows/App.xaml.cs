@@ -16,10 +16,17 @@ public partial class App : Application
     /// window that grabs focus mid-paste steals the Ctrl+V.
     /// </summary>
     private const string ForegroundEventName = "Local\\WeChatBridge.Windows.Foreground";
+    /// <summary>
+    /// The helper's "a batch is staged, the pick is still open" signal — the
+    /// cue to start the scene reads inside the user's decision time. Distinct
+    /// from <see cref="ChangeEventName"/>: that one means "committed, reload".
+    /// </summary>
+    private const string PrefetchEventName = PrefetchHint.EventName;
 
     private Mutex? _mutex;
     private EventWaitHandle? _changeEvent;
     private EventWaitHandle? _foregroundEvent;
+    private EventWaitHandle? _prefetchEvent;
     private CancellationTokenSource? _shutdown;
     private InboxPaths? _paths;
     private MainViewModel? _model;
@@ -52,6 +59,7 @@ public partial class App : Application
 
         _changeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ChangeEventName);
         _foregroundEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ForegroundEventName);
+        _prefetchEvent = new EventWaitHandle(false, EventResetMode.AutoReset, PrefetchEventName);
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
         var model = new MainViewModel(_paths);
@@ -80,6 +88,10 @@ public partial class App : Application
         // helper relaunched us hidden and two shares were never delivered).
         Dispatcher.BeginInvoke(() =>
         {
+            // A hint can predate this process — the share that launched us
+            // staged while we were still starting. Draining it here starts
+            // the scene reads before Reload announces the batch.
+            model.ConsumePrefetchHint();
             model.RebuildEntries();
             window.RefreshBatches();
         });
@@ -110,6 +122,7 @@ public partial class App : Application
         _shutdown?.Cancel();
         _changeEvent?.Dispose();
         _foregroundEvent?.Dispose();
+        _prefetchEvent?.Dispose();
         if (_mutex is not null)
         {
             try { _mutex.ReleaseMutex(); } catch (ApplicationException) { }
@@ -125,7 +138,7 @@ public partial class App : Application
             try
             {
                 var signalled = await Task.Run(
-                    () => WaitHandle.WaitAny(new WaitHandle?[] { _changeEvent, _foregroundEvent }
+                    () => WaitHandle.WaitAny(new WaitHandle?[] { _changeEvent, _foregroundEvent, _prefetchEvent }
                         .OfType<WaitHandle>().ToArray(), 500),
                     cancellationToken);
                 if (signalled == WaitHandle.WaitTimeout || cancellationToken.IsCancellationRequested)
@@ -133,6 +146,13 @@ public partial class App : Application
 
                 Dispatcher.Invoke(() =>
                 {
+                    // A prefetch hint touches no window — the resident process
+                    // is expected to be hidden while it runs the reads.
+                    if (signalled == 2)
+                    {
+                        _model?.ConsumePrefetchHint();
+                        return;
+                    }
                     if (MainWindow is not MainWindow window)
                         return;
                     window.RefreshBatches();

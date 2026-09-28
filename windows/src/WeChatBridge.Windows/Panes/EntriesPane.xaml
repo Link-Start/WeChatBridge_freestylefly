@@ -8,6 +8,7 @@
         <panes:RowLogoPathConverter x:Key="RowLogoPath" />
         <panes:RowLogoVisibilityConverter x:Key="RowLogoVisibility" />
         <panes:RowLogoInitialConverter x:Key="RowLogoInitial" />
+        <panes:RowGlyphConverter x:Key="RowGlyph" />
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -16,6 +17,8 @@
                  between rows, a real logo or a tinted letter badge at the left. -->
             <StackPanel>
                 <TextBlock Style="{StaticResource SectionLabel}" Text="分享入口" />
+                <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{StaticResource InkSecondaryColor}"
+                           Text="微信菜单里只有「微⁠信流」一行；下面开启的入口会出现在它的选择器里。" />
                 <Border Height="1" Background="{StaticResource StrokeColor}" Margin="0,8,0,10" />
                 <Border Style="{StaticResource Card}" Padding="0">
                     <ItemsControl ItemsSource="{Binding Entries}" AlternationCount="100000">
@@ -46,18 +49,25 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Grid Width="28" Height="28" VerticalAlignment="Center">
+                                            <!-- PNG logo → Segoe glyph → letter badge. -->
                                             <Border CornerRadius="8"
                                                     Background="{StaticResource BrandTintColor}"
-                                                    Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=missing}">
+                                                    Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=badge}">
                                                 <TextBlock FontSize="12.5" FontWeight="SemiBold"
                                                            Foreground="{StaticResource BrandColor}"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"
                                                            Text="{Binding ., Converter={StaticResource RowLogoInitial}}" />
                                             </Border>
+                                            <TextBlock FontSize="15"
+                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                       Foreground="{StaticResource InkSecondaryColor}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Text="{Binding ., Converter={StaticResource RowGlyph}}"
+                                                       Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=glyph}" />
                                             <Image Width="24" Height="24"
                                                    Source="{Binding ., Converter={StaticResource RowLogoPath}}"
-                                                   Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}}" />
+                                                   Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=logo}" />
                                         </Grid>
                                         <StackPanel Grid.Column="1" Margin="12,0,0,0"
                                                     VerticalAlignment="Center">
@@ -177,16 +187,22 @@
                                         <Grid Width="24" Height="24" VerticalAlignment="Center">
                                             <Border CornerRadius="7"
                                                     Background="{StaticResource BrandTintColor}"
-                                                    Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=missing}">
+                                                    Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=badge}">
                                                 <TextBlock FontSize="11" FontWeight="SemiBold"
                                                            Foreground="{StaticResource BrandColor}"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"
                                                            Text="{Binding ., Converter={StaticResource RowLogoInitial}}" />
                                             </Border>
+                                            <TextBlock FontSize="13"
+                                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                       Foreground="{StaticResource InkSecondaryColor}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Text="{Binding ., Converter={StaticResource RowGlyph}}"
+                                                       Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=glyph}" />
                                             <Image Width="22" Height="22"
                                                    Source="{Binding ., Converter={StaticResource RowLogoPath}}"
-                                                   Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}}" />
+                                                   Visibility="{Binding ., Converter={StaticResource RowLogoVisibility}, ConverterParameter=logo}" />
                                         </Grid>
                                         <StackPanel Grid.Column="1" Margin="10,0,0,0"
                                                     VerticalAlignment="Center">

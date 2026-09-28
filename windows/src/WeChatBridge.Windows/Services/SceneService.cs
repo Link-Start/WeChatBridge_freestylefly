@@ -64,6 +64,19 @@ public sealed class SceneService : IDisposable
         public DateTimeOffset? BatchEnd => Selection.Insights.End;
     }
 
+    /// <summary>
+    /// The coordinator's two IO reads started ahead of time. Kicking them off
+    /// while the user is still reading the entry picker — or while a previous
+    /// forward is still delivering — is what keeps the scene picker appearing
+    /// instantly after the pick instead of a second wait. Both tasks already
+    /// degrade to empty results; they never fault.
+    /// </summary>
+    public sealed class ShareContextPrefetch
+    {
+        internal Task<GroupTitleParser.Title?>? TitleTask { get; init; }
+        internal Task<WeChatBatchInsights>? InsightsTask { get; init; }
+    }
+
     /// <summary>One scene-package import attempt's tally.</summary>
     public sealed record SceneImportReport
     {
@@ -166,6 +179,38 @@ public sealed class SceneService : IDisposable
     // MARK: - Share path (the integrator's seam)
 
     /// <summary>
+    /// Starts the title read and transcript-insights parse early — call this
+    /// the moment a fresh share's intent is consumed, then hand the result to
+    /// <see cref="ResolveForShareAsync"/>. The reads are the same ones the
+    /// coordinator would run; prefetch only changes *when* they run. A null
+    /// <paramref name="filePaths"/> skips insights, matching the resolver.
+    /// </summary>
+    public ShareContextPrefetch PrefetchForShare(
+        IReadOnlyList<string>? filePaths,
+        bool captureTitle)
+    {
+        return new ShareContextPrefetch
+        {
+            TitleTask = captureTitle ? SafeTitle() : null,
+            InsightsTask = filePaths is not null && Scenes.Load().EnabledScenes.Count > 0
+                ? SafeInsights(filePaths)
+                : null,
+        };
+
+        async Task<GroupTitleParser.Title?> SafeTitle()
+        {
+            try { return await _titleReader(CancellationToken.None); }
+            catch { return null; }
+        }
+
+        async Task<WeChatBatchInsights> SafeInsights(IReadOnlyList<string> paths)
+        {
+            try { return await _insightsReader(paths, CancellationToken.None); }
+            catch { return WeChatBatchInsights.Empty; }
+        }
+    }
+
+    /// <summary>
     /// The per-share decision the forward path calls before delivering — the
     /// Windows port of <c>ActionRunner.handle</c>'s
     /// <c>sceneCoordinator.prepare</c> call. Reads the WeChat window title when
@@ -181,18 +226,22 @@ public sealed class SceneService : IDisposable
     /// <param name="groupName">A group name the caller already knows (rare).</param>
     /// <param name="allowDefault">Whether the configured default scene may
     /// answer last; macOS share arrivals pass false.</param>
+    /// <param name="prefetch">Reads already in flight from
+    /// <see cref="PrefetchForShare"/>; when supplied, the coordinator awaits
+    /// those instead of starting its own.</param>
     public async Task<SceneChoice?> ResolveForShareAsync(
         IReadOnlyList<string>? filePaths = null,
         string? groupName = null,
         bool captureTitle = true,
         bool allowDefault = false,
+        ShareContextPrefetch? prefetch = null,
         CancellationToken cancellationToken = default)
     {
         // macOS passes enabled = !enabledScenes.isEmpty — the whole pipeline
         // (picker included) is skipped when nothing is enabled, while the title
         // read still runs for the batch's 群名 snapshot.
         var enabled = Scenes.Load().EnabledScenes.Count > 0;
-        var answer = await CoordinatorFor(filePaths).PrepareAsync(
+        var answer = await CoordinatorFor(filePaths, prefetch).PrepareAsync(
             enabled, groupName, captureTitle, allowDefault, cancellationToken);
         if (answer.Kind != SceneCoordinator.AnswerKind.Ready || answer.Selection is not { } selection)
             return null;
@@ -557,9 +606,31 @@ public sealed class SceneService : IDisposable
     /// <summary>
     /// The coordinator is per-call: the transcript reader is bound to this
     /// share's file list, while stores, picker and title reader are fixed.
+    /// A prefetch swaps the two reader delegates for the already-running tasks.
     /// </summary>
-    private SceneCoordinator CoordinatorFor(IReadOnlyList<string>? filePaths) =>
-        new(
+    private SceneCoordinator CoordinatorFor(
+        IReadOnlyList<string>? filePaths,
+        ShareContextPrefetch? prefetch = null)
+    {
+        if (prefetch is not null)
+        {
+            // A prefetch task that was never started falls back to the real
+            // reader — prefetching must never shrink what the resolver sees.
+            return new SceneCoordinator(
+                Scenes,
+                Memories,
+                Pending,
+                _picker,
+                titleReader: prefetch.TitleTask is { } titleTask
+                    ? _ => titleTask
+                    : _titleReader,
+                insightsReader: prefetch.InsightsTask is { } insightsTask
+                    ? _ => insightsTask
+                    : filePaths is null
+                        ? null
+                        : cancellationToken => _insightsReader(filePaths, cancellationToken));
+        }
+        return new(
             Scenes,
             Memories,
             Pending,
@@ -568,6 +639,7 @@ public sealed class SceneService : IDisposable
             insightsReader: filePaths is null
                 ? null
                 : cancellationToken => _insightsReader(filePaths, cancellationToken));
+    }
 
     private void RemoveSceneFromBindings(string sceneId)
     {

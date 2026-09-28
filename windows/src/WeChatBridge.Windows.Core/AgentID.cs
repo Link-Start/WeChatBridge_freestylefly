@@ -53,20 +53,6 @@ public static class AgentIds
         _ => throw new ArgumentOutOfRangeException(nameof(id)),
     };
 
-    /// <summary>
-    /// Home-relative skill directories, identical on Windows: the agents keep the
-    /// same layout under the user profile (%USERPROFILE%\.codex\skills etc.).
-    /// Null means the app accepts skills only through its own import UI.
-    /// </summary>
-    public static string? DirectSkillRoot(this AgentId id) => id switch
-    {
-        AgentId.ChatGptCodex => ".codex/skills",
-        AgentId.QwenWork => ".qwenworkcn/skills",
-        AgentId.WorkBuddy => ".workbuddy/skills",
-        AgentId.Claude or AgentId.Doubao or AgentId.WeSight => null,
-        _ => throw new ArgumentOutOfRangeException(nameof(id)),
-    };
-
     public static AgentId? Matching(ShareAction action) => action switch
     {
         ShareAction.Codex => AgentId.ChatGptCodex,
@@ -143,17 +129,17 @@ public sealed record OfficialSkillCatalog(int SchemaVersion, IReadOnlyList<Offic
         var path = Path.Combine(resourcesRoot, "Skills", "catalog.json");
         var catalog = JsonSerializer.Deserialize<OfficialSkillCatalog>(
             File.ReadAllText(path), CatalogJsonOptions)
-            ?? throw new SkillInstallException("技能清单内容无效。");
+            ?? throw new SkillException("技能清单内容无效。");
         if (catalog.SchemaVersion != CurrentSchemaVersion)
-            throw new SkillInstallException("技能清单版本不受支持。");
+            throw new SkillException("技能清单版本不受支持。");
         if (catalog.Skills.Select(s => s.Id).Distinct().Count() != catalog.Skills.Count
             || catalog.Skills.Any(s => string.IsNullOrEmpty(s.Id)))
-            throw new SkillInstallException("技能清单内容无效。");
+            throw new SkillException("技能清单内容无效。");
         if (catalog.Skills.FirstOrDefault(s => !SkillId.IsValid(s.Id)) is { } invalid)
-            throw new SkillInstallException(
+            throw new SkillException(
                 $"技能 ID「{invalid.Id}」不符合规范：只能包含小写字母、数字和连字符。");
         return catalog;
     }
 }
 
-public sealed class SkillInstallException(string message) : Exception(message);
+public sealed class SkillException(string message) : Exception(message);

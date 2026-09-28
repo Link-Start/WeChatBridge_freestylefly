@@ -61,9 +61,23 @@ public partial class TargetPickerWindow : Window
     /// <summary>The 0.96 → 1 settle of Motion.panelIn, applied to the panel.</summary>
     private readonly ScaleTransform _entranceScale = new(0.96, 0.96);
 
+    /// <summary>What was shared, printed under the title when the caller knows it.</summary>
+    public static readonly DependencyProperty ContextLineProperty =
+        DependencyProperty.Register(
+            nameof(ContextLine), typeof(string), typeof(TargetPickerWindow),
+            new PropertyMetadata(null));
+
+    public string? ContextLine
+    {
+        get => (string?)GetValue(ContextLineProperty);
+        set => SetValue(ContextLineProperty, value);
+    }
+
     public TargetPickerWindow(IReadOnlyList<ForwardTarget> targets)
     {
         _targets = targets;
+        Resources.MergedDictionaries.Add(
+            new ResourceDictionary { Source = EntryPickerWindow.ThemeSource });
         InitializeComponent();
         Root.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
         Root.RenderTransform = _entranceScale;
@@ -89,9 +103,12 @@ public partial class TargetPickerWindow : Window
     public static Task<TargetPickerAnswer> ChooseAsync(
         IReadOnlyList<ForwardTarget> targets,
         CancellationToken cancellationToken = default,
-        Window? owner = null)
+        Window? owner = null,
+        string? contextLine = null)
     {
         var window = new TargetPickerWindow(targets);
+        if (contextLine is not null)
+            window.ContextLine = contextLine;
         if (owner is not null)
             window.Owner = owner;
         cancellationToken.Register(
@@ -245,7 +262,8 @@ public partial class TargetPickerWindow : Window
     {
         public ForwardTarget Target { get; } = target;
         public string DisplayName => Target.DisplayName;
-        public string? LogoPath { get; } = AppLogos.PathFor(target.DisplayName);
+        /// <summary>Bundled PNG path or the target exe's extracted icon.</summary>
+        public object? Logo { get; } = AppLogos.IconFor(target);
         /// <summary>The letter-badge fallback when no logo file exists.</summary>
         public string Initial =>
             DisplayName.Length > 0 ? DisplayName[..1].ToUpperInvariant() : "?";

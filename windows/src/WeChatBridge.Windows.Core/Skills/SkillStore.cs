@@ -39,7 +39,7 @@ public sealed record SkillSyncReport(int Added, int Updated, IReadOnlyList<strin
 /// <c>SkillBackups\</c>. Scene prompts point agents at these files; agent
 /// skill directories are only deployment targets.
 ///
-/// Safety mirrors <see cref="SkillInstaller"/>: a directory the registry does
+/// Safety mirrors the macOS installer: a directory the registry does
 /// not know, or whose digest no longer matches, is reported as a conflict and
 /// left untouched.
 /// </summary>
@@ -101,7 +101,7 @@ public sealed class SkillStore
                 ? SkillLibraryState.Ready
                 : SkillLibraryState.Conflict;
         }
-        catch (Exception error) when (IsFileSystemError(error) || error is SkillInstallException)
+        catch (Exception error) when (IsFileSystemError(error) || error is SkillException)
         {
             return SkillLibraryState.Conflict;
         }

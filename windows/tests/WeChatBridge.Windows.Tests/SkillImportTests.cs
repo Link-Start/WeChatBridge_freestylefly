@@ -106,7 +106,7 @@ public sealed class SkillImportTests : IDisposable
     public void MissingSkillMdIsRejected()
     {
         var zip = WriteZip(("a/readme.md", "x"));
-        var error = Assert.Throws<SkillInstallException>(() => Extract(zip));
+        var error = Assert.Throws<SkillException>(() => Extract(zip));
         Assert.Contains("SKILL.md", error.Message);
     }
 
@@ -115,19 +115,19 @@ public sealed class SkillImportTests : IDisposable
     {
         var zip = WriteZip(
             ("a/SKILL.md", SkillMd("a")), ("b/SKILL.md", SkillMd("b")));
-        Assert.Throws<SkillInstallException>(() => Extract(zip));
+        Assert.Throws<SkillException>(() => Extract(zip));
     }
 
     [Fact]
     public void TraversalAndAbsolutePathsAreRejected()
     {
-        Assert.Throws<SkillInstallException>(() =>
+        Assert.Throws<SkillException>(() =>
             Extract(WriteZip(("a/SKILL.md", SkillMd("a")), ("../evil.txt", "x"))));
-        Assert.Throws<SkillInstallException>(() =>
+        Assert.Throws<SkillException>(() =>
             Extract(WriteZip(("a/SKILL.md", SkillMd("a")), ("/abs/x.txt", "x"))));
-        Assert.Throws<SkillInstallException>(() =>
+        Assert.Throws<SkillException>(() =>
             Extract(WriteZip(("a/SKILL.md", SkillMd("a")), ("C:/evil.txt", "x"))));
-        Assert.Throws<SkillInstallException>(() =>
+        Assert.Throws<SkillException>(() =>
             Extract(WriteZip(("a/SKILL.md", SkillMd("a")), ("a/..\\evil.txt", "x"))));
     }
 
@@ -135,7 +135,7 @@ public sealed class SkillImportTests : IDisposable
     public void InvalidFrontmatterNameIsRejected()
     {
         var zip = WriteZip(("x/SKILL.md", SkillMd("Bad Name")));
-        var error = Assert.Throws<SkillInstallException>(() => Extract(zip));
+        var error = Assert.Throws<SkillException>(() => Extract(zip));
         Assert.Contains("Bad Name", error.Message);
     }
 
@@ -144,7 +144,7 @@ public sealed class SkillImportTests : IDisposable
     {
         var path = Path.Combine(_fixture.Root, "broken.zip");
         File.WriteAllText(path, "not a zip");
-        Assert.Throws<SkillInstallException>(() => Extract(path));
+        Assert.Throws<SkillException>(() => Extract(path));
     }
 
     // MARK: - Library import and removal
@@ -231,9 +231,7 @@ public sealed class SkillImportTests : IDisposable
 
     private SkillService MakeService() =>
         new(resourcesRoot: Path.Combine(_fixture.Root, "Resources"),
-            homeDirectory: Path.Combine(_fixture.Root, "Home"),
             stateDirectory: Path.Combine(_fixture.Root, "State"),
-            agentInstalled: _ => true,
             scenes: () => []);
 
     [Fact]
@@ -250,7 +248,8 @@ public sealed class SkillImportTests : IDisposable
         Assert.Equal("导入的技能", row.OriginText);
         Assert.Equal("演示", row.Skill.Name);
         Assert.Equal("导入测试", row.Skill.Summary);
-        Assert.Equal(AgentIds.All.Count, row.States.Count);
+        Assert.Equal("已就绪", row.StatusTitle);
+        Assert.Equal("{{skill:my-skill}}", row.ReferenceToken);
 
         var resolution = service.Resolve("my-skill", AgentId.ChatGptCodex);
         Assert.Equal(SkillRenderMode.Path, resolution.Mode);
@@ -274,25 +273,8 @@ public sealed class SkillImportTests : IDisposable
         var service = MakeService();
         var zip = WriteZip(("official-one/SKILL.md", SkillMd("official-one")));
 
-        await Assert.ThrowsAsync<SkillInstallException>(() => service.ImportArchiveAsync(zip));
+        await Assert.ThrowsAsync<SkillException>(() => service.ImportArchiveAsync(zip));
         Assert.DoesNotContain(service.Rows, r => r.IsUserSkill);
-    }
-
-    [Fact]
-    public async Task ImportedSkillInstallsToADirectAgentFromTheLibrary()
-    {
-        var zip = WriteZip(("my-skill/SKILL.md", SkillMd("my-skill")));
-        var service = MakeService();
-        await service.ImportArchiveAsync(zip);
-        var row = Assert.Single(service.Rows);
-        var codex = row.States.Single(s => s.Agent == AgentId.ChatGptCodex);
-
-        Assert.Equal(new SkillAgentStatus.NotInstalled(), codex.Status);
-        await service.InstallAsync(row, codex);
-
-        Assert.Equal(new SkillAgentStatus.Installed("1.0.0"), codex.Status);
-        Assert.True(File.Exists(Path.Combine(
-            _fixture.Root, "Home", ".codex", "skills", "my-skill", "SKILL.md")));
     }
 
     [Fact]
@@ -319,7 +301,7 @@ public sealed class SkillImportTests : IDisposable
             """{"schema_version":1,"skills":[{"id":"official-one","name":"官方","summary":"","version":"1.0.0","package":null,"supported_agents":["claude"]}]}""");
         var service = MakeService();
 
-        await Assert.ThrowsAsync<SkillInstallException>(
+        await Assert.ThrowsAsync<SkillException>(
             () => service.RemoveSkillAsync(Assert.Single(service.Rows)));
     }
 }

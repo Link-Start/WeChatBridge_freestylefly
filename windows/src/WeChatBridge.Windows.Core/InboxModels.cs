@@ -75,6 +75,19 @@ public sealed class UtcIso8601Converter : JsonConverter<DateTimeOffset>
 
 public sealed record BatchCommitResult(Guid BatchId, string BatchDirectory, BatchManifest Manifest);
 
+/// <summary>
+/// A share that has passed validation and whose payload is fully staged — the
+/// half-commit the picker flow needs: the helper asks its question while the
+/// files are being staged, then finishes in the second half of
+/// <see cref="InboxWriter"/> with the intent (or a settled outcome) the answer
+/// produced. Nothing is visible to the app until the rename at the end.
+/// </summary>
+public sealed record StagedShare(
+    Guid BatchId,
+    string StagingDirectory,
+    string ReadyDirectory,
+    BatchManifest Manifest);
+
 public sealed class InboxPaths
 {
     public InboxPaths(string? root = null)
@@ -214,6 +227,23 @@ public static class InboxWriter
         ShareAction action = ShareAction.Clipboard,
         BatchIntent? intent = null)
     {
+        var staged = await StageAsync(paths, sources, cancellationToken, limits, action);
+        return await CommitAsync(paths, staged, intent, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// The first half of a commit: validation, payload copy and manifest, all
+    /// still inside <c>Staging/</c>. A caller that has a question left to ask —
+    /// the helper's entry picker — stages here, asks in parallel, then hands the
+    /// answer to <see cref="CommitAsync(InboxPaths, StagedShare, BatchIntent?, BatchOutcome?, CancellationToken)"/>.
+    /// </summary>
+    public static async Task<StagedShare> StageAsync(
+        InboxPaths paths,
+        IReadOnlyList<InboxSourceFile> sources,
+        CancellationToken cancellationToken = default,
+        InboxLimits? limits = null,
+        ShareAction action = ShareAction.Clipboard)
+    {
         if (sources.Count == 0)
             throw new InboxValidationException("分享中没有可处理的文件。");
 
@@ -275,22 +305,58 @@ public static class InboxWriter
                 manifestPath,
                 JsonSerializer.Serialize(manifest, BatchManifest.JsonOptions),
                 cancellationToken);
-
-            if (intent is not null)
-            {
-                await File.WriteAllTextAsync(
-                    Path.Combine(staging, BatchIntent.FileName),
-                    JsonSerializer.Serialize(intent, BatchManifest.JsonOptions),
-                    cancellationToken);
-            }
-
-            Directory.Move(staging, ready);
-            return new BatchCommitResult(batchId, ready, manifest);
+            return new StagedShare(batchId, staging, ready, manifest);
         }
         catch (Exception error)
         {
             TryDeleteDirectory(staging);
             TryWriteFailure(paths, batchId, error);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The second half: intent and — when the share is already settled — an
+    /// initial state.json written inside the staged tree, then the rename that
+    /// publishes the batch. An <paramref name="initialOutcome"/> (the helper's
+    /// picker was cancelled) rides the same atomic commit, so the app never
+    /// announces or re-asks a share that already has an answer.
+    /// </summary>
+    public static async Task<BatchCommitResult> CommitAsync(
+        InboxPaths paths,
+        StagedShare staged,
+        BatchIntent? intent,
+        BatchOutcome? initialOutcome = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (intent is not null)
+            {
+                await File.WriteAllTextAsync(
+                    Path.Combine(staged.StagingDirectory, BatchIntent.FileName),
+                    JsonSerializer.Serialize(intent, BatchManifest.JsonOptions),
+                    cancellationToken);
+            }
+
+            if (initialOutcome is not null)
+            {
+                var state = BatchState
+                    .Initial(staged.Manifest, intent?.Action, intent?.TargetDisplayName)
+                    .WithOutcome(initialOutcome);
+                await File.WriteAllTextAsync(
+                    Path.Combine(staged.StagingDirectory, BatchState.FileName),
+                    JsonSerializer.Serialize(state, BatchManifest.JsonOptions),
+                    cancellationToken);
+            }
+
+            Directory.Move(staged.StagingDirectory, staged.ReadyDirectory);
+            return new BatchCommitResult(staged.BatchId, staged.ReadyDirectory, staged.Manifest);
+        }
+        catch (Exception error)
+        {
+            TryDeleteDirectory(staged.StagingDirectory);
+            TryWriteFailure(paths, staged.BatchId, error);
             throw;
         }
     }

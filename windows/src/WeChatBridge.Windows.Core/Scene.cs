@@ -551,22 +551,19 @@ public static class ScenePrompt
             parts.Add(instruction);
         if (output.Length > 0)
             parts.Add($"输出规范：\n{output}");
-        if (scene.EffectiveSkillIDs().Count > 0)
-        {
-            // Inline references already carry their phrase; only declared-only
-            // skills (official or legacy scenes) are listed here.
-            var inline = SkillReference.Parse(scene.Instruction)
-                .Concat(SkillReference.Parse(scene.OutputSpec))
-                .ToHashSet(StringComparer.Ordinal);
-            var listed = scene.RequiredSkillIDs
-                .Where(id => !inline.Contains(id))
-                .Distinct(StringComparer.Ordinal)
-                .Select(id => $"- 使用{skills.Phrase(id)}");
-            parts.Add(string.Join("\n",
-                new[] { "技能要求：" }
-                    .Concat(listed)
-                    .Append("如果技能不可用，请继续执行该场景，并明确说明哪些部分未使用技能、未完成或未验证。")));
-        }
+        // Inline references already carry their phrase; declared-only skills
+        // (official or legacy scenes) get listed under 技能要求. An all-inline
+        // scene emits no section at all.
+        var inline = SkillReference.Parse(scene.Instruction)
+            .Concat(SkillReference.Parse(scene.OutputSpec))
+            .ToHashSet(StringComparer.Ordinal);
+        var listed = scene.RequiredSkillIDs
+            .Where(id => !inline.Contains(id))
+            .Distinct(StringComparer.Ordinal)
+            .Select(id => $"- 使用{skills.Phrase(id)}")
+            .ToList();
+        if (listed.Count > 0)
+            parts.Add(string.Join("\n", new[] { "技能要求：" }.Concat(listed)));
         if (previousSummaryAt is { } prev && currentEnd is { } end && end > prev)
         {
             var stamp = prev.ToString("yyyy-MM-dd HH:mm", culture ?? CultureInfo.CurrentCulture);

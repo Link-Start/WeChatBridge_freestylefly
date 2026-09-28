@@ -39,20 +39,19 @@ public sealed class ScenePromptSkillTests : IDisposable
     }
 
     [Fact]
-    public void MissingModeAsksTheAgentToFlagGaps()
+    public void MissingModeNamesTheSkillAndAsksTheAgentToProceed()
     {
         var prompt = ScenePrompt.Render(Scene("用 {{skill:a}} 提取"), null,
             skills: Context(AgentId.Claude, SkillRenderMode.Missing));
-        Assert.Contains("「名称-a」技能（本机未安装，请直接完成，并注明未验证的部分）", prompt);
+        Assert.Contains("「名称-a」技能（技能文件不可用，请直接完成）", prompt);
     }
 
     [Fact]
-    public void MissingWithoutAnAgentOnlyNamesTheSkill()
+    public void MissingModeReadsTheSameWithoutAnAgent()
     {
         var prompt = ScenePrompt.Render(Scene("用 {{skill:a}} 提取"), null,
             skills: Context(null, SkillRenderMode.Missing));
-        Assert.StartsWith("用 「名称-a」技能 提取", prompt);
-        Assert.DoesNotContain("本机未安装", prompt);
+        Assert.Contains("「名称-a」技能（技能文件不可用，请直接完成）", prompt);
     }
 
     [Fact]
@@ -81,7 +80,16 @@ public sealed class ScenePromptSkillTests : IDisposable
         Assert.Contains("- 使用「名称-b」技能（b）", section);
         Assert.DoesNotContain("名称-a", section);
         Assert.Equal(1, section.Split("名称-b").Length - 1);
-        Assert.Contains("如果技能不可用", section);
+    }
+
+    [Fact]
+    public void InlineOnlyScenesEmitNoSkillSection()
+    {
+        // Regression: an all-inline scene used to still get a bare
+        // "技能要求：" header followed by boilerplate filler.
+        var prompt = ScenePrompt.Render(Scene("用 {{skill:a}}", "", "a"), null,
+            skills: Context(AgentId.ChatGptCodex, SkillRenderMode.Native))!;
+        Assert.DoesNotContain("技能要求", prompt);
     }
 
     [Fact]
@@ -104,7 +112,7 @@ public sealed class ScenePromptSkillTests : IDisposable
     public void ContinuationStillFollowsTheSkillSection()
     {
         var start = new DateTimeOffset(2026, 9, 17, 8, 30, 0, TimeSpan.Zero);
-        var prompt = ScenePrompt.Render(Scene("用 {{skill:a}}"), start, start.AddHours(1),
+        var prompt = ScenePrompt.Render(Scene("用 {{skill:a}}", "", "b"), start, start.AddHours(1),
             skills: Context(AgentId.ChatGptCodex, SkillRenderMode.Native),
             culture: System.Globalization.CultureInfo.InvariantCulture)!;
         Assert.True(prompt.IndexOf("技能要求：", StringComparison.Ordinal)
@@ -127,9 +135,7 @@ public sealed class ScenePromptSkillTests : IDisposable
             File.WriteAllText(Path.Combine(skills, package, "SKILL.md"), "# demo\n");
         }
         return new SkillService(resources,
-            Path.Combine(_fixture.Root, "Home"),
             Path.Combine(_fixture.Root, "State"),
-            _ => true,
             () => []);
     }
 
@@ -145,20 +151,10 @@ public sealed class ScenePromptSkillTests : IDisposable
         Assert.Equal(libraryFile, codex.SkillFile);
         Assert.Equal("演示技能", codex.DisplayName);
 
-        Assert.Equal(SkillRenderMode.Missing, service.Resolve("demo-skill", AgentId.Claude).Mode);
+        // Every destination gets the library path now — readable or not.
+        Assert.Equal(SkillRenderMode.Path, service.Resolve("demo-skill", AgentId.Claude).Mode);
         Assert.Equal(SkillRenderMode.Path, service.Resolve("demo-skill", null).Mode);
         Assert.Equal(SkillRenderMode.Unknown, service.Resolve("ghost", AgentId.ChatGptCodex).Mode);
-    }
-
-    [Fact]
-    public async Task NativeInstallWinsOverThePathReference()
-    {
-        var service = MakeService();
-        var row = service.Rows.Single();
-
-        await service.InstallAsync(row, row.States.Single(s => s.Agent == AgentId.ChatGptCodex));
-
-        Assert.Equal(SkillRenderMode.Native, service.Resolve("demo-skill", AgentId.ChatGptCodex).Mode);
     }
 
     [Fact]
@@ -174,9 +170,7 @@ public sealed class ScenePromptSkillTests : IDisposable
         MakeService();
         var service = new SkillService(
             Path.Combine(_fixture.Root, "Resources"),
-            Path.Combine(_fixture.Root, "Home"),
             Path.Combine(_fixture.Root, "State"),
-            _ => true,
             () =>
             [
                 new WeChatScene { Instruction = "用 {{skill:demo-skill}}" },
@@ -203,9 +197,7 @@ public sealed class ScenePromptSkillTests : IDisposable
 
         var service = new SkillService(
             Path.Combine(_fixture.Root, "Resources"),
-            Path.Combine(_fixture.Root, "Home"),
             Path.Combine(_fixture.Root, "State"),
-            _ => true,
             () => []);
 
         Assert.Contains("demo-skill", service.LibraryIssue);

@@ -459,7 +459,7 @@ public sealed class SceneDecisionTests
     }
 
     [Fact]
-    public void PromptIncludesSkillRequirementAndFallback()
+    public void PromptListsDeclaredSkillsUnderTheRequirementHeader()
     {
         var scene = new WeChatScene
         {
@@ -472,8 +472,7 @@ public sealed class SceneDecisionTests
         var prompt = ScenePrompt.Render(scene, null,
             skills: new SkillRenderContext(AgentId.Claude,
                 id => new SkillResolution(id, "文章提取", SkillRenderMode.Missing)));
-        Assert.Contains("文章提取", prompt);
-        Assert.Contains("如果技能不可用", prompt);
+        Assert.Contains("技能要求：\n- 使用「文章提取」技能", prompt);
     }
 
     [Fact]

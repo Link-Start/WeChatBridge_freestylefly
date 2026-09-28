@@ -72,6 +72,12 @@ public sealed class DeliveryEngine
     /// </summary>
     public static readonly TimeSpan BetweenPastes = TimeSpan.FromMilliseconds(450);
 
+    /// <summary>
+    /// After a <see cref="WindowsForwardTarget.PrePasteHotkey"/>: Doubao's new
+    /// 工作任务 view needs a beat to render its composer before the paste.
+    /// </summary>
+    public static readonly TimeSpan PrePasteHotkeySettle = TimeSpan.FromMilliseconds(700);
+
     private readonly DeliveryEnvironment _env;
     private readonly InboxReader? _inbox;
     private readonly IReadOnlyDictionary<ShareAction, WindowsForwardTarget> _targets;
@@ -97,23 +103,45 @@ public sealed class DeliveryEngine
     public Task<DeliveryResult> DeliverAsync(ReadyBatch batch, BatchIntent intent, string? prompt = null, CancellationToken ct = default) =>
         DeliverAsync(batch, WindowsForwardTargets.IntentTarget(intent), prompt, ct);
 
+    /// <summary>The share-action → target-spec mapping, shared by resolve and pre-resolve.</summary>
+    private WindowsForwardTarget? SpecFor(ReadyBatch batch, ForwardTarget? customTarget) =>
+        batch.Action == ShareAction.Custom && customTarget is not null
+            ? WindowsForwardTargets.ForCustom(customTarget)
+            : _targets.TryGetValue(batch.Action, out var fixedTarget) ? fixedTarget : null;
+
+    /// <summary>
+    /// Starts target resolution on a worker thread so it overlaps whatever the
+    /// caller is still waiting on — the scene decision — rather than running
+    /// inside <see cref="DeliverAsync"/>'s critical path. Process scans and PATH
+    /// probing are pure reads, safe off the caller's thread; the result feeds
+    /// <see cref="DeliverAsync(ReadyBatch, ForwardTarget?, string?, CancellationToken, Task{ResolvedTarget?}?)"/>.
+    /// Null when the batch's action names no deliverable target — the caller
+    /// then passes nothing and delivery does its own (failing) resolve.
+    /// </summary>
+    public Task<ResolvedTarget?>? BeginResolve(ReadyBatch batch, ForwardTarget? customTarget)
+    {
+        var spec = SpecFor(batch, customTarget);
+        return spec is null ? null : Task.Run(() => _env.ResolveTarget(spec));
+    }
+
     /// <summary>
     /// Resolve → activate → wait foreground → paste → record.
     ///
     /// Freshness (<see cref="BatchIntent.FreshnessWindow"/>) is the caller's
     /// check, made when the intent is consumed — by the time delivery runs, the
-    /// request was already judged worth doing.
+    /// request was already judged worth doing. <paramref name="preresolved"/> is
+    /// an in-flight <see cref="BeginResolve"/> — awaited here instead of
+    /// resolving anew, so its head start is not wasted.
     /// </summary>
     public async Task<DeliveryResult> DeliverAsync(
         ReadyBatch batch,
         ForwardTarget? customTarget,
         string? prompt = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Task<ResolvedTarget?>? preresolved = null)
     {
         var paths = batch.Items.Select(i => i.FullPath).ToArray();
-        var spec = batch.Action == ShareAction.Custom && customTarget is not null
-            ? WindowsForwardTargets.ForCustom(customTarget)
-            : _targets.TryGetValue(batch.Action, out var fixedTarget) ? fixedTarget : null;
+        var spec = SpecFor(batch, customTarget);
         var targetName = customTarget?.DisplayName ?? spec?.DisplayName ?? batch.Action.TargetDisplayName();
 
         if (spec is null)
@@ -135,8 +163,10 @@ public sealed class DeliveryEngine
         // goes nowhere — the user is one manual paste away from their files.
         WriteManualPayload(plan, paths);
 
-        var resolved = _env.ResolveTarget(spec);
-        _env.Log?.Invoke($"[deliver {batch.Id:N}] resolve {targetName}: {(resolved is null ? "null" : $"pid={resolved.ProcessId?.ToString() ?? "null"} hwnd={resolved.MainWindowHandle} exe={resolved.ExePath ?? "null"} aumid={resolved.Spec.Aumid ?? "null"}")}");
+        var resolved = preresolved is not null
+            ? await preresolved.ConfigureAwait(false)
+            : _env.ResolveTarget(spec);
+        _env.Log?.Invoke($"[deliver {batch.Id:N}] resolve {targetName}{(preresolved is not null ? " (pre)" : "")}: {(resolved is null ? "null" : $"pid={resolved.ProcessId?.ToString() ?? "null"} hwnd={resolved.MainWindowHandle} exe={resolved.ExePath ?? "null"} aumid={resolved.Spec.Aumid ?? "null"}")}");
         if (resolved is null)
         {
             return Fail(batch, DeliveryFailureKind.NotInstalled,
@@ -152,6 +182,18 @@ public sealed class DeliveryEngine
         }
 
         await _env.DelayAsync(_env.ForegroundSettle ?? ForegroundSettle, ct).ConfigureAwait(false);
+
+        // A target that needs a mode switch gets its hotkey first — Doubao's
+        // Ctrl+J opens a new 工作任务 whose composer reads local files; the
+        // 对话 composer cannot. Best effort: if the chord is dropped, the paste
+        // still lands wherever the window was left.
+        if (spec.PrePasteHotkey is { } hotkey)
+        {
+            var sent = _env.SendCtrlKey?.Invoke(hotkey);
+            _env.Log?.Invoke($"[deliver {batch.Id:N}] pre-paste hotkey vk=0x{hotkey:X2} sent={sent?.ToString() ?? "skipped"}");
+            if (sent == true)
+                await _env.DelayAsync(PrePasteHotkeySettle, ct).ConfigureAwait(false);
+        }
 
         // Point the keyboard at the composer before the first paste. Without
         // this a Ctrl+V into an unfocused chat window lands nowhere — the

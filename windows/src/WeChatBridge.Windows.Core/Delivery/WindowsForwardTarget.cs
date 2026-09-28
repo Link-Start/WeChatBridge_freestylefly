@@ -37,7 +37,14 @@ public sealed record WindowsForwardTarget(
     /// as text instead of a file drop. Pending real-device verification on
     /// Windows — kept as a spec flag so it can be flipped per target.
     /// </summary>
-    bool ReadsLocalArchives = false);
+    bool ReadsLocalArchives = false,
+    /// <summary>
+    /// A virtual-key code sent as Ctrl+key once the target owns the foreground,
+    /// before the composer is focused — for targets whose default input mode
+    /// cannot take what we paste. Doubao gets Ctrl+J (新工作任务): the 工作
+    /// composer reads local files, the 对话 one cannot.
+    /// </summary>
+    ushort? PrePasteHotkey = null);
 
 /// <summary>
 /// A target after resolution: what the OS gave back for a
@@ -109,7 +116,8 @@ public static class WindowsForwardTargets
                     "Doubao.exe",
                 ],
                 Aumid: "Doubao.ChatApp",
-                ReadsLocalArchives: true),
+                ReadsLocalArchives: true,
+                PrePasteHotkey: 0x4A /* Ctrl+J → 新工作任务 */),
             // Verified on device: the Windows build of 千问 installs as Qianwen
             // (exe Qianwen.exe), a plain win32 app with no AUMID. Its Windows
             // client cannot take a pasted ZIP (the macOS one could), so — like

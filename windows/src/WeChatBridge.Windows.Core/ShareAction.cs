@@ -26,6 +26,13 @@ public enum ShareAction
     Obsidian,
     Clipboard,
     Custom,
+    /// <summary>
+    /// The single entry Windows exposes to WeChat: 「微信流」. Picking it does
+    /// not name a destination — the app asks through its own entry picker and
+    /// then forwards as the chosen action, which is why every per-app
+    /// Application was folded into this one.
+    /// </summary>
+    Hub,
 }
 
 public static class ShareActions
@@ -42,6 +49,7 @@ public static class ShareActions
         ShareAction.Obsidian => "obsidian",
         ShareAction.Clipboard => "clipboard",
         ShareAction.Custom => "custom",
+        ShareAction.Hub => "hub",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
@@ -58,6 +66,7 @@ public static class ShareActions
         // macOS compatibility: the retired shelf entry decodes as clipboard.
         "shelf" => ShareAction.Clipboard,
         "custom" => ShareAction.Custom,
+        "hub" => ShareAction.Hub,
         _ => null,
     };
 
@@ -78,6 +87,7 @@ public static class ShareActions
         ShareAction.Obsidian => "Share.Obsidian",
         ShareAction.Clipboard => "Share.Clipboard",
         ShareAction.Custom => "Share.Custom",
+        ShareAction.Hub => "Share.Hub",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
@@ -100,6 +110,7 @@ public static class ShareActions
         ShareAction.Obsidian => "Obsidian",
         ShareAction.Clipboard => "剪贴板",
         ShareAction.Custom => "所选应用",
+        ShareAction.Hub => "微信流",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
@@ -115,11 +126,13 @@ public static class ShareActions
         ShareAction.Obsidian => "沉淀到 Obsidian",
         ShareAction.Clipboard => "复制到剪贴板",
         ShareAction.Custom => "发送到自定义",
+        ShareAction.Hub => "微信流",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
+    /// <summary>Every destination the 入口 pane offers — Hub excluded on purpose: it is the share-sheet façade, not something the user enables.</summary>
     public static IReadOnlyList<ShareAction> All { get; } =
-        Enum.GetValues<ShareAction>();
+        Enum.GetValues<ShareAction>().Where(a => a != ShareAction.Hub).ToArray();
 }
 
 public sealed class ShareActionConverter : JsonConverter<ShareAction>

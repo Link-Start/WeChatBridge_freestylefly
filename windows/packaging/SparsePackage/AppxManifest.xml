@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
@@ -24,109 +24,27 @@
     <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
   <!--
-    One Application per share entry — verified 2026-09-25 that Windows and
-    WeChat both enumerate every windows.shareTarget extension of a sparse
-    multi-application package (the four-entry probe all appeared).
-    Every Application runs the same helper exe; it tells entries apart from
-    its own AUMID suffix (AppInfo.Current.AppUserModelId → ShareEntryId).
+    One Application total — earlier revisions declared one per share entry
+    and WeChat enumerated all of them; the share menu now shows only「微信流」
+    and the app asks for the destination itself once the files are durable.
     DisplayNames must never contain a contiguous 微信/WeChat/Weixin
     substring — WeChat hides those targets. The package DisplayName keeps
     微<U+2060>信流 above.
   -->
   <Applications>
-    <Application Id="Share.Codex" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发给 Codex" Description="将聊天归档发给 Codex" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
+    <!--
+      A single entry is the whole menu architecture now: WeChat sees 「微信流」
+      and nothing else, and the app asks which destination after the files are
+      durable — so the 入口 pane's switches take effect in the share menu
+      immediately, without repacking the MSIX. The DisplayName keeps the
+      微<U+2060>信流 word-joiner spelling: a contiguous 微信/WeChat/Weixin
+      substring is still hidden by WeChat's filter.
+    -->
+    <Application Id="Share.Hub" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
+      <uap:VisualElements AppListEntry="none" DisplayName="微⁠信流" Description="将聊天归档交给微⁠信流选择目标" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
       <Extensions>
         <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发给 Codex">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.Claude" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发给 Claude" Description="将聊天归档发给 Claude" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发给 Claude">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.Doubao" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发给豆包" Description="将聊天归档发给豆包" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发给豆包">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.Qwen" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发给千问" Description="将聊天归档发给千问" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发给千问">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.WorkBuddy" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发给 WorkBuddy" Description="将聊天归档发给 WorkBuddy" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发给 WorkBuddy">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.WeSight" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发给 WeSight" Description="将聊天归档发给 WeSight" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发给 WeSight">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.Obsidian" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="沉淀到 Obsidian" Description="将聊天归档沉淀到 Obsidian 知识库" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="沉淀到 Obsidian">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.Clipboard" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="复制到剪贴板" Description="复制聊天归档文件到剪贴板" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="复制到剪贴板">
-            <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
-            <uap:DataFormat>StorageItems</uap:DataFormat>
-          </uap:ShareTarget>
-        </uap:Extension>
-      </Extensions>
-    </Application>
-    <Application Id="Share.Custom" Executable="share-target\WeChatBridge.ShareTarget.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="发送到自定义" Description="将聊天归档发送到自己添加的应用" BackgroundColor="transparent" Square44x44Logo="Assets\Square44x44Logo.png" Square150x150Logo="Assets\Square150x150Logo.png" />
-      <Extensions>
-        <uap:Extension Category="windows.shareTarget">
-          <uap:ShareTarget Description="发送到自定义">
+          <uap:ShareTarget Description="微⁠信流">
             <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
             <uap:DataFormat>StorageItems</uap:DataFormat>
           </uap:ShareTarget>

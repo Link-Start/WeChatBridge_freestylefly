@@ -54,7 +54,7 @@ public partial class MainWindow : Window
             [AppTab.General] = ("通用", "运行状态、启动项与保留策略", new GeneralPane()),
             [AppTab.Entries] = ("入口", "微信「转发到其他应用」里的可用操作", new EntriesPane()),
             [AppTab.Scenes] = ("场景", "按群聊绑定提示词与适用 Agent", scenesPane),
-            [AppTab.Skills] = ("技能中心", "各 Agent 可安装与调用的技能包", skillsPane),
+            [AppTab.Skills] = ("技能中心", "微信流统一管理的技能库", skillsPane),
             [AppTab.About] = ("关于", "版本信息与项目链接", new AboutPane()),
         };
         scenesPane.Bind(model.Scenes, model.Skills);

@@ -167,6 +167,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// second's files. One intent runs at a time.
     /// </summary>
     private Task _pendingForward = Task.CompletedTask;
+    /// <summary>
+    /// The reads a helper-published <see cref="PrefetchHint"/> already started —
+    /// the scene work that used to begin only after the user's entry pick.
+    /// Consumed once by the matching batch; a hint for a cancelled or different
+    /// share is discarded rather than applied across batches.
+    /// </summary>
+    private SceneService.ShareContextPrefetch? _hintedPrefetch;
+    private Guid? _hintedBatchId;
     private string _query = string.Empty;
     private string? _inboxFailure;
 
@@ -331,6 +339,32 @@ public sealed class MainViewModel : INotifyPropertyChanged
     // MARK: - Loading
 
     /// <summary>
+    /// The helper's prefetch signal lands here: the batch is staged and the
+    /// entry pick is still in front of the user, so starting the title read
+    /// and transcript parse now hides them inside the decision time. Called
+    /// on the dispatcher — it only kicks off tasks and stashes them for
+    /// <see cref="EnqueueForward"/> to pick up.
+    /// </summary>
+    public void ConsumePrefetchHint()
+    {
+        var hint = PrefetchHint.Consume(_paths);
+        if (hint is null)
+            return;
+        _hintedPrefetch = Scenes.PrefetchForShare(hint.ResolvePaths(_paths), captureTitle: true);
+        _hintedBatchId = hint.BatchId;
+        InboxLogger.Write(_paths, $"[trace] main.prefetch-hint batch={hint.BatchId:N}");
+    }
+
+    /// <summary>One-shot hand-off of the hinted prefetch to its batch — never across batches.</summary>
+    private SceneService.ShareContextPrefetch? TakePrefetchHint(Guid batchId)
+    {
+        var hinted = _hintedBatchId == batchId ? _hintedPrefetch : null;
+        _hintedPrefetch = null;
+        _hintedBatchId = null;
+        return hinted;
+    }
+
+    /// <summary>
     /// Re-reads Ready, carries out anything the app has never processed, then
     /// ages out what the retention window says is finished with.
     /// </summary>
@@ -369,6 +403,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Returns true when it wrote an outcome, so the caller reloads.</summary>
     private bool Announce(ReadyBatch batch)
     {
+        // The share-target helper can settle a batch itself — a cancelled or
+        // expired entry pick commits state.json alongside the files. An outcome
+        // already on disk is the batch's answer; nothing here may overwrite it.
+        if (batch.Outcome is not null)
+            return false;
         switch (_reader.ConsumeIntent(batch.Id))
         {
             case { Kind: ConsumedIntentKind.Ready, Intent: { } intent }:
@@ -418,6 +457,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         async Task RunAfter(Task predecessor)
         {
+            // Title read + transcript parse run ahead of the scene decision —
+            // ideally already started by the helper's prefetch hint while the
+            // entry pick was still open; otherwise they start now, while a
+            // previous forward may still be delivering.
+            var prefetch = TakePrefetchHint(batch.Id);
+            InboxLogger.Write(_paths,
+                $"[trace] main.enqueue batch={batch.Id:N} prefetch={(prefetch is not null ? "hint" : "fresh")}");
+            prefetch ??= Scenes.PrefetchForShare(
+                batch.Items.Select(i => i.FullPath).ToList(), captureTitle: true);
             try
             {
                 await predecessor;
@@ -432,7 +480,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Reload();
                 return;
             }
-            await PerformForward(batch, intent.Action, ResolveTarget(intent), freshShare: true);
+            await PerformForward(batch, intent.Action, ResolveTarget(intent),
+                freshShare: true, prefetch: prefetch);
         }
     }
 
@@ -505,8 +554,33 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// the intent-driven path — the one moment reading the WeChat window title
     /// is honest — while resends and 「发给…」 reuse what the batch recorded.
     /// </summary>
-    public async Task PerformForward(ReadyBatch batch, ShareAction action, ForwardTarget? target, bool freshShare = false)
+    public async Task PerformForward(ReadyBatch batch, ShareAction action, ForwardTarget? target,
+        bool freshShare = false, SceneService.ShareContextPrefetch? prefetch = null)
     {
+        // 「微信流」 intent: the share menu names no destination, so the app asks
+        // once the batch is durable. The pick maps onto the same action/target
+        // pair every other path already uses, which keeps outcome records and
+        // the scene pipeline identical.
+        if (action == ShareAction.Hub)
+        {
+            var pick = await PickShareEntry(batch);
+            switch (pick.Kind)
+            {
+                case EntryPickerAnswerKind.Picked:
+                    action = pick.Action!.Value;
+                    target = pick.Target;
+                    break;
+                case EntryPickerAnswerKind.Expired:
+                    Record(BatchOutcomeKind.Expired, batch.Id);
+                    Reload();
+                    return;
+                default:
+                    Record(BatchOutcomeKind.Failed, batch.Id, "已取消选择入口。");
+                    Reload();
+                    return;
+            }
+        }
+
         var pathsOnly = action == ShareAction.Custom
             && target is not null
             && (target.PastesPathOnly
@@ -585,17 +659,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
         }
 
+        // Target resolution — process scan + PATH probing — overlaps the scene
+        // decision rather than starting after it. Null when the action has no
+        // deliverable target; DeliverAsync then resolves (and fails) itself.
+        var preresolved = Delivery.BeginResolve(batch, target);
+
         // The scene decision — pending shortcut → group binding → picker →
         // optional default. Null means the picker let the share expire; macOS
         // records that as expired rather than forwarding it bare.
         var choice = await Scenes.ResolveForShareAsync(
-            batch.Items.Select(i => i.FullPath).ToList(), captureTitle: freshShare);
+            batch.Items.Select(i => i.FullPath).ToList(),
+            captureTitle: freshShare,
+            prefetch: prefetch);
         if (choice is null)
         {
             Record(BatchOutcomeKind.Expired, batch.Id);
             Reload();
             return;
         }
+        InboxLogger.Write(_paths, $"[trace] main.scene-resolved batch={batch.Id:N}");
         if (choice.GroupName is not null || choice.Scene is not null)
             _reader.RecordContext(batch.Id, choice.GroupName, choice.Scene?.Id, choice.Scene?.Name);
         var agent = AgentIds.Matching(action)
@@ -606,7 +688,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var name = target?.DisplayName ?? action.TargetDisplayName();
         try
         {
-            var result = await Delivery.DeliverAsync(batch, target, prompt);
+            var result = await Delivery.DeliverAsync(batch, target, prompt, preresolved: preresolved);
             // advance only on a real landing — the scene watermark must not
             // swallow a batch that never reached its app.
             if (result.Delivered)
@@ -621,8 +703,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 {
                     var names = string.Join("、", missing);
                     ToastRequested?.Invoke(
-                        $"场景「{choice.Scene!.Name}」还可安装技能：{names}",
-                        "去安装", () => Navigate(AppTab.Skills), true);
+                        $"场景「{choice.Scene!.Name}」引用的技能不可用：{names}",
+                        "查看技能", () => Navigate(AppTab.Skills), true);
                 }
             }
             else
@@ -658,6 +740,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
             .Select(skill => skill.DisplayName)
             .ToList();
     }
+
+    /// <summary>
+    /// The 「微信流」 answer: build the enabled-entry list and either auto-pick
+    /// (zero or one option) or ask through <see cref="EntryPickerWindow"/>.
+    /// The 0/1 fast paths mirror <c>CustomForwardDecision</c>: a list with
+    /// one row is not a question.
+    /// </summary>
+    private async Task<EntryPickerAnswer> PickShareEntry(ReadyBatch? batch = null)
+    {
+        var options = ShareEntryCatalog.BuildOptions(_settings, _targetStore.Load());
+
+        switch (options.Count)
+        {
+            case 0:
+                ToastRequested?.Invoke("还没有开启任何入口。", "去入口页开启", () => Navigate(AppTab.Entries), true);
+                return EntryPickerAnswer.Cancelled;
+            case 1:
+            {
+                var only = options[0];
+                return EntryPickerAnswer.Picked(only.Action, only.Target);
+            }
+            default:
+                return await EntryPickerWindow.ChooseAsync(
+                    options, contextLine: batch is null ? null : BatchContextLine(batch));
+        }
+    }
+
+    /// <summary>The picker's payload line: what arrived, in one glance.</summary>
+    private static string BatchContextLine(ReadyBatch batch) => batch.Items.Count switch
+    {
+        1 => $"{batch.Items[0].DisplayName} · {ByteText.Format(batch.ByteCount)}",
+        var count => $"{count} 个文件 · {ByteText.Format(batch.ByteCount)}",
+    };
 
     /// <summary>发给… menu contents: built-ins first, then the user's own order.</summary>
     public IReadOnlyList<ForwardDestination> Destinations()
@@ -829,21 +944,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ReloadTargets(targets);
     }
 
-    private string EntryDetail(ShareAction action, IReadOnlyList<ForwardTarget> targets) => action switch
-    {
-        ShareAction.Codex => "激活 ChatGPT 并直接粘贴到输入框。",
-        ShareAction.Claude => "激活 Claude 并直接粘贴到输入框。",
-        ShareAction.Doubao => "激活豆包，把压缩包路径粘贴到输入框。",
-        ShareAction.Qwen => "激活千问，把压缩包路径粘贴到输入框。",
-        ShareAction.WorkBuddy => "激活 WorkBuddy 并直接粘贴到输入框。",
-        ShareAction.WeSight => "激活 WeSight 并直接粘贴到输入框。",
-        ShareAction.Obsidian => _settings.ObsidianVaultPath is { Length: > 0 } path
-            ? $"知识库：{new DirectoryInfo(path).Name}"
-            : "未选择知识库",
-        ShareAction.Clipboard => "只复制，不自动粘贴",
-        ShareAction.Custom => targets.Count == 0 ? "未添加应用" : $"{targets.Count} 个应用",
-        _ => string.Empty,
-    };
+    private string EntryDetail(ShareAction action, IReadOnlyList<ForwardTarget> targets) =>
+        ShareEntryCatalog.Detail(action, _settings, targets);
 
     private bool EntryDetailIsWarning(ShareAction action, IReadOnlyList<ForwardTarget> targets) => action switch
     {

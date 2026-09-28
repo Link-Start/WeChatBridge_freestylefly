@@ -35,6 +35,12 @@ public sealed record DeliveryEnvironment
     public required Func<bool> SendCtrlV { get; init; }
 
     /// <summary>
+    /// One Ctrl+key chord for a target's mode-switch hotkey — sent before the
+    /// composer is focused. Null skips <see cref="WindowsForwardTarget.PrePasteHotkey"/>.
+    /// </summary>
+    public Func<ushort, bool>? SendCtrlKey { get; init; }
+
+    /// <summary>
     /// Points the keyboard at the target's composer before pasting — the port of
     /// macOS's <c>focusTextInput</c>. Best effort: a paste into the unfocused
     /// message list silently does nothing, so this is attempted but never
@@ -80,6 +86,7 @@ public sealed record DeliveryEnvironment
         WriteFileDropList = WindowsClipboard.WriteFileDropList,
         WriteClipboardText = WindowsClipboard.WriteText,
         SendCtrlV = Win32.SendCtrlV,
+        SendCtrlKey = Win32.SendCtrlKey,
         FocusTextInput = Win32.FocusTextInput,
     };
 }

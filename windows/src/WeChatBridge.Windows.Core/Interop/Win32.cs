@@ -24,6 +24,7 @@ internal static class Win32
     internal const uint GMEM_MOVEABLE = 0x0002;
 
     internal const ushort VK_CONTROL = 0x11;
+    internal const ushort VK_J = 0x4A;
     internal const ushort VK_V = 0x56;
     internal const ushort VK_F24 = 0x87;
 
@@ -211,12 +212,15 @@ internal static class Win32
     /// Windows — it lands in the real input stream, not a message queue the
     /// target might not pump.
     /// </summary>
-    internal static bool SendCtrlV()
+    internal static bool SendCtrlV() => SendCtrlKey(VK_V);
+
+    /// <summary>One Ctrl+key chord — e.g. Doubao's Ctrl+J for a new 工作任务.</summary>
+    internal static bool SendCtrlKey(ushort virtualKey)
     {
         return SendInputs(
             Key(VK_CONTROL, keyUp: false),
-            Key(VK_V, keyUp: false),
-            Key(VK_V, keyUp: true),
+            Key(virtualKey, keyUp: false),
+            Key(virtualKey, keyUp: true),
             Key(VK_CONTROL, keyUp: true));
     }
 

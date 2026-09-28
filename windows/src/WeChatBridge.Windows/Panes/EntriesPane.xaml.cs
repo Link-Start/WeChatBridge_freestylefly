@@ -174,13 +174,43 @@ public sealed class RowLogoPathConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>Visible when the row has a logo; "missing" flips it for the letter badge.</summary>
+/// <summary>
+/// Segoe Fluent/MDL2 codepoint for rows that are not real apps — the
+/// clipboard, the 发送到自定义 summary row, and the hub entry itself — so the
+/// picker and this pane draw the same three-layer mark: PNG → glyph → letter.
+/// </summary>
+public sealed class RowGlyphConverter : IValueConverter
+{
+    public static string? GlyphFor(object? row) => row switch
+    {
+        EntryRow { Action: ShareAction.Clipboard } => "",
+        EntryRow { Action: ShareAction.Custom } => "",
+        EntryRow { Action: ShareAction.Hub } => "",
+        ForwardTargetRow { Target: { } target }
+            when AppLogos.PathFor(target.DisplayName) is null => "",
+        _ => null,
+    };
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        GlyphFor(value) ?? string.Empty;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>
+/// Three-way visibility: parameter "logo" shows the PNG, "glyph" the Segoe
+/// mark, anything else the letter badge. Each row draws exactly one.
+/// </summary>
 public sealed class RowLogoVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         var hasLogo = RowLogoPathConverter.PathFor(value) is not null;
-        var visible = Equals(parameter, "missing") ? !hasLogo : hasLogo;
+        var hasGlyph = RowGlyphConverter.GlyphFor(value) is not null;
+        var visible = Equals(parameter, "glyph") ? hasGlyph
+            : Equals(parameter, "logo") ? hasLogo
+            : !hasLogo && !hasGlyph;
         return visible ? Visibility.Visible : Visibility.Collapsed;
     }
 

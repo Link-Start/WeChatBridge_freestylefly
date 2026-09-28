@@ -4,13 +4,21 @@ using System.Text;
 namespace WeChatBridge.Windows.Core;
 
 /// <summary>
-/// Package-directory helpers shared by <see cref="SkillInstaller"/> (agent
-/// installs) and <see cref="SkillStore"/> (the app-owned skill library):
+/// Package-directory helpers used by <see cref="SkillStore"/> (the app-owned
+/// skill library) and <see cref="SkillArchive"/> (user zip imports):
 /// validation, the cross-platform SHA-256 digest, safe enumeration and copy.
-/// Extracted verbatim from SkillInstaller so both sides hash identically.
+/// The digest matches the macOS SkillInstaller byte-for-byte so copies hash
+/// identically on both platforms.
 /// </summary>
 internal static class SkillPackage
 {
+    /// <summary>
+    /// The install sidecar written next to agent-deployed copies. The Windows
+    /// port no longer installs into agents, but legacy packages may carry one
+    /// and the digest must skip it to match macOS.
+    /// </summary>
+    internal const string MetadataFileName = ".wechatbridge-install.json";
+
     private static readonly byte[] DigestSeparator = [0];
 
     /// <summary>
@@ -22,9 +30,9 @@ internal static class SkillPackage
     internal static string ValidatePackage(string root)
     {
         if (!Directory.Exists(root))
-            throw new SkillInstallException("技能包目录不存在。");
+            throw new SkillException("技能包目录不存在。");
         if (!File.Exists(Path.Combine(root, "SKILL.md")))
-            throw new SkillInstallException("技能包缺少 SKILL.md。");
+            throw new SkillException("技能包缺少 SKILL.md。");
         return PackageDigest(root);
     }
 
@@ -38,7 +46,7 @@ internal static class SkillPackage
         using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var file in EnumeratePackageFiles(root))
         {
-            if (file.RelativePath == SkillInstaller.MetadataFileName)
+            if (file.RelativePath == MetadataFileName)
                 continue;
             hasher.AppendData(Encoding.UTF8.GetBytes(file.RelativePath));
             hasher.AppendData(DigestSeparator);
@@ -78,12 +86,12 @@ internal static class SkillPackage
         }
         catch (Exception error) when (IsFileSystemError(error))
         {
-            throw new SkillInstallException("技能包目录不存在。");
+            throw new SkillException("技能包目录不存在。");
         }
         if (rootAttributes.HasFlag(FileAttributes.ReparsePoint))
-            throw new SkillInstallException("技能包不能包含符号链接。");
+            throw new SkillException("技能包不能包含符号链接。");
         if (!rootAttributes.HasFlag(FileAttributes.Directory))
-            throw new SkillInstallException("技能包目录无效。");
+            throw new SkillException("技能包目录无效。");
 
         var files = new List<PackageFile>();
         var pending = new Stack<string>();
@@ -95,18 +103,18 @@ internal static class SkillPackage
             {
                 var attributes = File.GetAttributes(entry);
                 if (attributes.HasFlag(FileAttributes.ReparsePoint))
-                    throw new SkillInstallException("技能包不能包含符号链接。");
+                    throw new SkillException("技能包不能包含符号链接。");
                 if (attributes.HasFlag(FileAttributes.Directory))
                 {
                     pending.Push(entry);
                     continue;
                 }
                 if (!File.Exists(entry))
-                    throw new SkillInstallException("技能包只能包含普通文件和目录。");
+                    throw new SkillException("技能包只能包含普通文件和目录。");
 
                 var relative = Path.GetRelativePath(rootFull, entry).Replace('\\', '/');
                 if (relative.StartsWith("..", StringComparison.Ordinal))
-                    throw new SkillInstallException("技能包包含越界路径。");
+                    throw new SkillException("技能包包含越界路径。");
                 files.Add(new PackageFile(entry, relative));
             }
         }

@@ -54,6 +54,8 @@ SignPath 项目创建完成后，工作流会先构建和测试，再发布外�
 
 **显示名过滤**：微信在「选择电脑中的应用」中隐藏显示名含连续子串 `微信` / `WeChat` / `Weixin` 的目标；单字、被任意字符（包括零宽字符）打断均不触发。manifest 使用 `微⁠信流`（`微` + U+2060 WORD JOINER + `信流`）绕过，渲染效果与原名一致。该字符是方案关键部分——任何字符串规范化、pretty-print、代码生成链路都可能将其剥掉，改动 manifest 工具链后必须跑 `PackagingAssetsTests.DisplayStringsAvoidContiguousBrandSubstrings` 并实机回归微信菜单。包名、Publisher、可执行路径等身份字段不含过滤词，不受此约束。签名类型不被过滤（WeixinShare 自身也是 Developer 签名）。
 
+**入口架构**：manifest 只注册一个 <Application Id="Share.Hub">（显示名 微⁠信流）。微信分享菜单因此只出现一行；helper 落盘后写 action=hub 的 intent，主程序消费时弹自己的「发送到…」选择器——只列 settings.json 里启用的入口和自定义目标，开关即时生效，不用重打包。之前按入口各注册一个 Application 的方案已废弃：Windows 没有 macOS pluginkit -e ignore 那种保留注册、只切可见性的 API，枚举由 manifest 全权决定。
+
 **激活方式**：helper 必须用 `Windows.ApplicationModel.AppInstance`（OS inbox API）获取激活参数。稀疏包不声明 WindowsAppRuntime 框架依赖，使用 `Microsoft.Windows.AppLifecycle.AppInstance` 会在激活时 `REGDB_E_CLASSNOTREG` 崩溃——不要重新引入 `Microsoft.WindowsAppSDK` 引用。
 
 **稀疏包**：`uap10:AllowExternalContent=true` + `runFullTrust`，exe 与资产位于外部 install root。manifest 声明的 Logo 必须在外部目录真实存在且尺寸匹配，否则 shell 静默不枚举。

@@ -55,6 +55,7 @@ internal sealed class FakeOs
                 return TextResults.Count == 0 || TextResults.Dequeue();
             },
             SendCtrlV = () => { Ops.Add("ctrlv"); return KeystrokeOk; },
+            SendCtrlKey = key => { Ops.Add($"ctrlkey:0x{key:X2}"); return KeystrokeOk; },
             DelayAsync = (span, _) => { Delays.Add(span); return Task.CompletedTask; },
             ThisProcessId = () => OwnPid,
             Now = () => Stamp,
@@ -228,6 +229,38 @@ public sealed class DeliveryEngineTests
         Assert.True(result.Delivered);
         var text = Assert.IsType<PastePayload.Text>(Assert.Single(result.Plan));
         Assert.Equal($"\"{A}\" ", text.Value);
+    }
+
+    [Fact]
+    public async Task DoubaoOpensANewWorkTaskBeforeThePaste()
+    {
+        // The 对话 composer cannot read a local file; Ctrl+J lands a fresh
+        // 工作任务 whose composer can. The hotkey goes out after the window is
+        // foreground and before the text paste.
+        var os = new FakeOs
+        {
+            Resolved = new ResolvedTarget(
+                WindowsForwardTargets.For(ShareAction.Doubao)!,
+                FakeOs.TargetPid, FakeOs.TargetHwnd, null),
+        };
+        var engine = new DeliveryEngine(os.Env);
+        var result = await engine.DeliverAsync(DeliveryFixtures.Batch(ShareAction.Doubao, A), prompt: "看一下");
+
+        Assert.True(result.Delivered);
+        var hotkey = os.Ops.IndexOf("ctrlkey:0x4A");
+        Assert.True(hotkey > os.Ops.IndexOf("activate") && hotkey < os.Ops.IndexOf("ctrlv"));
+        Assert.Contains(DeliveryEngine.PrePasteHotkeySettle, os.Delays);
+    }
+
+    [Fact]
+    public async Task ATargetWithoutAHotkeyPastesStraightAway()
+    {
+        var os = new FakeOs();
+        var engine = new DeliveryEngine(os.Env);
+        await engine.DeliverAsync(DeliveryFixtures.Batch(ShareAction.Codex, A));
+
+        Assert.DoesNotContain(os.Ops, op => op.StartsWith("ctrlkey", StringComparison.Ordinal));
+        Assert.DoesNotContain(DeliveryEngine.PrePasteHotkeySettle, os.Delays);
     }
 
     [Fact]

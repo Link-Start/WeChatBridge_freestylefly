@@ -56,8 +56,9 @@ public sealed class BatchOutcomeKindConverter : JsonConverter<BatchOutcomeKind>
 
 /// <summary>
 /// The app's own notes about a batch: <c>Ready/&lt;batch-id&gt;/state.json</c>.
-/// Written by the app, never by the share helper — the split is what lets the app
-/// record an outcome without racing a helper committing another batch.
+/// Written by the app — or by the share helper inside the staging tree, where it
+/// commits atomically with the batch. Never written into Ready by the helper:
+/// the split is what lets the app record an outcome without racing a commit.
 /// Ported from <c>BatchState</c> in BatchState.swift.
 /// </summary>
 public sealed record BatchState
