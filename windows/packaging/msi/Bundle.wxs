@@ -8,6 +8,7 @@
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <Bundle Name="WeChatBridge" Version="$(var.BundleVersion)" Manufacturer="WeChatBridge"
@@ -20,11 +21,13 @@
           ShowVersion="yes" />
     </BootstrapperApplication>
 
-    <!-- Existence of the shared runtime directory means some desktop runtime is
-         installed; machines stuck on < .NET 10 are rare enough that the plain
-         directory probe beats inventing version-dependent registry keys. -->
-    <util:DirectorySearch Id="DesktopRuntimeSearch" Variable="DesktopRuntimeInstalled"
-        Path="[ProgramFiles64Folder]dotnet\shared\Microsoft.WindowsDesktop.App" Result="exists" />
+    <!-- Latest installed version of the matching desktop runtime (major 10);
+         the variable stays unset when no .NET 10 desktop runtime exists, which
+         makes the DetectCondition below evaluate false and fetch the runtime. -->
+    <netfx:DotNetCoreSearch Id="DesktopRuntimeSearch"
+        Variable="DesktopRuntimeVersion"
+        RuntimeType="desktop" MajorVersion="10"
+        Platform="$(var.RuntimePlatform)" />
 
     <Chain>
       <ExePackage Id="NetDesktopRuntime"
@@ -34,7 +37,7 @@
           RepairArguments="/repair /quiet /norestart"
           UninstallArguments="/uninstall /quiet /norestart"
           PerMachine="yes" Vital="yes" Cache="remove"
-          DetectCondition="DesktopRuntimeInstalled">
+          DetectCondition="DesktopRuntimeVersion >= v10.0.0">
         <ExePackagePayload Name="$(var.RuntimeName)"
             DownloadUrl="$(var.RuntimeUrl)"
             Description="Microsoft .NET Desktop Runtime"

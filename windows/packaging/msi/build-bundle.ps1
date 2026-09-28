@@ -19,7 +19,8 @@ $ErrorActionPreference = 'Stop'
 $extDir = 'D:\WeChatB-Hub\_scratch\tools\wixext'
 $exts = @(
   "$extDir\wixtoolset.util.wixext\wixext6\WixToolset.Util.wixext.dll",
-  "$extDir\wixtoolset.bal.wixext\wixext6\WixToolset.BootstrapperApplications.wixext.dll"
+  "$extDir\wixtoolset.bal.wixext\wixext6\WixToolset.BootstrapperApplications.wixext.dll",
+  "$extDir\wixtoolset.netfx.wixext\wixext6\WixToolset.Netfx.wixext.dll"
 )
 
 # Official .NET Desktop Runtime installers, pinned per arch.
@@ -55,8 +56,9 @@ foreach ($f in @($msi, $icon) + $exts) {
 }
 
 wix build (Join-Path $PSScriptRoot 'Bundle.wxs') `
-  -ext $exts[0] -ext $exts[1] `
+  -ext $exts[0] -ext $exts[1] -ext $exts[2] `
   -arch $Arch `
+  -d "RuntimePlatform=$Arch" `
   -d "BundleVersion=$Version.0" `
   -d "IconFile=$icon" `
   -d "MsiPath=$msi" `
