@@ -389,10 +389,10 @@ final class ActionRunner {
             if !missing.isEmpty {
                 let names = missing.joined(separator: "、")
                 toast.show(
-                    L10n.format("场景已使用，但缺少技能：%@", names),
+                    L10n.format("场景「%@」引用的技能不可用：%@", context.scene?.name ?? "", names),
                     symbol: "puzzlepiece.extension.fill",
                     tone: .warning,
-                    action: ToastPresenter.Action(title: L10n.text("去安装技能")) { [weak self] in
+                    action: ToastPresenter.Action(title: L10n.text("查看技能")) { [weak self] in
                         self?.openSkills?()
                     }
                 )
@@ -409,8 +409,8 @@ final class ActionRunner {
         }
     }
 
-    /// Display names of the skills a delivered scene references that this
-    /// agent can use neither natively nor through the library's SKILL.md.
+    /// Display names of the skills a delivered scene references that have no
+    /// usable copy in the app-owned skill library.
     private func missingSkills(
         for scene: WeChatScene?,
         bundleIdentifier: String

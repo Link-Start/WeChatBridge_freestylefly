@@ -362,6 +362,44 @@ final class SkillStoreTests: XCTestCase {
         XCTAssertTrue(backups.contains { $0.hasPrefix("\(skill.id)-removed-") })
     }
 
+    // MARK: - Catalog loading
+
+    func testCatalogLoaderRejectsDuplicateIDs() throws {
+        try writeCatalog("""
+        [
+          {"id":"same","name":"A","summary":"","version":"1.0.0","package":null,"supported_agents":["doubao"]},
+          {"id":"same","name":"B","summary":"","version":"1.0.0","package":null,"supported_agents":["claude"]}
+        ]
+        """)
+        XCTAssertThrowsError(try OfficialSkillCatalog.load(from: resources)) { error in
+            XCTAssertEqual(
+                (error as? SkillError)?.errorDescription,
+                L10n.text("技能清单内容无效。")
+            )
+        }
+    }
+
+    func testCatalogLoaderRejectsInvalidSkillIDs() throws {
+        try writeCatalog("""
+        [
+          {"id":"Bad.Id","name":"A","summary":"","version":"1.0.0","package":null,"supported_agents":["doubao"]}
+        ]
+        """)
+        XCTAssertThrowsError(try OfficialSkillCatalog.load(from: resources)) { error in
+            XCTAssertTrue(
+                ((error as? SkillError)?.errorDescription ?? "")
+                    .contains("不符合规范")
+            )
+        }
+    }
+
+    private func writeCatalog(_ skillsJSON: String) throws {
+        let skills = resources.appendingPathComponent("Skills", isDirectory: true)
+        try FileManager.default.createDirectory(at: skills, withIntermediateDirectories: true)
+        let json = "{\"schema_version\":1,\"skills\":\(skillsJSON)}"
+        try Data(json.utf8).write(to: skills.appendingPathComponent("catalog.json"))
+    }
+
     private func makePackage(id: String, version: String = "1.0.0") throws -> OfficialSkill {
         let source = resources
             .appendingPathComponent("Skills", isDirectory: true)

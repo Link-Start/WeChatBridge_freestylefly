@@ -780,27 +780,26 @@ public enum SkillArchive {
 // MARK: - Package helpers shared by the installer, the store and the archive
 
 /// Package-directory helpers used by `SkillStore` (the app-owned skill
-/// library), `SkillArchive` (user zip imports) and `SkillInstaller` (agent
-/// deployment): validation, the SHA-256 digest, safe enumeration and copy.
-/// The digest matches the Windows `SkillPackage` byte-for-byte so copies hash
-/// identically on both platforms.
+/// library) and `SkillArchive` (user zip imports): validation, the SHA-256
+/// digest, safe enumeration and copy. The digest matches the Windows
+/// `SkillPackage` byte-for-byte so copies hash identically on both platforms.
 enum SkillPackage {
-    /// The install sidecar written next to agent-deployed copies. The library
-    /// never writes one, but legacy packages may carry it and the digest must
-    /// skip it to match the installer.
-    static let metadataFileName = SkillInstaller.metadataFileName
+    /// The install sidecar written next to agent-deployed copies by older app
+    /// versions. The library never writes one, but legacy packages may carry
+    /// it and the digest must skip it to stay compatible.
+    static let metadataFileName = ".wechatbridge-install.json"
 
     static func validatePackage(at root: URL) throws -> String {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
               isDirectory.boolValue
         else {
-            throw SkillInstallError.invalidPackage(L10n.text("技能包目录不存在。"))
+            throw SkillError(L10n.text("技能包目录不存在。"))
         }
         guard FileManager.default.fileExists(
             atPath: root.appendingPathComponent("SKILL.md").path
         ) else {
-            throw SkillInstallError.invalidPackage(L10n.text("技能包缺少 SKILL.md。"))
+            throw SkillError(L10n.text("技能包缺少 SKILL.md。"))
         }
         return try packageDigest(at: root)
     }
@@ -848,10 +847,10 @@ enum SkillPackageFiles {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
         let rootValues = try root.resourceValues(forKeys: Set(keys))
         if rootValues.isSymbolicLink == true {
-            throw SkillInstallError.unsafePackage(L10n.text("技能包不能包含符号链接。"))
+            throw SkillError(L10n.text("技能包不能包含符号链接。"))
         }
         guard rootValues.isDirectory == true else {
-            throw SkillInstallError.invalidPackage(L10n.text("技能包目录无效。"))
+            throw SkillError(L10n.text("技能包目录无效。"))
         }
         guard let enumerator = fileManager.enumerator(
             at: root,
@@ -862,7 +861,7 @@ enum SkillPackageFiles {
                 return false
             }
         ) else {
-            throw SkillInstallError.invalidPackage(L10n.text("无法读取技能包。"))
+            throw SkillError(L10n.text("无法读取技能包。"))
         }
 
         let base = root.standardizedFileURL.path
@@ -870,15 +869,15 @@ enum SkillPackageFiles {
         for case let url as URL in enumerator {
             let values = try url.resourceValues(forKeys: Set(keys))
             if values.isSymbolicLink == true {
-                throw SkillInstallError.unsafePackage(L10n.text("技能包不能包含符号链接。"))
+                throw SkillError(L10n.text("技能包不能包含符号链接。"))
             }
             if values.isDirectory == true { continue }
             guard values.isRegularFile == true else {
-                throw SkillInstallError.unsafePackage(L10n.text("技能包只能包含普通文件和目录。"))
+                throw SkillError(L10n.text("技能包只能包含普通文件和目录。"))
             }
             let path = url.standardizedFileURL.path
             guard path.hasPrefix(base + "/") else {
-                throw SkillInstallError.unsafePackage(L10n.text("技能包包含越界路径。"))
+                throw SkillError(L10n.text("技能包包含越界路径。"))
             }
             files.append(File(url: url, relativePath: String(path.dropFirst(base.count + 1))))
         }

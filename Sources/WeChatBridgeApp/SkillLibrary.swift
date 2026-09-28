@@ -5,14 +5,12 @@ import SwiftUI
 import WeChatBridgeCore
 
 /// The shipped skill catalogue plus the app-owned skill library: the catalog
-/// says what exists, the store keeps the authoritative copy agents are pointed
-/// at through `{{skill:id}}` prompt references, and the installer remains the
-/// deployment layer for agents with a native skills directory. Views read
-/// from here; no row reaches into the file system itself.
+/// says what exists and the store keeps the authoritative copy scenes point
+/// agents at through `{{skill:id}}` prompt references. Views read from here;
+/// no row reaches into the file system itself.
 @MainActor
 final class SkillLibrary: ObservableObject {
     let resourcesRoot: URL?
-    let installer: SkillInstaller
     let store: SkillStore
 
     @Published private(set) var catalog = OfficialSkillCatalog(skills: [])
@@ -30,11 +28,9 @@ final class SkillLibrary: ObservableObject {
 
     init(
         resourcesRoot: URL? = SkillLibrary.findResourcesRoot(),
-        installer: SkillInstaller = SkillInstaller(),
         store: SkillStore = SkillStore()
     ) {
         self.resourcesRoot = resourcesRoot
-        self.installer = installer
         self.store = store
         reload()
     }
@@ -72,21 +68,6 @@ final class SkillLibrary: ObservableObject {
     /// file scene prompts point agents at.
     func libraryFile(for skill: OfficialSkill) -> String? {
         store.skillFile(skill.id)
-    }
-
-    /// The package source an install deploys: the library copy while it
-    /// exists, else the bundled package.
-    func sourceDirectory(for skill: OfficialSkill) -> URL? {
-        let libraryDir = store.skillDirectory(skill.id)
-        if FileManager.default.fileExists(
-            atPath: libraryDir.appendingPathComponent("SKILL.md").path
-        ) {
-            return libraryDir
-        }
-        guard let package = skill.package, let resourcesRoot else { return nil }
-        return resourcesRoot
-            .appendingPathComponent("Skills", isDirectory: true)
-            .appendingPathComponent(package, isDirectory: true)
     }
 
     /// Every skill a scene can reference: catalog + imported, then stray
@@ -141,17 +122,12 @@ final class SkillLibrary: ObservableObject {
 
     // MARK: - Scene prompt resolution
 
-    /// How `id` reaches `agent`: a native install when this agent has it
-    /// (installed, confirmed or awaiting update), else a pointer to the
-    /// library's SKILL.md whenever the copy exists. A known skill with no
-    /// library copy resolves as missing; an id nobody knows resolves as
-    /// unknown.
+    /// Scenes carry skills by reference only: a pointer to the library's
+    /// SKILL.md whenever the copy exists, missing for a known skill with no
+    /// package, unknown for an id nobody knows.
     func resolve(_ id: String, agent: AgentID?) -> SkillResolution {
         let skill = skill(id: id)
         let file = store.skillFile(id)
-        if let agent, let skill, isInstalledNatively(skill, agent: agent) {
-            return SkillResolution(id: id, displayName: skill.name, mode: .native)
-        }
         if skill == nil, file == nil {
             return SkillResolution(id: id, displayName: id, mode: .unknown)
         }
@@ -167,15 +143,9 @@ final class SkillLibrary: ObservableObject {
     func promptContext(agent: AgentID?) -> SkillRenderContext {
         let byID = Dictionary(allSkills.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let store = self.store
-        let nativeIDs: Set<String> = agent.map { agent in
-            Set(allSkills.filter { isInstalledNatively($0, agent: agent) }.map(\.id))
-        } ?? []
         return SkillRenderContext(agent: agent) { id in
             let skill = byID[id]
             let file = store.skillFile(id)
-            if nativeIDs.contains(id) {
-                return SkillResolution(id: id, displayName: skill?.name ?? id, mode: .native)
-            }
             if skill == nil, file == nil {
                 return SkillResolution(id: id, displayName: id, mode: .unknown)
             }
@@ -184,75 +154,6 @@ final class SkillLibrary: ObservableObject {
                 ? SkillResolution(id: id, displayName: name, mode: .path, skillFile: file)
                 : SkillResolution(id: id, displayName: name, mode: .missing)
         }
-    }
-
-    private func isInstalledNatively(_ skill: OfficialSkill, agent: AgentID) -> Bool {
-        switch status(for: skill, agent: agent) {
-        case .installed, .manualConfirmed, .updateAvailable:
-            return true
-        case .packageUnavailable, .agentUnavailable, .notInstalled,
-             .versionConflict, .manualOnly:
-            return false
-        }
-    }
-
-    // MARK: - Agent installation
-
-    func isAgentInstalled(_ agent: AgentID) -> Bool {
-        InstalledApp.lookup(agent.bundleIdentifier).isInstalled
-    }
-
-    func status(for skill: OfficialSkill, agent: AgentID) -> SkillAgentStatus {
-        guard let resourcesRoot else { return .packageUnavailable }
-        return installer.status(
-            for: skill,
-            agent: agent,
-            resourcesRoot: resourcesRoot,
-            sourceDirectory: sourceDirectory(for: skill),
-            agentInstalled: isAgentInstalled(agent)
-        )
-    }
-
-    func plan(for skill: OfficialSkill, agent: AgentID) -> SkillInstallPlan? {
-        guard let resourcesRoot else { return nil }
-        return installer.plan(
-            for: skill,
-            agent: agent,
-            resourcesRoot: resourcesRoot,
-            sourceDirectory: sourceDirectory(for: skill),
-            agentInstalled: isAgentInstalled(agent)
-        )
-    }
-
-    func install(
-        _ skill: OfficialSkill,
-        to agent: AgentID,
-        replacingExisting: Bool = false
-    ) throws {
-        guard let resourcesRoot else { throw SkillInstallError.packageUnavailable }
-        try installer.install(
-            skill,
-            to: agent,
-            resourcesRoot: resourcesRoot,
-            sourceDirectory: sourceDirectory(for: skill),
-            replacingExisting: replacingExisting
-        )
-        revision += 1
-    }
-
-    func uninstall(_ skill: OfficialSkill, from agent: AgentID) throws {
-        try installer.uninstall(skill, from: agent)
-        revision += 1
-    }
-
-    func confirmManual(_ skill: OfficialSkill, agent: AgentID) throws {
-        try installer.confirmManual(skill, agent: agent)
-        revision += 1
-    }
-
-    func revokeManual(_ skill: OfficialSkill, agent: AgentID) {
-        installer.revokeManualConfirmation(skill, agent: agent)
-        revision += 1
     }
 
     // MARK: - Internals

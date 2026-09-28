@@ -467,3 +467,7 @@
 "技能由微信流统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。" = "Skills are managed by WeChatBridge; scenes reference them with {{skill:id}} and the destination Agent reads them on forward.";
 "技能 ID" = "Skill ID";
 "技能已从技能库移除，原包在备份目录中可恢复。" = "The skill was removed from the library; the original package can be recovered from the backup directory.";
+"副本冲突" = "Copy conflict";
+"已就绪" = "Ready";
+"查看技能" = "View skills";
+"场景「%@」引用的技能不可用：%@" = "Scene "%@" references skills that are unavailable: %@";
