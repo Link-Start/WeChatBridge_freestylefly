@@ -65,6 +65,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 @MainActor
 final class SettingsRouter: ObservableObject {
     @Published var tab: SettingsTab = .general
+    /// Set by the skills pane's 用于 N 个场景 badge; the scenes pane consumes
+    /// it by selecting the first scene that references the skill.
+    @Published var skillFocus: String?
 }
 
 /// What the settings window can ask the rest of the app to do. Closures rather
@@ -165,9 +168,9 @@ struct SettingsView: View {
                 actions: actions
             )
         case .scenes:
-            SceneSettingsView(preferences: preferences, skills: skills)
+            SceneSettingsView(preferences: preferences, skills: skills, router: router)
         case .skills:
-            SkillsPane(skills: skills, preferences: preferences)
+            SkillsPane(skills: skills, preferences: preferences, router: router)
         case .entries:
             EntriesPane(targets: forwardTargets, preferences: preferences)
         case .permissions:

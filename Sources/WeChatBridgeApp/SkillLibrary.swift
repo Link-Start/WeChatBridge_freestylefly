@@ -4,52 +4,199 @@ import Foundation
 import SwiftUI
 import WeChatBridgeCore
 
-/// The shipped skill catalogue plus the one installer that writes or confirms
-/// skills for this user. Views read from here; no row reaches into the file
-/// system itself.
+/// The shipped skill catalogue plus the app-owned skill library: the catalog
+/// says what exists, the store keeps the authoritative copy agents are pointed
+/// at through `{{skill:id}}` prompt references, and the installer remains the
+/// deployment layer for agents with a native skills directory. Views read
+/// from here; no row reaches into the file system itself.
 @MainActor
 final class SkillLibrary: ObservableObject {
     let resourcesRoot: URL?
     let installer: SkillInstaller
+    let store: SkillStore
 
     @Published private(set) var catalog = OfficialSkillCatalog(skills: [])
     @Published private(set) var loadError: String?
+    /// Last library sync problem (a conflict or I/O failure); nil when clean.
+    @Published private(set) var libraryIssue: String?
     @Published private(set) var revision = 0
+    /// User-imported skills, synthesized into catalog-shaped records on every
+    /// reload so imported packages get the same card treatment as official
+    /// ones. Never contains catalog ids.
+    @Published private(set) var userSkills: [OfficialSkill] = []
 
     var skills: [OfficialSkill] { catalog.skills }
+    var allSkills: [OfficialSkill] { catalog.skills + userSkills }
 
     init(
         resourcesRoot: URL? = SkillLibrary.findResourcesRoot(),
-        installer: SkillInstaller = SkillInstaller()
+        installer: SkillInstaller = SkillInstaller(),
+        store: SkillStore = SkillStore()
     ) {
         self.resourcesRoot = resourcesRoot
         self.installer = installer
+        self.store = store
         reload()
     }
 
     func reload() {
-        guard let resourcesRoot else {
+        if let resourcesRoot {
+            do {
+                catalog = try OfficialSkillCatalog.load(from: resourcesRoot)
+                loadError = nil
+            } catch {
+                catalog = OfficialSkillCatalog(skills: [])
+                loadError = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+            syncLibrary(resourcesRoot)
+        } else {
+            catalog = OfficialSkillCatalog(skills: [])
             loadError = L10n.text("没有找到内置技能清单。")
-            return
         }
-        do {
-            catalog = try OfficialSkillCatalog.load(from: resourcesRoot)
-            loadError = nil
-            revision += 1
-        } catch {
-            loadError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
+        loadUserSkills()
+        revision += 1
     }
 
     func skill(id: String) -> OfficialSkill? {
-        catalog.skills.first { $0.id == id }
+        allSkills.first { $0.id == id }
     }
 
-    func skillNames(for scene: WeChatScene) -> [String: String] {
-        Dictionary(uniqueKeysWithValues: scene.requiredSkillIDs.compactMap { id in
-            skill(id: id).map { (id, $0.name) }
-        })
+    // MARK: - The app-owned library
+
+    func libraryState(for skill: OfficialSkill) -> SkillLibraryState {
+        store.state(skill.id)
     }
+
+    /// Absolute SKILL.md path while the library copy is ready — the exact
+    /// file scene prompts point agents at.
+    func libraryFile(for skill: OfficialSkill) -> String? {
+        store.skillFile(skill.id)
+    }
+
+    /// The package source an install deploys: the library copy while it
+    /// exists, else the bundled package.
+    func sourceDirectory(for skill: OfficialSkill) -> URL? {
+        let libraryDir = store.skillDirectory(skill.id)
+        if FileManager.default.fileExists(
+            atPath: libraryDir.appendingPathComponent("SKILL.md").path
+        ) {
+            return libraryDir
+        }
+        guard let package = skill.package, let resourcesRoot else { return nil }
+        return resourcesRoot
+            .appendingPathComponent("Skills", isDirectory: true)
+            .appendingPathComponent(package, isDirectory: true)
+    }
+
+    /// Every skill a scene can reference: catalog + imported, then stray
+    /// library ids.
+    func referenceableSkills() -> [(id: String, name: String)] {
+        let known = Set(allSkills.map(\.id))
+        return allSkills.map { ($0.id, $0.name) }
+            + store.entries().keys
+                .filter { !known.contains($0) }
+                .sorted()
+                .map { ($0, $0) }
+    }
+
+    /// 导入技能 — unpacks a user-picked zip into the library and reloads so
+    /// the new card and scene references pick it up. Errors (corrupt archive,
+    /// unsafe paths, invalid frontmatter, an id that an official skill already
+    /// owns) surface as `SkillError` for the pane to display.
+    @discardableResult
+    func importArchive(at url: URL) throws -> SkillPackageInfo {
+        let stagingParent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WeChatBridge", isDirectory: true)
+        let result = try SkillArchive.extractToStaging(
+            archivePath: url,
+            stagingParent: stagingParent
+        )
+        defer { try? FileManager.default.removeItem(at: result.directory) }
+        guard !catalog.skills.contains(where: { $0.id == result.info.id }) else {
+            throw SkillError(L10n.format(
+                "「%@」是内置技能，请修改 SKILL.md 的 name 后再导入。",
+                result.info.id
+            ))
+        }
+        try store.import(
+            source: result.directory,
+            id: result.info.id,
+            version: result.info.version
+        )
+        reload()
+        return result.info
+    }
+
+    /// 从技能库移除 — the package moves into the backups and the card drops
+    /// out. Only user-imported skills can be removed; official ones come back
+    /// on the next catalog sync.
+    func removeSkill(_ skill: OfficialSkill) throws {
+        guard userSkills.contains(where: { $0.id == skill.id }) else {
+            throw SkillError(L10n.text("内置技能不能移除。"))
+        }
+        try store.remove(skill.id)
+        reload()
+    }
+
+    // MARK: - Scene prompt resolution
+
+    /// How `id` reaches `agent`: a native install when this agent has it
+    /// (installed, confirmed or awaiting update), else a pointer to the
+    /// library's SKILL.md whenever the copy exists. A known skill with no
+    /// library copy resolves as missing; an id nobody knows resolves as
+    /// unknown.
+    func resolve(_ id: String, agent: AgentID?) -> SkillResolution {
+        let skill = skill(id: id)
+        let file = store.skillFile(id)
+        if let agent, let skill, isInstalledNatively(skill, agent: agent) {
+            return SkillResolution(id: id, displayName: skill.name, mode: .native)
+        }
+        if skill == nil, file == nil {
+            return SkillResolution(id: id, displayName: id, mode: .unknown)
+        }
+        let name = skill?.name ?? id
+        return file != nil
+            ? SkillResolution(id: id, displayName: name, mode: .path, skillFile: file)
+            : SkillResolution(id: id, displayName: name, mode: .missing)
+    }
+
+    /// The render context the forward path and the scene preview hand to
+    /// `ScenePrompt`. The resolver works off value snapshots so `ScenePrompt`
+    /// can render synchronously off the main actor.
+    func promptContext(agent: AgentID?) -> SkillRenderContext {
+        let byID = Dictionary(allSkills.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let store = self.store
+        let nativeIDs: Set<String> = agent.map { agent in
+            Set(allSkills.filter { isInstalledNatively($0, agent: agent) }.map(\.id))
+        } ?? []
+        return SkillRenderContext(agent: agent) { id in
+            let skill = byID[id]
+            let file = store.skillFile(id)
+            if nativeIDs.contains(id) {
+                return SkillResolution(id: id, displayName: skill?.name ?? id, mode: .native)
+            }
+            if skill == nil, file == nil {
+                return SkillResolution(id: id, displayName: id, mode: .unknown)
+            }
+            let name = skill?.name ?? id
+            return file != nil
+                ? SkillResolution(id: id, displayName: name, mode: .path, skillFile: file)
+                : SkillResolution(id: id, displayName: name, mode: .missing)
+        }
+    }
+
+    private func isInstalledNatively(_ skill: OfficialSkill, agent: AgentID) -> Bool {
+        switch status(for: skill, agent: agent) {
+        case .installed, .manualConfirmed, .updateAvailable:
+            return true
+        case .packageUnavailable, .agentUnavailable, .notInstalled,
+             .versionConflict, .manualOnly:
+            return false
+        }
+    }
+
+    // MARK: - Agent installation
 
     func isAgentInstalled(_ agent: AgentID) -> Bool {
         InstalledApp.lookup(agent.bundleIdentifier).isInstalled
@@ -61,6 +208,7 @@ final class SkillLibrary: ObservableObject {
             for: skill,
             agent: agent,
             resourcesRoot: resourcesRoot,
+            sourceDirectory: sourceDirectory(for: skill),
             agentInstalled: isAgentInstalled(agent)
         )
     }
@@ -71,6 +219,7 @@ final class SkillLibrary: ObservableObject {
             for: skill,
             agent: agent,
             resourcesRoot: resourcesRoot,
+            sourceDirectory: sourceDirectory(for: skill),
             agentInstalled: isAgentInstalled(agent)
         )
     }
@@ -85,6 +234,7 @@ final class SkillLibrary: ObservableObject {
             skill,
             to: agent,
             resourcesRoot: resourcesRoot,
+            sourceDirectory: sourceDirectory(for: skill),
             replacingExisting: replacingExisting
         )
         revision += 1
@@ -103,6 +253,52 @@ final class SkillLibrary: ObservableObject {
     func revokeManual(_ skill: OfficialSkill, agent: AgentID) {
         installer.revokeManualConfirmation(skill, agent: agent)
         revision += 1
+    }
+
+    // MARK: - Internals
+
+    /// Copies shipped official packages into the library. A failure here must
+    /// not take the pane down — it is surfaced through `libraryIssue`.
+    private func syncLibrary(_ resourcesRoot: URL) {
+        do {
+            let report = try store.syncOfficial(catalog: catalog, resourcesRoot: resourcesRoot)
+            libraryIssue = report.conflicts.isEmpty
+                ? nil
+                : L10n.format(
+                    "技能库中的 %@ 被外部修改，未自动更新。",
+                    report.conflicts.joined(separator: "、")
+                )
+        } catch {
+            libraryIssue = (error as? LocalizedError)?.errorDescription
+                ?? error.localizedDescription
+        }
+    }
+
+    /// Rebuilds `userSkills` from the library registry: every imported id that
+    /// still has a package on disk becomes a catalog-shaped record. Ids that a
+    /// shipped catalog later claims stay official — the catalog wins.
+    private func loadUserSkills() {
+        let catalogIDs = Set(catalog.skills.map(\.id))
+        userSkills = store.entries().values
+            .filter {
+                $0.source == SkillStore.importedSource
+                    && !catalogIDs.contains($0.id)
+                    && store.state($0.id) != .missing
+            }
+            .map { entry in
+                let info = try? SkillArchive.readInfo(
+                    packageDirectory: store.skillDirectory(entry.id)
+                )
+                return OfficialSkill(
+                    id: entry.id,
+                    name: info?.displayName ?? entry.id,
+                    summary: info?.summary ?? "",
+                    version: entry.version,
+                    package: nil,
+                    supportedAgents: AgentID.allCases
+                )
+            }
+            .sorted { $0.id < $1.id }
     }
 
     nonisolated private static func findResourcesRoot() -> URL? {

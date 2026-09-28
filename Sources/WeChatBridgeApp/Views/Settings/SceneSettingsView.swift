@@ -6,6 +6,7 @@ import WeChatBridgeCore
 struct SceneSettingsView: View {
     @ObservedObject var preferences: Preferences
     @ObservedObject var skills: SkillLibrary
+    @ObservedObject var router: SettingsRouter
 
     @State private var page = ScenePage.scenes
     @State private var selectedSceneID: String?
@@ -80,6 +81,17 @@ struct SceneSettingsView: View {
             if let selectedGroupKey, keys.contains(selectedGroupKey) { return }
             selectedGroupKey = keys.first
         }
+        // The skills pane's 用于 N 个场景 badge lands here.
+        .onChange(of: router.skillFocus) { _, skillID in
+            guard let skillID else { return }
+            router.skillFocus = nil
+            page = .scenes
+            if let scene = preferences.scenes.scenes.first(where: {
+                $0.effectiveSkillIDs.contains(skillID)
+            }) {
+                selectedSceneID = scene.id
+            }
+        }
     }
 
     private var pagePicker: some View {
@@ -118,7 +130,7 @@ struct SceneSettingsView: View {
                 SceneEditor(
                     scene: scene,
                     enabled: enabledBinding(for: scene.wrappedValue.id),
-                    resourcesRoot: skills.resourcesRoot,
+                    skills: skills,
                     duplicate: { duplicate(scene.wrappedValue) },
                     moveUp: { move(scene.wrappedValue, by: -1) },
                     moveDown: { move(scene.wrappedValue, by: 1) },
@@ -467,6 +479,7 @@ struct SceneSettingsView: View {
             return
         }
         var scene = package.scene
+        SkillId.migrate(&scene)
         scene.enabled = true
         preferences.scenes.replace(scene)
         selectedSceneID = scene.id
@@ -525,12 +538,16 @@ private struct SceneListRow: View {
 private struct SceneEditor: View {
     @Binding var scene: WeChatScene
     @Binding var enabled: Bool
-    let resourcesRoot: URL?
+    let skills: SkillLibrary
     let duplicate: () -> Void
     let moveUp: () -> Void
     let moveDown: () -> Void
     let export: () -> Void
     let remove: () -> Void
+
+    /// Which destination the prompt preview renders for — nil means
+    /// clipboard / a custom app with no known agent.
+    @State private var previewTarget: SkillPreviewTarget = .none
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.l) {
@@ -571,12 +588,14 @@ private struct SceneEditor: View {
                             agent: agent,
                             selected: scene.compatibleAgents.contains(agent),
                             editable: !scene.isOfficial,
-                            resourcesRoot: resourcesRoot,
+                            resourcesRoot: skills.resourcesRoot,
                             toggle: { toggle(agent) }
                         )
                     }
                 }
             }
+
+            skillPanel
 
             if scene.isOfficial {
                 HStack {
@@ -625,11 +644,165 @@ private struct SceneEditor: View {
     private var promptBinding: Binding<String> {
         Binding(
             get: { promptText },
-            set: {
-                scene.instruction = $0
-                scene.outputSpec = ""
-            }
+            set: { applyPrompt($0) }
         )
+    }
+
+    /// User scenes declare skills by referencing them inline; the stored list
+    /// follows the prompt so removing a `{{skill:id}}` drops the dependency.
+    private func applyPrompt(_ text: String) {
+        scene.instruction = text
+        scene.outputSpec = ""
+        var seen = Set<String>()
+        scene.requiredSkillIDs = SkillReference.parse(text)
+            .filter { seen.insert($0).inserted }
+    }
+
+    // MARK: - Skill references & preview
+
+    private var previewAgent: AgentID? {
+        if case .agent(let agent) = previewTarget { return agent }
+        return nil
+    }
+
+    private var skillPanel: some View {
+        let agent = previewAgent
+        let context = skills.promptContext(agent: agent)
+        let resolved = scene.effectiveSkillIDs.map { context.resolve($0) }
+        let invalid = SkillReference.invalid(scene.instruction)
+            + SkillReference.invalid(scene.outputSpec)
+        let warnings = invalid.map {
+            L10n.format("「%@」不是有效的技能 ID（只能使用小写字母、数字和连字符）。", $0)
+        } + resolved.filter { $0.mode == .unknown }.map {
+            L10n.format("未找到技能「%@」，转发时会提示 Agent 该技能不存在。", $0.id)
+        }
+
+        return VStack(alignment: .leading, spacing: Space.s) {
+            HStack(spacing: Space.s) {
+                Text(L10n.text("技能引用"))
+                    .font(Typo.captionStrong)
+                    .foregroundStyle(Theme.inkSecondary)
+                Spacer(minLength: Space.s)
+                if !scene.isOfficial {
+                    insertSkillMenu
+                }
+            }
+
+            if resolved.isEmpty {
+                Text(L10n.text("没有引用技能。点「插入技能」可在光标处插入 {{skill:id}}。"))
+                    .font(Typo.paneCaption)
+                    .foregroundStyle(Theme.inkTertiary)
+            } else {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(resolved, id: \.id) { skill in
+                        Text("• \(skill.displayName)（\(skill.id)）：\(modeText(for: skill.mode, agent: agent))")
+                            .font(Typo.paneCaption)
+                            .foregroundStyle(Theme.inkSecondary)
+                    }
+                }
+            }
+
+            ForEach(warnings, id: \.self) { warning in
+                Notice(warning, tone: .warn)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: Space.s) {
+                    Text(L10n.text("转发提示词预览"))
+                        .font(Typo.captionStrong)
+                        .foregroundStyle(Theme.inkSecondary)
+                    Spacer(minLength: Space.s)
+                    SettingsSelect(
+                        title: L10n.text("预览目标"),
+                        selection: $previewTarget,
+                        choices: previewChoices,
+                        identifier: "scene.skillPreviewAgent"
+                    )
+                    .frame(width: 190)
+                }
+                Text(previewText(context: context))
+                    .font(Typo.paneCaption)
+                    .foregroundStyle(Theme.inkSecondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
+            }
+        }
+    }
+
+    /// 插入技能 — a menu of referenceable skills; the pick lands at the caret
+    /// of the prompt field when it has focus, else at the end.
+    private var insertSkillMenu: some View {
+        Menu {
+            let choices = skills.referenceableSkills()
+            if choices.isEmpty {
+                Text(L10n.text("没有可引用的技能"))
+            }
+            ForEach(choices, id: \.id) { choice in
+                Button("\(choice.name)（\(choice.id)）\(librarySuffix(for: choice.id))") {
+                    insertSkillToken(choice.id)
+                }
+            }
+        } label: {
+            Text(L10n.text("插入技能"))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private func librarySuffix(for id: String) -> String {
+        switch skills.store.state(id) {
+        case .ready: return ""
+        case .conflict: return L10n.text(" · 技能库中已被修改")
+        case .missing: return L10n.text(" · 暂无技能包")
+        }
+    }
+
+    /// Inserts the token at the live prompt field's caret when it owns the
+    /// focus — the field editor is an NSTextView — otherwise appends it.
+    private func insertSkillToken(_ id: String) {
+        let token = SkillReference.token(id)
+        if let textView = NSApp.keyWindow?.firstResponder as? NSTextView {
+            textView.insertText(token, replacementRange: textView.selectedRange())
+            return
+        }
+        var text = promptText
+        if !text.isEmpty, !text.hasSuffix(" "), !text.hasSuffix("\n") {
+            text += " "
+        }
+        applyPrompt(text + token)
+    }
+
+    private func modeText(for mode: SkillRenderMode, agent: AgentID?) -> String {
+        switch mode {
+        case .native:
+            L10n.text("已安装到该 Agent")
+        case .path:
+            L10n.text("通过技能库中的 SKILL.md 引用")
+        case .missing where agent == nil:
+            L10n.text("技能库中暂无技能包")
+        case .missing:
+            L10n.text("该 Agent 无法使用，转发时会要求说明未完成部分")
+        case .unknown:
+            L10n.text("未找到该技能")
+        }
+    }
+
+    private var previewChoices: [SettingsChoice<SkillPreviewTarget>] {
+        [SettingsChoice(id: .none, title: L10n.text("无 Agent（剪贴板 / 自定义）"))]
+            + AgentID.allCases.map {
+                SettingsChoice(id: .agent($0), title: $0.displayName)
+            }
+    }
+
+    private func previewText(context: SkillRenderContext) -> String {
+        if let agent = previewAgent, !scene.compatibleAgents.contains(agent) {
+            return L10n.format("这个场景不适用于 %@，转发时不会附加提示词。", agent.displayName)
+        }
+        return ScenePrompt.render(scene: scene, previousSummaryAt: nil, skills: context)
+            ?? L10n.text("（提示词为空）")
     }
 
     private func toggle(_ agent: AgentID) {
@@ -849,6 +1022,11 @@ private struct ReadOnlySceneField: View {
                 .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Radius.row))
         }
     }
+}
+
+private enum SkillPreviewTarget: Hashable {
+    case none
+    case agent(AgentID)
 }
 
 private struct SceneNotice {

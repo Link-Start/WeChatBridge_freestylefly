@@ -6,6 +6,7 @@ import WeChatBridgeCore
 struct SkillsPane: View {
     @ObservedObject var skills: SkillLibrary
     @ObservedObject var preferences: Preferences
+    @ObservedObject var router: SettingsRouter
 
     @State private var query = ""
     @State private var statusFilter = SkillStatusFilter.all
@@ -13,6 +14,7 @@ struct SkillsPane: View {
     @State private var expandedSkillIDs: Set<String> = []
     @State private var notice: SkillNotice?
     @State private var replaceRequest: ReplaceRequest?
+    @State private var importing = false
 
     var body: some View {
         let records = makeRecords()
@@ -20,12 +22,16 @@ struct SkillsPane: View {
         let visibleRecords = scopedRecords.filter { statusFilter.includes($0.kind) }
 
         VStack(alignment: .leading, spacing: Space.l) {
-            Text(L10n.text("发现、安装和管理各 Agent 可用的技能。"))
+            Text(L10n.text("发现、安装和管理各 Agent 可用的技能；场景用 {{skill:id}} 引用技能库中的副本。"))
                 .font(Typo.paneBody)
                 .foregroundStyle(Theme.inkSecondary)
 
             metrics(records)
             controls(allRecords: records, scopedRecords: scopedRecords)
+
+            if let issue = skills.libraryIssue {
+                Notice(issue, tone: .warn)
+            }
 
             if visibleRecords.isEmpty {
                 emptyState
@@ -36,8 +42,9 @@ struct SkillsPane: View {
                             record: record,
                             resourcesRoot: skills.resourcesRoot,
                             sceneCount: preferences.scenes.scenes.filter {
-                                $0.requiredSkillIDs.contains(record.skill.id)
+                                $0.effectiveSkillIDs.contains(record.skill.id)
                             }.count,
+                            showScenes: { showScenes(referencing: record.skill.id) },
                             expanded: expandedSkillIDs.contains(record.id),
                             toggleDetails: { toggleDetails(record.id) },
                             primaryAction: { performPrimaryAction(for: record) },
@@ -65,7 +72,8 @@ struct SkillsPane: View {
                             revoke: { agent in
                                 skills.revokeManual(record.skill, agent: agent)
                                 notice = SkillNotice(L10n.text("已撤销本地确认。"), tone: .good)
-                            }
+                            },
+                            removeSkill: { removeSkill(record.skill) }
                         )
                     }
                 }
@@ -76,6 +84,17 @@ struct SkillsPane: View {
             }
         }
         .frame(maxWidth: 980, alignment: .leading)
+        .fileImporter(
+            isPresented: $importing,
+            allowedContentTypes: [.zip]
+        ) { result in
+            switch result {
+            case .success(let url):
+                importArchive(url)
+            case .failure(let error):
+                notice = SkillNotice(error.localizedDescription, tone: .bad)
+            }
+        }
         .alert(
             L10n.text("替换已有技能目录？"),
             isPresented: Binding(
@@ -145,6 +164,9 @@ struct SkillsPane: View {
                     .buttonStyle(SettingsActionButtonStyle(primary: true, width: nil))
                     .disabled(!allRecords.contains(where: \.hasAutomaticMissing))
 
+                Button(L10n.text("导入 ZIP…")) { importing = true }
+                    .buttonStyle(SettingsActionButtonStyle(width: nil))
+
                 Text(L10n.text("仅处理支持直接安装的 Agent；其余仍需导出 ZIP。"))
                     .font(Typo.paneCaption)
                     .foregroundStyle(Theme.inkTertiary)
@@ -179,12 +201,15 @@ struct SkillsPane: View {
     }
 
     private func makeRecords() -> [SkillRecord] {
-        skills.skills.map { skill in
+        skills.allSkills.map { skill in
             SkillRecord(
                 skill: skill,
                 states: skill.supportedAgents.map { agent in
                     AgentSkillState(agent: agent, status: skills.status(for: skill, agent: agent))
-                }
+                },
+                isUserSkill: skills.userSkills.contains { $0.id == skill.id },
+                libraryState: skills.libraryState(for: skill),
+                libraryFile: skills.libraryFile(for: skill)
             )
         }
     }
@@ -302,11 +327,51 @@ struct SkillsPane: View {
             try skills.installer.makeManualArchive(
                 skill,
                 resourcesRoot: resourcesRoot,
+                sourceDirectory: skills.sourceDirectory(for: skill),
                 destination: url
             )
             notice = SkillNotice(L10n.text("技能 ZIP 已导出。"), tone: .good)
         } catch {
             notice = SkillNotice(error.localizedDescription, tone: .bad)
+        }
+    }
+
+    /// 用于 N 个场景 badge — jumps to the scenes page and selects the first
+    /// scene referencing this skill.
+    private func showScenes(referencing skillID: String) {
+        router.tab = .scenes
+        router.skillFocus = skillID
+    }
+
+    /// 导入技能 — the archive is unpacked into the app-owned library; an id
+    /// already owned by an official skill is refused.
+    private func importArchive(_ url: URL) {
+        do {
+            let info = try skills.importArchive(at: url)
+            notice = SkillNotice(
+                L10n.format("已导入技能「%@」。", info.displayName),
+                tone: .good
+            )
+        } catch {
+            notice = SkillNotice(
+                (error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
+                tone: .bad
+            )
+        }
+    }
+
+    /// 从技能库移除 — the copy moves into the backups, so a mis-tap is
+    /// recoverable; only user-imported skills offer it.
+    private func removeSkill(_ skill: OfficialSkill) {
+        do {
+            try skills.removeSkill(skill)
+            expandedSkillIDs.remove(skill.id)
+            notice = SkillNotice(L10n.text("已从技能库移除。"), tone: .good)
+        } catch {
+            notice = SkillNotice(
+                (error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
+                tone: .bad
+            )
         }
     }
 }
@@ -414,6 +479,7 @@ private struct SkillCard: View {
     let record: SkillRecord
     let resourcesRoot: URL?
     let sceneCount: Int
+    let showScenes: () -> Void
     let expanded: Bool
     let toggleDetails: () -> Void
     let primaryAction: () -> Void
@@ -423,6 +489,7 @@ private struct SkillCard: View {
     let export: () -> Void
     let confirm: (AgentID) -> Void
     let revoke: (AgentID) -> Void
+    let removeSkill: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
@@ -451,11 +518,39 @@ private struct SkillCard: View {
             }
 
             HStack(spacing: Space.s) {
-                SkillBadge(title: L10n.text("官方技能"), systemImage: "checkmark.seal")
-                SkillBadge(
-                    title: L10n.format("用于 %d 个场景", sceneCount),
-                    systemImage: "square.stack.3d.up"
-                )
+                if record.isUserSkill {
+                    SkillBadge(title: L10n.text("导入的技能"), systemImage: "square.and.arrow.down")
+                } else {
+                    SkillBadge(title: L10n.text("官方技能"), systemImage: "checkmark.seal")
+                }
+                if let libraryBadge = record.libraryBadge {
+                    SkillBadge(
+                        title: libraryBadge,
+                        systemImage: record.libraryState == .conflict
+                            ? "exclamationmark.triangle"
+                            : "externaldrive.badge.checkmark"
+                    )
+                }
+                if sceneCount > 0 {
+                    Button(action: showScenes) {
+                        Label(
+                            L10n.format("用于 %d 个场景", sceneCount),
+                            systemImage: "square.stack.3d.up"
+                        )
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(Theme.inkSecondary)
+                        .padding(.horizontal, 9)
+                        .frame(height: 24)
+                        .background(Theme.sunken, in: Capsule(style: .continuous))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(PlainPressButtonStyle(staticFeedback: true))
+                } else {
+                    SkillBadge(
+                        title: L10n.format("用于 %d 个场景", sceneCount),
+                        systemImage: "square.stack.3d.up"
+                    )
+                }
 
                 Spacer(minLength: Space.s)
 
@@ -482,11 +577,61 @@ private struct SkillCard: View {
             if expanded {
                 Divider()
 
-                if record.kind == .packageUnavailable {
+                if record.libraryState == .missing {
                     Notice(
-                        L10n.text("技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。"),
+                        record.isUserSkill
+                            ? L10n.text("技能库中的副本不可用或被外部修改，重新导入压缩包可恢复。")
+                            : L10n.text("技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。"),
                         tone: .warn
                     )
+                } else if record.libraryState == .conflict {
+                    Notice(
+                        L10n.text("技能库中的副本被外部修改，场景会引用这份修改后的文件。"),
+                        tone: .warn
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: Space.s) {
+                        Text(L10n.text("场景引用"))
+                            .font(Typo.paneCaption)
+                            .foregroundStyle(Theme.inkTertiary)
+                            .frame(width: 64, alignment: .leading)
+                        Text(SkillReference.token(record.skill.id))
+                            .font(Typo.paneCaption.monospaced())
+                            .foregroundStyle(Theme.inkSecondary)
+                            .textSelection(.enabled)
+                        Button(L10n.text("复制")) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(
+                                SkillReference.token(record.skill.id),
+                                forType: .string
+                            )
+                        }
+                        .buttonStyle(.link)
+                        .font(Typo.paneCaption)
+                    }
+                    HStack(spacing: Space.s) {
+                        Text(L10n.text("技能库文件"))
+                            .font(Typo.paneCaption)
+                            .foregroundStyle(Theme.inkTertiary)
+                            .frame(width: 64, alignment: .leading)
+                        Text(record.libraryFile ?? L10n.text("不可用"))
+                            .font(Typo.paneCaption.monospaced())
+                            .foregroundStyle(Theme.inkSecondary)
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    if record.isUserSkill {
+                        Button(L10n.text("从技能库移除"), role: .destructive, action: removeSkill)
+                            .buttonStyle(.link)
+                            .font(Typo.paneCaption)
+                    }
+                }
+
+                if !record.states.isEmpty {
+                    Divider()
                 }
 
                 VStack(spacing: 0) {
@@ -696,8 +841,21 @@ private struct AgentSkillState: Identifiable {
 private struct SkillRecord: Identifiable {
     let skill: OfficialSkill
     let states: [AgentSkillState]
+    let isUserSkill: Bool
+    let libraryState: SkillLibraryState
+    let libraryFile: String?
 
     var id: String { skill.id }
+
+    /// The library badge text; nil hides it (a missing package already has
+    /// its explainer).
+    var libraryBadge: String? {
+        switch libraryState {
+        case .ready: L10n.text("技能库已就绪")
+        case .conflict: L10n.text("技能库副本已被修改")
+        case .missing: nil
+        }
+    }
 
     var totalAgentCount: Int { states.count }
 

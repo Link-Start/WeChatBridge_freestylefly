@@ -317,7 +317,9 @@ final class ActionRunner {
                 scene: scene,
                 previousSummaryAt: context.previousSummaryAt,
                 currentEnd: context.insights.end,
-                skillNames: skills.skillNames(for: scene)
+                skills: scene.effectiveSkillIDs.isEmpty
+                    ? nil
+                    : skills.promptContext(agent: agent)
             )
         }
         let prompt = doubaoReadsLocalArchive
@@ -385,7 +387,7 @@ final class ActionRunner {
             sceneCoordinator.advance(context)
             let missing = missingSkills(for: context.scene, bundleIdentifier: bundleIdentifier)
             if !missing.isEmpty {
-                let names = missing.map(\.name).joined(separator: "、")
+                let names = missing.joined(separator: "、")
                 toast.show(
                     L10n.format("场景已使用，但缺少技能：%@", names),
                     symbol: "puzzlepiece.extension.fill",
@@ -407,23 +409,20 @@ final class ActionRunner {
         }
     }
 
+    /// Display names of the skills a delivered scene references that this
+    /// agent can use neither natively nor through the library's SKILL.md.
     private func missingSkills(
         for scene: WeChatScene?,
         bundleIdentifier: String
-    ) -> [OfficialSkill] {
-        guard let scene, let agent = AgentID.matching(bundleIdentifier: bundleIdentifier) else {
+    ) -> [String] {
+        guard let scene, let agent = AgentID.matching(bundleIdentifier: bundleIdentifier),
+              !scene.effectiveSkillIDs.isEmpty
+        else {
             return []
         }
-        return scene.requiredSkillIDs.compactMap { id in
-            guard let skill = skills.skill(id: id),
-                  skill.supportedAgents.contains(agent)
-            else { return nil }
-            switch skills.status(for: skill, agent: agent) {
-            case .installed, .manualConfirmed:
-                return nil
-            default:
-                return skill
-            }
+        return scene.effectiveSkillIDs.compactMap { id in
+            let resolved = skills.resolve(id, agent: agent)
+            return resolved.mode == .missing ? resolved.displayName : nil
         }
     }
 

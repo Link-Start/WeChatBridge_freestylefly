@@ -135,6 +135,12 @@ public struct OfficialSkillCatalog: Codable, Hashable, Sendable {
             guard !skill.id.isEmpty, seen.insert(skill.id).inserted else {
                 throw SkillInstallError.invalidCatalog
             }
+            guard SkillId.isValid(skill.id) else {
+                throw SkillError(L10n.format(
+                    "技能 ID「%@」不符合规范：只能包含小写字母、数字和连字符。",
+                    skill.id
+                ))
+            }
         }
         return catalog
     }
@@ -231,13 +237,21 @@ public struct SkillInstaller: Sendable {
         self.stateDirectory = stateDirectory
     }
 
+    /// `sourceDirectory` overrides the catalog package lookup — the library
+    /// copy of a user-imported skill (which has no bundled package).
     public func plan(
         for skill: OfficialSkill,
         agent: AgentID,
         resourcesRoot: URL,
+        sourceDirectory: URL? = nil,
         agentInstalled: Bool = true
     ) -> SkillInstallPlan {
-        guard let package = skill.package else {
+        let source: URL
+        if let sourceDirectory {
+            source = sourceDirectory
+        } else if let package = skill.package {
+            source = packageURL(package, resourcesRoot: resourcesRoot)
+        } else {
             return SkillInstallPlan(
                 skillID: skill.id,
                 agent: agent,
@@ -245,7 +259,6 @@ public struct SkillInstaller: Sendable {
                 method: .unavailable
             )
         }
-        let source = packageURL(package, resourcesRoot: resourcesRoot)
         if let root = agent.directSkillRoot {
             return SkillInstallPlan(
                 skillID: skill.id,
@@ -271,11 +284,16 @@ public struct SkillInstaller: Sendable {
         for skill: OfficialSkill,
         agent: AgentID,
         resourcesRoot: URL,
+        sourceDirectory: URL? = nil,
         agentInstalled: Bool = true
     ) -> SkillAgentStatus {
-        guard let package = skill.package else { return .packageUnavailable }
-        let source = packageURL(package, resourcesRoot: resourcesRoot)
-        guard FileManager.default.fileExists(
+        let source: URL?
+        if let sourceDirectory {
+            source = sourceDirectory
+        } else {
+            source = skill.package.map { packageURL($0, resourcesRoot: resourcesRoot) }
+        }
+        guard let source, FileManager.default.fileExists(
             atPath: source.appendingPathComponent("SKILL.md").path
         ) else {
             return .packageUnavailable
@@ -287,6 +305,7 @@ public struct SkillInstaller: Sendable {
             for: skill,
             agent: agent,
             resourcesRoot: resourcesRoot,
+            sourceDirectory: sourceDirectory,
             agentInstalled: agentInstalled
         )
         switch plan.method {
@@ -337,10 +356,18 @@ public struct SkillInstaller: Sendable {
         _ skill: OfficialSkill,
         to agent: AgentID,
         resourcesRoot: URL,
+        sourceDirectory: URL? = nil,
         replacingExisting: Bool = false
     ) throws -> String {
-        guard skill.package != nil else { throw SkillInstallError.packageUnavailable }
-        let plan = plan(for: skill, agent: agent, resourcesRoot: resourcesRoot)
+        guard sourceDirectory != nil || skill.package != nil else {
+            throw SkillInstallError.packageUnavailable
+        }
+        let plan = plan(
+            for: skill,
+            agent: agent,
+            resourcesRoot: resourcesRoot,
+            sourceDirectory: sourceDirectory
+        )
         guard case .direct(let source, let target) = plan.method else {
             throw SkillInstallError.manualInstallOnly
         }
@@ -439,10 +466,12 @@ public struct SkillInstaller: Sendable {
     public func makeManualArchive(
         _ skill: OfficialSkill,
         resourcesRoot: URL,
+        sourceDirectory: URL? = nil,
         destination: URL
     ) throws {
-        guard let package = skill.package else { throw SkillInstallError.packageUnavailable }
-        let source = packageURL(package, resourcesRoot: resourcesRoot)
+        guard let source = sourceDirectory
+            ?? skill.package.map({ packageURL($0, resourcesRoot: resourcesRoot) })
+        else { throw SkillInstallError.packageUnavailable }
         _ = try validatePackage(at: source)
         try SkillZip.write(directory: source, rootName: skill.id, to: destination)
     }
@@ -491,186 +520,15 @@ public struct SkillInstaller: Sendable {
     }
 
     private func validatePackage(at root: URL) throws -> String {
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
-              isDirectory.boolValue
-        else {
-            throw SkillInstallError.invalidPackage(L10n.text("技能包目录不存在。"))
-        }
-        let skill = root.appendingPathComponent("SKILL.md")
-        guard FileManager.default.fileExists(atPath: skill.path) else {
-            throw SkillInstallError.invalidPackage(L10n.text("技能包缺少 SKILL.md。"))
-        }
-        return try packageDigest(at: root)
+        try SkillPackage.validatePackage(at: root)
     }
 
     private func packageDigest(at root: URL) throws -> String {
-        var hasher = SHA256()
-        for file in try SkillPackageFiles.enumerate(root: root) {
-            if file.relativePath == Self.metadataFileName { continue }
-            hasher.update(data: Data(file.relativePath.utf8))
-            hasher.update(data: [0])
-            hasher.update(data: try Data(contentsOf: file.url))
-            hasher.update(data: [0])
-        }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        try SkillPackage.packageDigest(at: root)
     }
 
     private func copyPackage(from source: URL, to destination: URL) throws {
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
-        for file in try SkillPackageFiles.enumerate(root: source) {
-            let target = destination.appendingPathComponent(file.relativePath)
-            try fileManager.createDirectory(
-                at: target.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try fileManager.copyItem(at: file.url, to: target)
-        }
+        try SkillPackage.copyPackage(from: source, to: destination)
     }
 }
 
-private enum SkillPackageFiles {
-    struct File {
-        let url: URL
-        let relativePath: String
-    }
-
-    static func enumerate(root: URL) throws -> [File] {
-        let fileManager = FileManager.default
-        let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
-        let rootValues = try root.resourceValues(forKeys: Set(keys))
-        if rootValues.isSymbolicLink == true {
-            throw SkillInstallError.unsafePackage(L10n.text("技能包不能包含符号链接。"))
-        }
-        guard rootValues.isDirectory == true else {
-            throw SkillInstallError.invalidPackage(L10n.text("技能包目录无效。"))
-        }
-        guard let enumerator = fileManager.enumerator(
-            at: root,
-            includingPropertiesForKeys: keys,
-            options: [],
-            errorHandler: { _, error in
-                assertionFailure(error.localizedDescription)
-                return false
-            }
-        ) else {
-            throw SkillInstallError.invalidPackage(L10n.text("无法读取技能包。"))
-        }
-
-        let base = root.standardizedFileURL.path
-        var files: [File] = []
-        for case let url as URL in enumerator {
-            let values = try url.resourceValues(forKeys: Set(keys))
-            if values.isSymbolicLink == true {
-                throw SkillInstallError.unsafePackage(L10n.text("技能包不能包含符号链接。"))
-            }
-            if values.isDirectory == true { continue }
-            guard values.isRegularFile == true else {
-                throw SkillInstallError.unsafePackage(L10n.text("技能包只能包含普通文件和目录。"))
-            }
-            let path = url.standardizedFileURL.path
-            guard path.hasPrefix(base + "/") else {
-                throw SkillInstallError.unsafePackage(L10n.text("技能包包含越界路径。"))
-            }
-            files.append(File(url: url, relativePath: String(path.dropFirst(base.count + 1))))
-        }
-        return files.sorted { $0.relativePath < $1.relativePath }
-    }
-}
-
-private enum SkillZip {
-    static func write(directory: URL, rootName: String, to destination: URL) throws {
-        let files = try SkillPackageFiles.enumerate(root: directory)
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        var archive = Data()
-        var central = Data()
-
-        for file in files {
-            let name = "\(rootName)/\(file.relativePath)"
-            let nameData = Data(name.utf8)
-            let contents = try Data(contentsOf: file.url)
-            let crc = CRC32.checksum(contents)
-            let offset = UInt32(archive.count)
-            archive.appendLE(UInt32(0x04034b50))
-            archive.appendLE(UInt16(20))
-            archive.appendLE(UInt16(0x0800))
-            archive.appendLE(UInt16(0))
-            archive.appendLE(UInt16(0))
-            archive.appendLE(UInt16(0))
-            archive.appendLE(crc)
-            archive.appendLE(UInt32(contents.count))
-            archive.appendLE(UInt32(contents.count))
-            archive.appendLE(UInt16(nameData.count))
-            archive.appendLE(UInt16(0))
-            archive.append(nameData)
-            archive.append(contents)
-
-            central.appendLE(UInt32(0x02014b50))
-            central.appendLE(UInt16(20))
-            central.appendLE(UInt16(20))
-            central.appendLE(UInt16(0x0800))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(crc)
-            central.appendLE(UInt32(contents.count))
-            central.appendLE(UInt32(contents.count))
-            central.appendLE(UInt16(nameData.count))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt32(0))
-            central.appendLE(offset)
-            central.append(nameData)
-        }
-
-        let centralOffset = UInt32(archive.count)
-        archive.append(central)
-        archive.appendLE(UInt32(0x06054b50))
-        archive.appendLE(UInt16(0))
-        archive.appendLE(UInt16(0))
-        archive.appendLE(UInt16(files.count))
-        archive.appendLE(UInt16(files.count))
-        archive.appendLE(UInt32(central.count))
-        archive.appendLE(centralOffset)
-        archive.appendLE(UInt16(0))
-        try archive.write(to: destination, options: .atomic)
-    }
-}
-
-private enum CRC32 {
-    static let table: [UInt32] = (0..<256).map { value in
-        var crc = UInt32(value)
-        for _ in 0..<8 {
-            crc = (crc & 1) == 1 ? 0xEDB88320 ^ (crc >> 1) : crc >> 1
-        }
-        return crc
-    }
-
-    static func checksum(_ data: Data) -> UInt32 {
-        var crc: UInt32 = 0xFFFFFFFF
-        for byte in data {
-            crc = table[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8)
-        }
-        return crc ^ 0xFFFFFFFF
-    }
-}
-
-private extension Data {
-    mutating func appendLE(_ value: UInt16) {
-        append(UInt8(value & 0xFF))
-        append(UInt8((value >> 8) & 0xFF))
-    }
-
-    mutating func appendLE(_ value: UInt32) {
-        append(UInt8(value & 0xFF))
-        append(UInt8((value >> 8) & 0xFF))
-        append(UInt8((value >> 16) & 0xFF))
-        append(UInt8((value >> 24) & 0xFF))
-    }
-}
