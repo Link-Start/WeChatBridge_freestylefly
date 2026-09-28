@@ -605,7 +605,20 @@ private struct SceneEditor: View {
             } else {
                 SceneField(title: L10n.text("名称"), text: $scene.name)
                 SceneField(title: L10n.text("说明"), text: $scene.summary)
-                SceneField(title: L10n.text("提示词"), text: promptBinding, lines: 5...9)
+                // Windows EditFields: 插入技能 sits on the prompt label row
+                // so the caret is one click away.
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Text(L10n.text("提示词"))
+                            .font(Typo.captionStrong)
+                            .foregroundStyle(Theme.inkSecondary)
+                        Spacer(minLength: Space.s)
+                        insertSkillMenu
+                    }
+                    TextField(L10n.text("提示词"), text: promptBinding, axis: .vertical)
+                        .lineLimit(5...9)
+                        .textFieldStyle(SettingsTextFieldStyle(multiline: true))
+                }
             }
 
             VStack(alignment: .leading, spacing: Space.s) {
@@ -717,15 +730,9 @@ private struct SceneEditor: View {
         }
 
         return VStack(alignment: .leading, spacing: Space.s) {
-            HStack(spacing: Space.s) {
-                Text(L10n.text("技能引用"))
-                    .font(Typo.captionStrong)
-                    .foregroundStyle(Theme.inkSecondary)
-                Spacer(minLength: Space.s)
-                if !scene.isOfficial {
-                    insertSkillMenu
-                }
-            }
+            Text(L10n.text("技能引用"))
+                .font(Typo.captionStrong)
+                .foregroundStyle(Theme.inkSecondary)
 
             if resolved.isEmpty {
                 Text(L10n.text("没有引用技能。点「插入技能」可在光标处插入 {{skill:id}}。"))
@@ -786,9 +793,19 @@ private struct SceneEditor: View {
             }
         } label: {
             Text(L10n.text("插入技能"))
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: SettingsControlMetrics.radius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SettingsControlMetrics.radius)
+                        .strokeBorder(Theme.stroke, lineWidth: Stroke.hairline)
+                )
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .help(L10n.text("在光标处插入 {{skill:id}} 技能引用"))
     }
 
     private func librarySuffix(for id: String) -> String {

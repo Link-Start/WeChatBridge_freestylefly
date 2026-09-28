@@ -471,3 +471,4 @@
 "已就绪" = "Ready";
 "查看技能" = "View skills";
 "场景「%@」引用的技能不可用：%@" = "Scene "%@" references skills that are unavailable: %@";
+"在光标处插入 {{skill:id}} 技能引用" = "Insert a {{skill:id}} skill reference at the caret";
