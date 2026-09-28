@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Burn bootstrapper for the framework-dependent build: checks for a .NET desktop
+  runtime under %ProgramFiles%\dotnet\shared (works for both installer- and
+  SDK-installed runtimes, unlike the registry keys), downloads .NET 10 desktop
+  runtime on demand via RemotePayload, then runs the embedded MSI which registers
+  the sparse package. Elevates only when the runtime actually needs installing.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Bundle Name="WeChatBridge" Version="$(var.BundleVersion)" Manufacturer="WeChatBridge"
+          UpgradeCode="{7E2C1F44-9B51-4F2C-8C1F-8C1D5B8C6E61}"
+          IconSourceFile="$(var.IconFile)">
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
+          LicenseUrl="https://github.com/xiangmingAI/WeChatBridge"
+          ShowVersion="yes" />
+    </BootstrapperApplication>
+
+    <!-- Existence of the shared runtime directory means some desktop runtime is
+         installed; machines stuck on < .NET 10 are rare enough that the plain
+         directory probe beats inventing version-dependent registry keys. -->
+    <util:DirectorySearch Id="DesktopRuntimeSearch" Variable="DesktopRuntimeInstalled"
+        Path="[ProgramFiles64Folder]dotnet\shared\Microsoft.WindowsDesktop.App" Result="exists" />
+
+    <Chain>
+      <ExePackage Id="NetDesktopRuntime"
+          DisplayName="Microsoft .NET Desktop Runtime 10"
+          Description="Microsoft .NET Desktop Runtime"
+          InstallArguments="/install /quiet /norestart"
+          RepairArguments="/repair /quiet /norestart"
+          UninstallArguments="/uninstall /quiet /norestart"
+          PerMachine="yes" Vital="yes" Cache="remove"
+          DetectCondition="DesktopRuntimeInstalled">
+        <ExePackagePayload Name="$(var.RuntimeName)"
+            DownloadUrl="$(var.RuntimeUrl)"
+            Description="Microsoft .NET Desktop Runtime"
+            ProductName="Microsoft .NET Desktop Runtime"
+            Hash="$(var.RuntimeHash)" Size="$(var.RuntimeSize)" Version="$(var.RuntimeVersion)" />
+      </ExePackage>
+      <MsiPackage Id="WeChatBridgeMsi" SourceFile="$(var.MsiPath)" Vital="yes" Visible="yes" />
+    </Chain>
+  </Bundle>
+</Wix>
