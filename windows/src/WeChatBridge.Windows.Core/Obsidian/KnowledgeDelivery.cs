@@ -100,14 +100,38 @@ public static class KnowledgeDelivery
                 transcript,
                 archiveName: Path.GetFileName(archive),
                 attachments: media);
-            var note = UniquePath(root, DisplayName.Sanitize(title) + ".md");
-            // Write beside the note then move: a reader never sees half a file.
-            var staging = note + ".tmp";
-            File.WriteAllText(staging, markdown, new UTF8Encoding(false));
-            File.Move(staging, note);
+            // One note per conversation: re-forwarding a chat re-exports the
+            // same messages, so a same-named note merges rather than spawning
+            // 「… 2.md」 copies of them.
+            var noteName = DisplayName.Sanitize(title) + ".md";
+            var preferred = Path.Combine(root, noteName);
+            if (transcript is not null && File.Exists(preferred))
+            {
+                var merge = ObsidianNote.TryMerge(
+                    File.ReadAllText(preferred), transcript, media,
+                    Path.GetFileName(archive), chatName, sceneName,
+                    DateTimeOffset.Now, out var mergedMarkdown);
+                if (merge == ObsidianNote.MergeOutcome.Merged)
+                    WriteAtomic(preferred, mergedMarkdown!);
+                if (merge != ObsidianNote.MergeOutcome.NotApplicable)
+                {
+                    written.Add(preferred);
+                    continue;
+                }
+            }
+            var note = UniquePath(root, noteName);
+            WriteAtomic(note, markdown);
             written.Add(note);
         }
         return written;
+    }
+
+    /// <summary>Write beside the note then move: a reader never sees half a file.</summary>
+    private static void WriteAtomic(string note, string markdown)
+    {
+        var staging = note + ".tmp";
+        File.WriteAllText(staging, markdown, new UTF8Encoding(false));
+        File.Move(staging, note, overwrite: true);
     }
 
     /// <summary>

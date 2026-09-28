@@ -480,8 +480,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Reload();
                 return;
             }
-            await PerformForward(batch, intent.Action, ResolveTarget(intent),
-                freshShare: true, prefetch: prefetch);
+            try
+            {
+                await PerformForward(batch, intent.Action, ResolveTarget(intent),
+                    freshShare: true, prefetch: prefetch);
+            }
+            catch (Exception error)
+            {
+                // A forward that faults must not vanish silently: the batch
+                // needs a recorded outcome and the queue needs to move on.
+                InboxLogger.Write(_paths, "转发执行异常", error);
+                Record(BatchOutcomeKind.Failed, batch.Id, error.Message);
+                Reload();
+            }
         }
     }
 
@@ -603,35 +614,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (action == ShareAction.Obsidian)
-        {
-            var vault = _settings.ObsidianVaultPath;
-            if (string.IsNullOrEmpty(vault))
-            {
-                Record(BatchOutcomeKind.Failed, batch.Id, "尚未选择 Obsidian 知识库", "Obsidian");
-                ToastRequested?.Invoke("还没有选择 Obsidian 知识库", "去入口页设置", () => Navigate(AppTab.Entries), true);
-            }
-            else
-            {
-                try
-                {
-                    var paths = batch.Items.Select(i => i.FullPath).ToList();
-                    var written = KnowledgeDelivery.Deliver(
-                        paths, vault, _settings.ObsidianSubfolder, batch.ChatName, batch.SceneName);
-                    Record(BatchOutcomeKind.Delivered, batch.Id, null, "Obsidian");
-                    ToastRequested?.Invoke($"已沉淀到 Obsidian（{written.Count} 篇笔记）", null, null, false);
-                }
-                catch (KnowledgeDelivery.FailureException error)
-                {
-                    CopyItems(batch.Items, pathsOnly: false);
-                    Record(BatchOutcomeKind.Failed, batch.Id, error.Message, "Obsidian");
-                    ToastRequested?.Invoke($"{error.Message} 文件已复制到剪贴板", null, null, true);
-                }
-            }
-            Reload();
-            return;
-        }
-
         // 「发送到自定义」 without a bundle id — the share helper cannot carry
         // one — resolves through the picker: zero targets prompts toward the
         // 入口 page, one forwards straight away, many pop the floating panel.
@@ -664,13 +646,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
         // deliverable target; DeliverAsync then resolves (and fails) itself.
         var preresolved = Delivery.BeginResolve(batch, target);
 
+        // Obsidian takes notes, not scenes — its decision is only the title
+        // read that names the group, so the scene picker never pops for it.
+        var resolveScenes = action != ShareAction.Obsidian;
+
         // The scene decision — pending shortcut → group binding → picker →
         // optional default. Null means the picker let the share expire; macOS
         // records that as expired rather than forwarding it bare.
         var choice = await Scenes.ResolveForShareAsync(
             batch.Items.Select(i => i.FullPath).ToList(),
             captureTitle: freshShare,
-            prefetch: prefetch);
+            prefetch: prefetch,
+            resolveScenes: resolveScenes);
         if (choice is null)
         {
             Record(BatchOutcomeKind.Expired, batch.Id);
@@ -680,6 +667,43 @@ public sealed class MainViewModel : INotifyPropertyChanged
         InboxLogger.Write(_paths, $"[trace] main.scene-resolved batch={batch.Id:N}");
         if (choice.GroupName is not null || choice.Scene is not null)
             _reader.RecordContext(batch.Id, choice.GroupName, choice.Scene?.Id, choice.Scene?.Name);
+
+        // Obsidian writes the note with the group name from the title read —
+        // the front matter gets no scene, since Obsidian never picks one.
+        if (action == ShareAction.Obsidian)
+        {
+            var vault = _settings.ObsidianVaultPath;
+            if (string.IsNullOrEmpty(vault))
+            {
+                Record(BatchOutcomeKind.Failed, batch.Id, "尚未选择 Obsidian 知识库", "Obsidian");
+                ToastRequested?.Invoke("还没有选择 Obsidian 知识库", "去入口页设置", () => Navigate(AppTab.Entries), true);
+            }
+            else
+            {
+                try
+                {
+                    var paths = batch.Items.Select(i => i.FullPath).ToList();
+                    var written = KnowledgeDelivery.Deliver(
+                        paths, vault, _settings.ObsidianSubfolder, choice.GroupName, choice.Scene?.Name);
+                    OpenInObsidian(vault, written);
+                    // No scene or insights to advance; the call still stamps
+                    // the group's memory entry (name + last-seen), the same
+                    // bookkeeping every other destination performs.
+                    Scenes.CompleteForward(choice);
+                    Record(BatchOutcomeKind.Delivered, batch.Id, null, "Obsidian");
+                    ToastRequested?.Invoke($"已沉淀到 Obsidian（{written.Count} 篇笔记）", null, null, false);
+                }
+                catch (KnowledgeDelivery.FailureException error)
+                {
+                    CopyItems(batch.Items, pathsOnly: false);
+                    Record(BatchOutcomeKind.Failed, batch.Id, error.Message, "Obsidian");
+                    ToastRequested?.Invoke($"{error.Message} 文件已复制到剪贴板", null, null, true);
+                }
+            }
+            Reload();
+            return;
+        }
+
         var agent = AgentIds.Matching(action)
             ?? AgentIds.MatchingBundleId(target?.BundleIdentifier);
         var prompt = Scenes.RenderPrompt(choice, agent,
@@ -722,6 +746,37 @@ public sealed class MainViewModel : INotifyPropertyChanged
             InboxLogger.Write(_paths, "投递引擎异常", error);
         }
         Reload();
+    }
+
+    /// <summary>
+    /// Brings up each note just written — Obsidian registers the obsidian://
+    /// handler, and a vault is named after its folder. Best-effort only: a
+    /// machine without the handler (or a renamed vault folder) still keeps
+    /// the delivered note, so every failure is swallowed.
+    /// </summary>
+    private static void OpenInObsidian(string vaultPath, IReadOnlyList<string> notes)
+    {
+        var vaultName = Path.GetFileName(
+            vaultPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (string.IsNullOrEmpty(vaultName))
+            return;
+        foreach (var note in notes)
+        {
+            try
+            {
+                var relative = Path.GetRelativePath(vaultPath, note).Replace('\\', '/');
+                var file = string.Join('/', relative.Split('/').Select(Uri.EscapeDataString));
+                Process.Start(new ProcessStartInfo(
+                    $"obsidian://open?vault={Uri.EscapeDataString(vaultName)}&file={file}")
+                {
+                    UseShellExecute = true,
+                });
+            }
+            catch
+            {
+                // Opening is cosmetic — the note is already in the vault.
+            }
+        }
     }
 
     /// <summary>

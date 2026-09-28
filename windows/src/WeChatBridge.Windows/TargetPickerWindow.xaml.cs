@@ -109,8 +109,7 @@ public partial class TargetPickerWindow : Window
         var window = new TargetPickerWindow(targets);
         if (contextLine is not null)
             window.ContextLine = contextLine;
-        if (owner is not null)
-            window.Owner = owner;
+        EntryPickerWindow.TryOwn(window, owner);
         cancellationToken.Register(
             () => window.Dispatcher.BeginInvoke(window.Close));
         window._deadline.Start();

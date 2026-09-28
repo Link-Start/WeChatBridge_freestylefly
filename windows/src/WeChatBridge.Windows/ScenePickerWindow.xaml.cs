@@ -57,8 +57,7 @@ public partial class ScenePickerWindow : Window
         Window? owner = null)
     {
         var window = new ScenePickerWindow(scenes);
-        if (owner is not null)
-            window.Owner = owner;
+        EntryPickerWindow.TryOwn(window, owner);
         cancellationToken.Register(
             () => window.Dispatcher.BeginInvoke(window.Close));
         window._deadline.Start();

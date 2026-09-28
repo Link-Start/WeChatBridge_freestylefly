@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -138,8 +139,7 @@ public partial class EntryPickerWindow : Window
         CancellationToken cancellationToken = default,
         Window? owner = null)
     {
-        if (owner is not null)
-            Owner = owner;
+        TryOwn(this, owner);
         cancellationToken.Register(
             () => Dispatcher.BeginInvoke(Close));
         _deadline.Start();
@@ -148,6 +148,18 @@ public partial class EntryPickerWindow : Window
         Activate();
         EntryList.Focus();
         return _completion.Task;
+    }
+
+    /// <summary>
+    /// Assigns <paramref name="owner"/> only when it already has a handle. WPF
+    /// throws when the owner was never shown — the tray-resident main window is
+    /// exactly that until the user opens settings once.
+    /// </summary>
+    internal static void TryOwn(Window window, Window? owner)
+    {
+        if (owner is not null &&
+            new WindowInteropHelper(owner).Handle != IntPtr.Zero)
+            window.Owner = owner;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

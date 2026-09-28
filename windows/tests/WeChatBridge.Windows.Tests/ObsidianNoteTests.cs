@@ -121,4 +121,89 @@ public sealed class ObsidianNoteTests
         Assert.Contains("title: \"a \\\"quoted\\\" title\"", note);
         Assert.Contains("未能从原始归档中解析聊天文本", note);
     }
+
+    private static WeChatNativeArchive.Transcript Txt(string body) =>
+        new("聊天记录.txt", body, WeChatTranscriptRecord.Parse(body, Utc));
+
+    private static string Rendered(WeChatNativeArchive.Transcript transcript) =>
+        ObsidianNote.Render("群的聊天", "群", null,
+            DateTimeOffset.UnixEpoch, transcript, "a.zip", timeZone: Utc);
+
+    [Fact]
+    public void MergeAppendsOnlyTheNewRecords()
+    {
+        var first = Txt("·甲\n2026年9月20日 09:10\n第一条\n\n·乙\n2026年9月20日 09:11\n第二条\n");
+        var note = Rendered(first);
+        var second = Txt("·乙\n2026年9月20日 09:11\n第二条\n\n·丙\n2026年9月20日 09:12\n第三条\n");
+
+        var outcome = ObsidianNote.TryMerge(
+            note, second, null, "b.zip", "群", null,
+            new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero),
+            out var merged, Utc);
+
+        Assert.Equal(ObsidianNote.MergeOutcome.Merged, outcome);
+        Assert.NotNull(merged);
+        Assert.Contains("messages: 3", merged);
+        Assert.Contains("exported: 2026-09-21 00:00", merged);
+        Assert.Contains("> 追加归档：[[附件/b.zip]]", merged);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(merged!, "第二条"));
+        Assert.Contains("第三条", merged);
+    }
+
+    [Fact]
+    public void MergeReportsNothingNewWhenEverythingIsAlreadyThere()
+    {
+        var transcript = Txt("·甲\n2026年9月20日 09:10\n第一条\n");
+        var outcome = ObsidianNote.TryMerge(
+            Rendered(transcript), transcript, null, "b.zip", "群", null,
+            DateTimeOffset.UnixEpoch, out var merged, Utc);
+
+        Assert.Equal(ObsidianNote.MergeOutcome.NothingNew, outcome);
+        Assert.Null(merged);
+    }
+
+    [Fact]
+    public void MergeRejectsANoteItDidNotWrite()
+    {
+        var transcript = Txt("·甲\n2026年9月20日 09:10\n第一条\n");
+        var outcome = ObsidianNote.TryMerge(
+            "# 我自己的笔记\n\n没有 front matter。\n", transcript, null, "b.zip",
+            "群", null, DateTimeOffset.UnixEpoch, out var merged, Utc);
+
+        Assert.Equal(ObsidianNote.MergeOutcome.NotApplicable, outcome);
+        Assert.Null(merged);
+    }
+
+    [Fact]
+    public void MergeKeepsASecondMessageFromTheSameMinute()
+    {
+        var first = Txt("·甲\n2026年9月20日 09:10\n在吗\n");
+        var second = Txt("·甲\n2026年9月20日 09:10\n在吗\n\n·甲\n2026年9月20日 09:10\n看到了吗\n");
+
+        var outcome = ObsidianNote.TryMerge(
+            Rendered(first), second, null, "b.zip", "群", null,
+            DateTimeOffset.UnixEpoch, out var merged, Utc);
+
+        Assert.Equal(ObsidianNote.MergeOutcome.Merged, outcome);
+        Assert.Contains("看到了吗", merged);
+        Assert.Contains("messages: 2", merged);
+    }
+
+    [Fact]
+    public void MergeFillsMissingFrontMatter()
+    {
+        var transcript = Txt("·甲\n2026年9月20日 09:10\n第一条\n");
+        // A note written before the title read worked: no chat/scene lines.
+        var note = ObsidianNote.Render("甲的聊天", null, null,
+            DateTimeOffset.UnixEpoch, transcript, "a.zip", timeZone: Utc);
+        var second = Txt("·甲\n2026年9月20日 09:10\n第一条\n\n·甲\n2026年9月20日 09:11\n新消息\n");
+
+        var outcome = ObsidianNote.TryMerge(
+            note, second, null, "b.zip", "甲", "项目周会",
+            DateTimeOffset.UnixEpoch, out var merged, Utc);
+
+        Assert.Equal(ObsidianNote.MergeOutcome.Merged, outcome);
+        Assert.Contains("chat: \"甲\"", merged);
+        Assert.Contains("scene: \"项目周会\"", merged);
+    }
 }

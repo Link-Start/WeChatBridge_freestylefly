@@ -229,18 +229,22 @@ public sealed class SceneService : IDisposable
     /// <param name="prefetch">Reads already in flight from
     /// <see cref="PrefetchForShare"/>; when supplied, the coordinator awaits
     /// those instead of starting its own.</param>
+    /// <param name="resolveScenes">False makes this a title read only — the
+    /// batch's 群名 snapshot for a destination (Obsidian) that takes notes,
+    /// not scenes. No bindings, fingerprints, picker, or default scene.</param>
     public async Task<SceneChoice?> ResolveForShareAsync(
         IReadOnlyList<string>? filePaths = null,
         string? groupName = null,
         bool captureTitle = true,
         bool allowDefault = false,
         ShareContextPrefetch? prefetch = null,
+        bool resolveScenes = true,
         CancellationToken cancellationToken = default)
     {
         // macOS passes enabled = !enabledScenes.isEmpty — the whole pipeline
         // (picker included) is skipped when nothing is enabled, while the title
         // read still runs for the batch's 群名 snapshot.
-        var enabled = Scenes.Load().EnabledScenes.Count > 0;
+        var enabled = resolveScenes && Scenes.Load().EnabledScenes.Count > 0;
         var answer = await CoordinatorFor(filePaths, prefetch).PrepareAsync(
             enabled, groupName, captureTitle, allowDefault, cancellationToken);
         if (answer.Kind != SceneCoordinator.AnswerKind.Ready || answer.Selection is not { } selection)
