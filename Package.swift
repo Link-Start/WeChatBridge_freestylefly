@@ -61,5 +61,11 @@ let package = Package(
             dependencies: ["WeChatBridgeCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .testTarget(
+            name: "WeChatBridgeAppTests",
+            dependencies: ["WeChatBridgeApp", "WeChatBridgeCore"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

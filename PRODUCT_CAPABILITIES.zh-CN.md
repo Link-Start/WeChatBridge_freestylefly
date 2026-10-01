@@ -28,7 +28,8 @@
 
 | 能力域 | 能力 | 用户结果 | 当前状态 |
 |---|---|---|---|
-| 分享入口 | 在微信转发菜单增加九个入口 | 无需打开微信流主窗口即可发起场景 | 稳定 |
+| 分享入口 | 在微信转发菜单增加十个入口 | 无需打开微信流主窗口即可发起场景 | 稳定 |
+| 分批收集 | 连续接收多批原始 ZIP，最后统一选择目标和场景 | 浮条首尾参考、记录页恢复、冻结交付和失败重试 | 开发版已实现，微信宿主分享链路待实测 |
 | 文件接入 | 接收微信导出的 ZIP 和文件型附件 | 原始文件和文件名进入本地批次 | 稳定 |
 | 目标转发 | 发给 Codex、Claude、豆包、千问办公、WorkBuddy、WeSight 或自定义应用 | 激活目标 App 并自动粘贴 | 稳定，依赖辅助功能权限 |
 | Obsidian | 生成 Markdown 笔记并保存原始归档 | 聊天记录进入本地知识库 | 稳定 |
@@ -43,7 +44,7 @@
 
 ## 3. 微信分享入口
 
-微信流通过签名后的 macOS Share Extension 出现在微信“转发到其他应用”菜单中，当前固定提供九条入口。
+微信流通过签名后的 macOS Share Extension 出现在微信“转发到其他应用”菜单中，当前固定提供十条入口。
 
 ### 3.1 发给 Codex
 
@@ -177,7 +178,7 @@
 ### 8.2 网络
 
 - 除软件更新外不联网。
-- 九个 Share Extension 均在沙盒中运行。
+- 十个 Share Extension 均在沙盒中运行。
 - 扩展没有网络权限。
 
 ### 8.3 系统权限
@@ -218,7 +219,7 @@
 
 | 能力 | 主要实现 |
 |---|---|
-| 九个分享入口 | `Scripts/share-slots.sh` |
+| 十个分享入口 | `Scripts/share-slots.sh` |
 | Share Extension 接入 | `Sources/WeChatBridgeShare/ShareViewController.swift` |
 | 附件复制与命名 | `Sources/WeChatBridgeShare/AttachmentImporter.swift` |
 | 目标应用定义 | `Sources/WeChatBridgeCore/ShareAction.swift` |

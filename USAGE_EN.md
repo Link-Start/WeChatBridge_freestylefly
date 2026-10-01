@@ -19,7 +19,7 @@ These entries come from WeChatBridge and sit in the same menu as AirDrop, Messag
 
 ## Destinations
 
-Nine entries cover mainstream agents, note-taking apps, and the clipboard. You can narrow or widen the list at any time.
+Ten entries cover mainstream agents, note-taking apps, and the clipboard. You can narrow or widen the list at any time.
 
 ![Entries settings](Resources/Screenshots/usage-entries.png)
 
@@ -117,3 +117,9 @@ The Entries pane flags it. Install the app and switch the entry back on; no need
 
 **The archive arrived but nothing was pasted.**
 Check the Accessibility permission. With the permission missing, the files stay on the clipboard for a manual paste.
+
+## Collect more than 100 messages
+
+Manually select each batch in WeChat and forward it to **Collect in WeChatBridge**. Share to the same entry to append batches. **View boundaries** lets you switch between batches to find the next range manually; each batch can also be expanded in History. Finish once to choose an agent and scene, copy all original ZIP files, or save them to a folder. Resume hidden collections from History or the menu bar; drafts and retryable collections are not automatically removed.
+
+Each batch stores an editable group or contact name. New shares try to recognize the current WeChat conversation; otherwise fill in the name before delivery. An explicit checkbox applies the name to unnamed and future batches in the collection. Delete buttons move batches to Trash; Undo restores their original files and order.

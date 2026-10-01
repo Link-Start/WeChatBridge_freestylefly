@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let updater = AppUpdater()
     private var actionRunner: ActionRunner?
     private var sceneShortcuts: SceneShortcutController?
+    private var collectionCoordinator: CollectionCoordinator?
     private var statusItem: StatusItemController?
     private var cancellables = Set<AnyCancellable>()
     private var settingsWindow: SettingsWindowController?
@@ -62,6 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The counter is reset here, not only on 完成: a guide that was
             // re-run and then closed at 权限 leaves it at 2, and the next
             // 重新运行 would resume rather than run.
+            openCollection: { [weak self] id, delivery in
+                self?.collectionCoordinator?.show(id, delivery: delivery)
+            },
             restartOnboarding: { [weak self] in
                 self?.preferences.onboardingStep = 0
                 self?.onboardingWindow?.show()
@@ -98,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         runner.openEntries = { [weak self] in self?.openMainWindow(.entries) }
         runner.openSkills = { [weak self] in self?.openMainWindow(.skills) }
         actionRunner = runner
+        collectionCoordinator = CollectionCoordinator(model: model, targets: forwardTargets, preferences: preferences, runner: runner)
         sceneShortcuts = SceneShortcutController(preferences: preferences)
 
         // One place decides what an arriving batch means.
@@ -111,7 +116,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // other failure uses.
         model.didFailToReceive
             .receive(on: RunLoop.main)
-            .sink { [weak runner] failure in runner?.report(failure) }
+            .sink { [weak self, weak runner] failure in
+                if failure.action == .collect { self?.collectionCoordinator?.importFailed(failure) }
+                else { runner?.report(failure) }
+            }
             .store(in: &cancellables)
 
         settingsWindow = SettingsWindowController(router: settingsRouter) { [unowned self] in

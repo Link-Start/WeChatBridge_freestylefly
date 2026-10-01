@@ -162,7 +162,7 @@ struct ShareEntryList: View {
         case .workBuddy: file = "06-workbuddy.png"
         case .weSight: file = "07-wesight.png"
         case .obsidian: file = "05-obsidian.png"
-        case .clipboard, .custom: return nil
+        case .collect, .clipboard, .custom: return nil
         }
         guard let url = Bundle.main.url(
             forResource: file,
@@ -178,6 +178,7 @@ struct ShareEntryList: View {
         switch action {
         case .codex, .claude, .doubao, .qwen, .workBuddy, .weSight: "paperplane"
         case .obsidian: "book.closed"
+        case .collect: "tray.and.arrow.down"
         case .clipboard: "doc.on.clipboard"
         case .custom: "paperplane.circle"
         }
@@ -197,6 +198,8 @@ struct ShareEntryList: View {
                 return obsidianVaultPath.map {
                     URL(fileURLWithPath: $0, isDirectory: true).lastPathComponent
                 } ?? L10n.text("未选择知识库")
+            case .collect:
+                return L10n.text("多次分享，收齐后一起发送")
             case .clipboard:
                 return L10n.text("只复制，不自动粘贴")
             case .custom:
@@ -214,6 +217,7 @@ struct ShareEntryList: View {
         case .workBuddy: return L10n.text("激活 WorkBuddy 并直接粘贴到输入框。")
         case .weSight: return L10n.text("激活 WeSight 并直接粘贴到输入框。")
         case .obsidian: return L10n.text("把聊天记录转成 Markdown，写入选定的 Obsidian 知识库。")
+        case .collect: return L10n.text("多次分享，收齐后一起发送")
         case .clipboard: return L10n.text("只放进剪贴板，去哪儿按 ⌘V 由你决定。")
         case .custom: return L10n.text("转发时从你自己的清单里挑一个 App，激活它并粘贴。")
         }
@@ -230,7 +234,7 @@ struct ShareEntryList: View {
             return obsidianVaultPath == nil
         case .custom:
             return customTargetCount == 0
-        case .clipboard:
+        case .collect, .clipboard:
             return false
         }
     }

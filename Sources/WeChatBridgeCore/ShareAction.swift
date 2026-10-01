@@ -24,6 +24,7 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
     /// Write a Markdown note and its source archive into the configured vault.
     case obsidian
     /// Put the files on the clipboard and stop there.
+    case collect
     case clipboard
     /// Ask which app, every time. The entry itself names no destination and
     /// neither does the intent the extension writes for it: the extension has no
@@ -79,7 +80,7 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         // `.custom` has no fixed destination and no destination in its intent
         // either. `ActionRunner` resolves one from the user's own list, or takes
         // the one a 发给 ▸ menu inside WeChatBridge named.
-        case .clipboard, .custom: return nil
+        case .collect, .clipboard, .custom: return nil
         }
     }
 
@@ -91,7 +92,7 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
     /// closed read 未执行 on the next launch, for a ⌘V that had worked all along.
     public var needsIntent: Bool {
         switch self {
-        case .clipboard: return false
+        case .collect, .clipboard: return false
         case .codex, .claude, .doubao, .qwen, .workBuddy, .weSight, .obsidian, .custom: return true
         }
     }
@@ -108,6 +109,7 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .workBuddy: return "WorkBuddy"
         case .weSight: return L10n.text("WeSight")
         case .obsidian: return L10n.text("Obsidian")
+        case .collect: return L10n.text("分批收集")
         case .clipboard: return L10n.text("剪贴板")
         // Only ever reached when the chosen target is missing — a failure
         // message has to name something, and this build has nothing better.
@@ -128,6 +130,7 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .workBuddy: return L10n.text("发给 WorkBuddy")
         case .weSight: return L10n.text("发给 WeSight")
         case .obsidian: return L10n.text("沉淀到 Obsidian")
+        case .collect: return L10n.text("分批收集到微信流")
         case .clipboard: return L10n.text("复制到剪贴板")
         case .custom: return L10n.text("发送到自定义")
         }
@@ -146,6 +149,7 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .workBuddy: return "ShareWorkBuddy"
         case .weSight: return "ShareWeSight"
         case .obsidian: return "ShareObsidian"
+        case .collect: return "ShareCollection"
         case .clipboard: return "ShareClipboard"
         case .custom: return "ShareCustom"
         }

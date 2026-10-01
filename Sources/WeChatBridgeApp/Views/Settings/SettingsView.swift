@@ -77,6 +77,7 @@ struct SettingsActions {
     /// Reached from a 发给 ▸ menu that has nothing of the user's own in it yet.
     let showEntries: () -> Void
     /// Opens the first-run guide again, from its first step.
+    let openCollection: (UUID, Bool) -> Void
     let restartOnboarding: () -> Void
 }
 
