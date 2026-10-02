@@ -30,12 +30,23 @@ final class Preferences: ObservableObject {
         static let pendingScene = "com.xiangming.wechatbridge.pendingScene.v1"
         static let obsidianVaultPath = "com.xiangming.wechatbridge.obsidianVaultPath"
         static let obsidianSubfolder = "com.xiangming.wechatbridge.obsidianSubfolder"
+        static let folderDeliveryPath = "com.xiangming.wechatbridge.folderDeliveryPath"
+        static let folderDeliverySubfolder = "com.xiangming.wechatbridge.folderDeliverySubfolder"
     }
 
     /// A week: long enough that last Friday's chat export is still there on
     /// Monday, short enough that the group container does not quietly become the
     /// user's archive of every file they ever forwarded.
     static let defaultHistoryRetentionDays = 7
+
+    /// 「沉淀到文件夹」 needs somewhere to land on a fresh install before the
+    /// user has opened 设置, and ~/Downloads is the one folder every Mac has.
+    static var defaultFolderDeliveryPath: String {
+        FileManager.default
+            .homeDirectoryForCurrentUser
+            .appendingPathComponent("Downloads", isDirectory: true)
+            .path
+    }
 
     private let defaults: UserDefaults
 
@@ -65,6 +76,9 @@ final class Preferences: ObservableObject {
             .flatMap { try? JSONDecoder().decode(PendingSceneSelection.self, from: $0) }
         obsidianVaultPath = defaults.string(forKey: Key.obsidianVaultPath)
         obsidianSubfolder = defaults.string(forKey: Key.obsidianSubfolder) ?? "微信流"
+        folderDeliveryPath = defaults.string(forKey: Key.folderDeliveryPath)
+            ?? Self.defaultFolderDeliveryPath
+        folderDeliverySubfolder = defaults.string(forKey: Key.folderDeliverySubfolder) ?? ""
     }
 
     /// Set only by finishing the guide. Closing its window half way through is
@@ -133,6 +147,20 @@ final class Preferences: ObservableObject {
 
     @Published var obsidianSubfolder: String {
         didSet { defaults.set(obsidianSubfolder, forKey: Key.obsidianSubfolder) }
+    }
+
+    /// Where 「沉淀到文件夹」 lands its notes. A real path, never `~`: the
+    /// folder entry ships working out of the box, and the tilde would have to
+    /// be re-expanded on every read for no gain.
+    @Published var folderDeliveryPath: String {
+        didSet { defaults.set(folderDeliveryPath, forKey: Key.folderDeliveryPath) }
+    }
+
+    /// The subfolder of the destination folder the note lands in, allowed to
+    /// name several levels with `/`. Empty means the `微信流` default — the
+    /// same fallback the Obsidian entry applies inside the vault.
+    @Published var folderDeliverySubfolder: String {
+        didSet { defaults.set(folderDeliverySubfolder, forKey: Key.folderDeliverySubfolder) }
     }
 
     /// Global scene shortcuts choose for the next share, not forever. A stale

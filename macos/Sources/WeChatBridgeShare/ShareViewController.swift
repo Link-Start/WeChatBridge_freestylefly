@@ -93,6 +93,11 @@ final class ShareViewController: NSViewController {
         }
 
         var manifestItems: [ManifestItem] = []
+        if action == .collect {
+            try? Data().write(to: staging.directory.appendingPathComponent("collection-import"))
+            InboxSignal.post()
+            launchContainingApp()
+        }
         var diagnostics: [AttachmentDiagnostic] = []
         var failure: Error?
 
@@ -167,7 +172,7 @@ final class ShareViewController: NSViewController {
         // Written here as well as in the app, so ⌘V works immediately even if
         // the automated paste is refused or WeChatBridge never starts.
         let urls = manifestItems.map { committed.appendingPathComponent($0.relativePath) }
-        FilePasteboard.write(urls)
+        if action != .collect { FilePasteboard.write(urls) }
 
         InboxSignal.post()
         // The clipboard entry is finished at this point and does not need the

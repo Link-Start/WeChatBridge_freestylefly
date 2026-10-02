@@ -57,9 +57,23 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "WeChatBridgeDeliveryTests",
+            dependencies: ["WeChatBridgeApp", "WeChatBridgeCore"],
+            path: "Tests",
+            exclude: ["WeChatBridgeCoreTests", "WeChatBridgeAppTests"],
+            sources: ["DeliveryNotifierTests.swift", "KnowledgeDeliveryTests.swift"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
             name: "WeChatBridgeCoreTests",
             dependencies: ["WeChatBridgeCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "WeChatBridgeAppTests",
+            dependencies: ["WeChatBridgeApp", "WeChatBridgeCore"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]
 )

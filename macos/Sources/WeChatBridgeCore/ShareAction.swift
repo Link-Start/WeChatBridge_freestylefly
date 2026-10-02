@@ -21,8 +21,15 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
     case workBuddy
     /// Paste into WeSight.
     case weSight
+    /// Paste into DeepSeek Harness.
+    case deepSeekHarness
     /// Write a Markdown note and its source archive into the configured vault.
     case obsidian
+    /// Write a Markdown note and its attachments into the configured folder,
+    /// no app involved.
+    case folder
+    /// Retain this batch for a collection instead of forwarding it immediately.
+    case collect
     /// Put the files on the clipboard and stop there.
     case clipboard
     /// Ask which app, every time. The entry itself names no destination and
@@ -75,11 +82,14 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .qwen: return "com.alibaba.qwenwork"
         case .workBuddy: return "com.tencent.workbuddy.mac"
         case .weSight: return "ai.wesight.app"
+        case .deepSeekHarness: return "com.deepseek.dsh"
         case .obsidian: return "md.obsidian"
         // `.custom` has no fixed destination and no destination in its intent
         // either. `ActionRunner` resolves one from the user's own list, or takes
         // the one a 发给 ▸ menu inside WeChatBridge named.
-        case .clipboard, .custom: return nil
+        // `.folder` delivers to a path, not a process — the app writes the
+        // note itself and no app is ever launched.
+        case .collect, .clipboard, .custom, .folder: return nil
         }
     }
 
@@ -91,8 +101,8 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
     /// closed read 未执行 on the next launch, for a ⌘V that had worked all along.
     public var needsIntent: Bool {
         switch self {
-        case .clipboard: return false
-        case .codex, .claude, .doubao, .qwen, .workBuddy, .weSight, .obsidian, .custom: return true
+        case .collect, .clipboard: return false
+        case .codex, .claude, .doubao, .qwen, .workBuddy, .weSight, .deepSeekHarness, .obsidian, .folder, .custom: return true
         }
     }
 
@@ -107,7 +117,10 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .qwen: return L10n.text("千问办公")
         case .workBuddy: return "WorkBuddy"
         case .weSight: return L10n.text("WeSight")
+        case .deepSeekHarness: return "DeepSeek Harness"
         case .obsidian: return L10n.text("Obsidian")
+        case .collect: return L10n.text("分批收集")
+        case .folder: return L10n.text("文件夹")
         case .clipboard: return L10n.text("剪贴板")
         // Only ever reached when the chosen target is missing — a failure
         // message has to name something, and this build has nothing better.
@@ -127,7 +140,10 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .qwen: return L10n.text("发给千问办公")
         case .workBuddy: return L10n.text("发给 WorkBuddy")
         case .weSight: return L10n.text("发给 WeSight")
+        case .deepSeekHarness: return L10n.text("发给 DeepSeek Harness")
         case .obsidian: return L10n.text("沉淀到 Obsidian")
+        case .collect: return L10n.text("分批收集到微信流")
+        case .folder: return L10n.text("沉淀到文件夹")
         case .clipboard: return L10n.text("复制到剪贴板")
         case .custom: return L10n.text("发送到自定义")
         }
@@ -145,7 +161,10 @@ public enum ShareAction: String, Codable, Sendable, CaseIterable {
         case .qwen: return "ShareQwenWork"
         case .workBuddy: return "ShareWorkBuddy"
         case .weSight: return "ShareWeSight"
+        case .deepSeekHarness: return "ShareDeepSeekHarness"
         case .obsidian: return "ShareObsidian"
+        case .collect: return "ShareCollection"
+        case .folder: return "ShareFolder"
         case .clipboard: return "ShareClipboard"
         case .custom: return "ShareCustom"
         }

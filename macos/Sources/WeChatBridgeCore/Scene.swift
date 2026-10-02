@@ -66,6 +66,16 @@ public struct WeChatScene: Codable, Hashable, Identifiable, Sendable {
             ?? id.hasPrefix("wechatflow.")
     }
 
+    /// Every skill the scene depends on: inline `{{skill:id}}` references in
+    /// the prompt first, then declared ids not referenced inline.
+    public var effectiveSkillIDs: [String] {
+        var seen = Set<String>()
+        return (SkillReference.parse(instruction)
+            + SkillReference.parse(outputSpec)
+            + requiredSkillIDs)
+            .filter { seen.insert($0).inserted }
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -87,7 +97,8 @@ public struct WeChatScene: Codable, Hashable, Identifiable, Sendable {
 /// switches and group bindings so importing a newer package cannot overwrite
 /// the user's choices.
 public struct ScenePackage: Codable, Hashable, Sendable {
-    public static let currentSchemaVersion = 2
+    /// 3 adds inline `{{skill:id}}` references inside the prompt text.
+    public static let currentSchemaVersion = 3
 
     public let schemaVersion: Int
     public let id: String
@@ -112,7 +123,7 @@ public struct ScenePackage: Codable, Hashable, Sendable {
         keywords = scene.keywords
         instruction = scene.instruction
         outputSpec = scene.outputSpec
-        requiredSkillIDs = scene.requiredSkillIDs
+        requiredSkillIDs = scene.effectiveSkillIDs
         compatibleAgents = scene.compatibleAgents
         isOfficial = scene.isOfficial
     }
@@ -279,7 +290,7 @@ public struct SceneSettings: Codable, Hashable, Sendable {
                 id: "wechatflow.official.article-extract",
                 name: L10n.text("公众号文章提取"),
                 summary: L10n.text("从聊天记录中找出公众号文章，提取正文并整理成 Markdown。"),
-                instruction: L10n.text("读取附件中的聊天记录，找出公众号文章链接或分享卡片，提取标题、公众号、发布时间、正文和图片，并保留原文链接。"),
+                instruction: L10n.text("读取附件中的聊天记录，找出公众号文章链接或分享卡片，用 {{skill:wechat-article-extract}} 提取标题、公众号、发布时间、正文和图片，并保留原文链接。"),
                 outputSpec: L10n.text("按文章逐篇输出 Markdown：标题、公众号、发布时间、核心摘要、正文、图片、原文链接。无法访问的文章明确标记。"),
                 keywords: ["公众号", "文章"],
                 enabled: false,
@@ -293,7 +304,7 @@ public struct SceneSettings: Codable, Hashable, Sendable {
                 id: "wechatflow.official.video-reading",
                 name: L10n.text("视频信息读取"),
                 summary: L10n.text("读取聊天里的视频链接或文件，提炼逐字稿、摘要和关键时间点。"),
-                instruction: L10n.text("读取附件中的聊天记录，找出视频链接或本地视频文件，提取可获得的逐字稿、摘要、关键结论和时间点，并保留来源。"),
+                instruction: L10n.text("读取附件中的聊天记录，找出视频链接或本地视频文件，用 {{skill:video-information-reading}} 提取可获得的逐字稿、摘要、关键结论和时间点，并保留来源。"),
                 outputSpec: L10n.text("输出来源、时长、逐字稿或摘要、关键结论、关键时间点和无法读取的部分。"),
                 keywords: ["视频", "抖音", "B站"],
                 enabled: false,
@@ -356,8 +367,15 @@ public struct SceneSettings: Codable, Hashable, Sendable {
         scenes.append(contentsOf: Self.starterScenes.filter { !existing.contains($0.id) })
         for starter in Self.starterScenes {
             guard let index = scenes.firstIndex(where: { $0.id == starter.id && $0.isOfficial }) else { continue }
+            // Official scenes are read-only templates, so their prompt and skill
+            // wiring follow the shipped version rather than a stale stored copy.
             scenes[index].compatibleAgents = starter.compatibleAgents
+            scenes[index].instruction = starter.instruction
+            scenes[index].outputSpec = starter.outputSpec
             scenes[index].requiredSkillIDs = starter.requiredSkillIDs
+        }
+        for index in scenes.indices {
+            SkillId.migrate(&scenes[index])
         }
     }
 
@@ -732,27 +750,40 @@ public enum GroupFingerprint {
 }
 
 public enum ScenePrompt {
+    /// - Parameter skills: Resolves each `{{skill:id}}` for the destination.
+    ///   Nil (no skill library available) still renders every reference,
+    ///   naming skills by id.
     public static func render(
         scene: WeChatScene,
         previousSummaryAt: Date?,
         currentEnd: Date? = nil,
-        skillNames: [String: String] = [:],
+        skills: SkillRenderContext? = nil,
         locale: Locale = .current,
         timeZone: TimeZone = .current
     ) -> String? {
-        let instruction = scene.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
-        let output = scene.outputSpec.trimmingCharacters(in: .whitespacesAndNewlines)
+        let context = skills ?? SkillRenderContext(agent: nil) { id in
+            SkillResolution(id: id, displayName: id, mode: .missing)
+        }
+        let instruction = SkillReference.replace(scene.instruction, render: context.phrase)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let output = SkillReference.replace(scene.outputSpec, render: context.phrase)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !instruction.isEmpty || !output.isEmpty else { return nil }
 
         var parts: [String] = []
         if !instruction.isEmpty { parts.append(instruction) }
         if !output.isEmpty { parts.append(L10n.format("输出规范：\n%@", output)) }
-        if !scene.requiredSkillIDs.isEmpty {
-            let names = scene.requiredSkillIDs.map { skillNames[$0] ?? $0 }
-            parts.append(L10n.format(
-                "技能要求：\n如果当前 Agent 已安装以下 Skill，请优先使用：%@。\n如果 Skill 不可用，请继续执行该场景，并明确说明哪些部分未使用 Skill、未完成或未验证。",
-                names.joined(separator: "、")
-            ))
+        // Inline references already carry their phrase; declared-only skills
+        // (official or legacy scenes) get listed under 技能要求. An all-inline
+        // scene emits no section at all.
+        let inline = Set(SkillReference.parse(scene.instruction) + SkillReference.parse(scene.outputSpec))
+        var seen = Set<String>()
+        let listed = scene.requiredSkillIDs
+            .filter { !inline.contains($0) }
+            .filter { seen.insert($0).inserted }
+            .map { L10n.format("- 使用%@", context.phrase($0)) }
+        if !listed.isEmpty {
+            parts.append(([L10n.text("技能要求：")] + listed).joined(separator: "\n"))
         }
         if let previousSummaryAt, let currentEnd, currentEnd > previousSummaryAt {
             let formatter = DateFormatter()

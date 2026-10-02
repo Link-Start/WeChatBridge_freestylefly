@@ -17,13 +17,13 @@
 </div>
 
 > [!NOTE]
-> 已发布经过 Developer ID 签名和 Apple 公证的 [WeChatBridge 0.1.14 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest)。
+> 已发布经过 Developer ID 签名和 Apple 公证的 [WeChatBridge 0.1.15 DMG](https://github.com/freestylefly/WeChatBridge/releases/latest)。
 
 ## 为什么做微信流
 
 macOS 微信 4.1.13 起，多选聊天记录后可以“合并转发”给第三方应用。微信会生成一份包含 TXT、图片和视频的 ZIP，天然适合交给 AI Agent 处理，也适合沉淀进本地知识库。
 
-系统的“转发到其他应用”列表只展示带有 Share Extension 的 App。微信流补齐这层入口，让一次转发直接抵达 Codex、Claude、豆包、千问办公、WorkBuddy、WeSight、Obsidian、剪贴板或你指定的其他应用。
+系统的“转发到其他应用”列表只展示带有 Share Extension 的 App。微信流补齐这层入口，让一次转发直接抵达 Codex、Claude、豆包、千问办公、WorkBuddy、WeSight、DeepSeek Harness、Obsidian、剪贴板或你指定的其他应用。
 
 ```mermaid
 flowchart LR
@@ -39,7 +39,7 @@ flowchart LR
 
 | 能力 | 使用体验 |
 | --- | --- |
-| 九个原生入口 | 在微信转发菜单直接选择目标，无需打开微信流主窗口 |
+| 十二个原生入口 | 在微信转发菜单直接选择目标，无需打开微信流主窗口 |
 | AI Agent 转发 | 激活目标 App，附加场景指令并自动粘贴聊天归档 |
 | Obsidian 沉淀 | 生成 Markdown 笔记，保存原始 ZIP，并按聊天名组织内容 |
 | 自定义目标 | 添加任意 macOS 应用，终端类应用可只接收文件路径 |
@@ -58,9 +58,14 @@ flowchart LR
 | 发给千问办公 | 激活千问办公并粘贴聊天归档 |
 | 发给 WorkBuddy | 激活 WorkBuddy 并粘贴聊天归档 |
 | 发给 WeSight | 激活 WeSight 并粘贴聊天归档 |
-| 沉淀到 Obsidian | 创建 Markdown 笔记并保存原始附件 |
+| 发给 DeepSeek Harness | 激活 DeepSeek Harness 并粘贴聊天归档 |
+| 沉淀到 Obsidian | 创建 Markdown 笔记并保存原始附件，通知可打开笔记 |
+| 沉淀到文件夹 | 写入选定目录中的 Markdown 与附件，通知可在访达中定位 |
+| 分批收集到微信流 | 连续分享多批原始 ZIP，收齐后一次选择目标和场景 |
 | 复制到剪贴板 | 保留文件，交给用户手动粘贴 |
 | 发送到自定义 | 转发到用户维护的应用列表 |
+
+需要整理超过 100 条时，每批在微信手动选取并分享到「分批收集到微信流」。浮条显示已收批次和上一批首尾参考；收齐后点击「完成并发送」。原始图片、视频保留在 ZIP 中，未完成的收集可在记录页继续，失败可重试。微信的单次多选上限保持不变。
 
 ## 实际效果
 
@@ -80,7 +85,7 @@ flowchart LR
     <td align="center"><img src="shared/Screenshots/usage-scenes.png" width="420" alt="场景管理页" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>九个入口随时开关，未安装的应用直接标注</sub></td>
+    <td align="center"><sub>十二个入口随时开关，未安装的应用直接标注</sub></td>
     <td align="center"><sub>场景保存提示词与适用 Agent，转发时挑一个</sub></td>
   </tr>
   <tr>
@@ -174,7 +179,7 @@ shared/                 # 两端共用的资产与契约
 site/                   # Sparkle 更新源与版本说明
 ```
 
-项目使用 Swift Package Manager 管理 macOS 源码和 Sparkle 依赖。`macos/Scripts/make-app.sh` 会把主程序与九个 Share Extension 组装成完整的 `.app`。Windows 侧见 `windows/AGENTS.md` 与 `windows/docs/README.zh-CN.md`。
+项目使用 Swift Package Manager 管理 macOS 源码和 Sparkle 依赖。`macos/Scripts/make-app.sh` 会把主程序与十二个 Share Extension 组装成完整的 `.app`。Windows 侧见 `windows/AGENTS.md` 与 `windows/docs/README.zh-CN.md`。
 
 ## 开发与验证
 
@@ -225,15 +230,15 @@ dotnet test windows/WeChatBridge.Windows.sln -c Release
 
 ## 关于我们
 
-关注项目动态、使用交流与后续更新，可通过微信搜索“向明”或“苍何”联系我们。
+关注项目动态、使用交流与后续更新，可通过微信搜索“数字生命蜗牛”或“苍何”联系我们。
 
 <table>
   <tr>
-    <th align="center">向明</th>
+    <th align="center">数字生命蜗牛</th>
     <th align="center">苍何</th>
   </tr>
   <tr>
-    <td align="center"><img src="shared/Screenshots/wechat-xiangming.jpg" width="420" alt="向明微信二维码" /></td>
+    <td align="center"><img src="shared/Screenshots/wechat-digital-life-snail.png" width="420" alt="数字生命蜗牛微信二维码" /></td>
     <td align="center"><img src="shared/Screenshots/wechat-canghe.jpg" width="420" alt="苍何微信二维码" /></td>
   </tr>
 </table>

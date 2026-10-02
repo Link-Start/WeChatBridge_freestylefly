@@ -64,6 +64,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         actionTargets.removeAll()
         menu.removeAllItems()
 
+        if let collection = model.collectionLedger.current {
+            menu.addItem(item(L10n.format("继续收集 · %d 批", collection.batchIDs.count)) { [weak self] in
+                self?.model.didCollect.send(collection.id)
+            })
+            menu.addItem(.separator())
+        }
+
         let recent = NSMenuItem(title: L10n.text("最近记录"), action: nil, keyEquivalent: "")
         recent.submenu = recentMenu()
         menu.addItem(recent)

@@ -35,10 +35,10 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         }
 
         let controller = NSHostingController(rootView: content())
-        // Left at its default the hosting controller pushes its preferred size
-        // at the window and AppKit adds a title bar on top of it; the guide is
-        // designed at one width and does not get a vote on it.
-        controller.sizingOptions = []
+        // The width is part of the layout; the height is the current step's
+        // intrinsic height. Without `.preferredContentSize`, macOS 15 leaves
+        // this fixed at the starting frame and clips step one's footer.
+        controller.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: controller)
         window.title = ""
         window.titleVisibility = .hidden
@@ -52,18 +52,14 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         // open on another Space. The guide has to follow them there.
         window.collectionBehavior = [.canJoinAllSpaces]
         window.delegate = self
-        // The design's size. `fullSizeContentView` puts the content view over
-        // the whole frame, so the frame is the design size — setting the
-        // *content* size would add a title bar's height back on.
-        //
-        // Where the guide's own layout asks for more — a step whose roster has
-        // outgrown the design, which is how the footer button came to sit under
-        // the bottom edge of step one — the hosting view's constraints take the
-        // window with them: the size below is where it starts, not a cage.
+        // `fullSizeContentView` puts the content view over the whole frame, so
+        // use the hosting view's size as the frame rather than adding a title
+        // bar back through `setContentSize`.
+        let preferredHeight = max(Metrics.onboardingHeight, controller.preferredContentSize.height)
         window.setFrame(
             NSRect(
                 origin: .zero,
-                size: NSSize(width: Metrics.onboardingWidth, height: Metrics.onboardingHeight)
+                size: NSSize(width: Metrics.onboardingWidth, height: preferredHeight)
             ),
             display: false
         )

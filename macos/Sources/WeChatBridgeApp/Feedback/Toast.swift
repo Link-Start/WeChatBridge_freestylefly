@@ -13,7 +13,10 @@ import SwiftUI
 /// Nothing here reports success any more (2026-09-05, at the user's request):
 /// every destination leaves its own evidence on screen, so a capsule saying
 /// 「已发给 Claude」 was one more thing to dismiss over a paste the user had
-/// just watched happen.
+/// just watched happen. One exception since 「沉淀到文件夹」: a note that lands
+/// in a folder shows nothing anywhere, so that delivery reports its own success
+/// — through a system notification (`DeliveryNotifier`), which is visible even
+/// while this app sits in the background, where the capsule was not.
 ///
 /// It used to appear next to the pointer, which put it over whatever the user
 /// was about to click and moved it somewhere new every time. One fixed corner

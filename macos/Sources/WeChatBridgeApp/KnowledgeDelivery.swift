@@ -1,9 +1,14 @@
 import WeChatBridgeCore
 import Foundation
 
-/// Writes a WeChat archive into an Obsidian vault as Markdown plus a durable
-/// copy of the original ZIP. Keeping the archive makes a parsing change or a
-/// future converter able to rebuild the note without asking WeChat again.
+/// Writes a WeChat archive into a folder as Markdown plus a durable copy of
+/// the original ZIP. Keeping the archive makes a parsing change or a future
+/// converter able to rebuild the note without asking WeChat again.
+///
+/// Two destinations share this assembly: 「沉淀到 Obsidian」 lands the note in
+/// a subfolder of the user's vault, and 「沉淀到文件夹」 lands it in a subfolder
+/// of the folder the user picked — the same shape either way. The note shape —
+/// `聊天名.md` plus `附件/` — is the same too.
 enum KnowledgeDelivery {
     enum Failure: LocalizedError {
         case notConfigured
@@ -17,6 +22,8 @@ enum KnowledgeDelivery {
         }
     }
 
+    /// The Obsidian entry: the vault is what the user configured, and the note
+    /// goes into a `微信流` (or named) subfolder of it.
     @discardableResult
     static func deliver(
         urls: [URL],
@@ -25,12 +32,55 @@ enum KnowledgeDelivery {
         chatName: String?,
         sceneName: String?
     ) throws -> [URL] {
-        guard !urls.isEmpty else { throw Failure.unreadableArchive }
         let vault = URL(fileURLWithPath: vaultPath, isDirectory: true)
         try FolderDelivery.validateFolder(vault)
 
-        let folderName = DisplayName.sanitize(subfolder.isEmpty ? "微信流" : subfolder)
-        let root = vault.appendingPathComponent(folderName, isDirectory: true)
+        let subfolderPath = DisplayName.subfolderPath(subfolder)
+        let folderName = subfolderPath.isEmpty ? "微信流" : subfolderPath
+        return try write(
+            urls: urls,
+            root: vault.appendingPathComponent(folderName, isDirectory: true),
+            chatName: chatName,
+            sceneName: sceneName
+        )
+    }
+
+    /// The folder entry: the folder is what the user configured, and the note
+    /// goes into a `微信流` (or named) subfolder of it — the same landing
+    /// shape the Obsidian entry writes inside its vault.
+    @discardableResult
+    static func deliver(
+        urls: [URL],
+        folderPath: String,
+        subfolder: String,
+        chatName: String?,
+        sceneName: String?
+    ) throws -> [URL] {
+        let folder = URL(fileURLWithPath: folderPath, isDirectory: true)
+        try FolderDelivery.validateFolder(folder)
+
+        let subfolderPath = DisplayName.subfolderPath(subfolder)
+        let folderName = subfolderPath.isEmpty ? "微信流" : subfolderPath
+        return try write(
+            urls: urls,
+            root: folder.appendingPathComponent(folderName, isDirectory: true),
+            chatName: chatName,
+            sceneName: sceneName
+        )
+    }
+
+    /// The shared assembly: one `聊天名.md` (merged when a same-named note is
+    /// already there, uniquely numbered otherwise) and `附件/` holding the
+    /// original archive plus any media unpacked from it. `root` is created if
+    /// absent; its nearest existing parent must already be writable.
+    @discardableResult
+    private static func write(
+        urls: [URL],
+        root: URL,
+        chatName: String?,
+        sceneName: String?
+    ) throws -> [URL] {
+        guard !urls.isEmpty else { throw Failure.unreadableArchive }
         let attachments = root.appendingPathComponent("附件", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
@@ -64,6 +114,29 @@ enum KnowledgeDelivery {
                 archiveName: archive.lastPathComponent,
                 attachments: media
             )
+            let preferred = root.appendingPathComponent(DisplayName.sanitize(title) + ".md")
+            if let transcript,
+               let existing = try? String(contentsOf: preferred, encoding: .utf8) {
+                switch ObsidianNote.merge(
+                    existingMarkdown: existing,
+                    transcript: transcript,
+                    attachments: media,
+                    archiveName: archive.lastPathComponent,
+                    chatName: chatName,
+                    sceneName: sceneName,
+                    mergedAt: Date()
+                ) {
+                case .merged(let merged):
+                    try Data(merged.utf8).write(to: preferred, options: .atomic)
+                    written.append(preferred)
+                    continue
+                case .nothingNew:
+                    written.append(preferred)
+                    continue
+                case .notApplicable:
+                    break
+                }
+            }
             let note = uniqueURL(
                 in: root,
                 name: DisplayName.sanitize(title) + ".md"

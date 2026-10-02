@@ -22,12 +22,16 @@ struct HistoryPane: View {
                 Notice(failure, tone: .bad)
             }
 
-            if model.batches.isEmpty {
+            ForEach(filteredCollections) { collection in
+                CollectionHistoryCard(model: model, collection: collection, actions: actions)
+            }
+
+            if model.batches.isEmpty && filteredCollections.isEmpty {
                 emptyState(
                     title: L10n.text("还没有记录"),
                     detail: L10n.text("从微信转发到任意一个 WeChatBridge 入口后，这里会列出来。")
                 )
-            } else if filteredBatches.isEmpty {
+            } else if filteredBatches.isEmpty && filteredCollections.isEmpty {
                 emptyState(
                     title: L10n.text("没有匹配的记录"),
                     detail: L10n.text("试试按群聊、场景或文件名搜索。")
@@ -81,7 +85,7 @@ struct HistoryPane: View {
     private var summary: some View {
         Text(
             L10n.format("共 %d 条 · 占用 %@ · %@",
-                model.batches.count,
+                model.historyEntryCount,
                 ByteFormat.string(model.historyByteCount),
                 retentionText
             )
@@ -121,7 +125,19 @@ struct HistoryPane: View {
     }
 
     private var filteredBatches: [ReadyBatch] {
-        model.batches.filter { HistoryLabel.matches($0, query: query) }
+        let grouped = Set(model.collectionLedger.collections.flatMap(\.batchIDs))
+        return model.batches.filter { !grouped.contains($0.id) && HistoryLabel.matches($0, query: query) }
+    }
+
+    private var filteredCollections: [BatchCollection] {
+        model.collectionLedger.collections.filter { group in
+            query.isEmpty || model.collectionName(group).localizedCaseInsensitiveContains(query)
+                || group.sceneName?.localizedCaseInsensitiveContains(query) == true
+                || model.collectionBatches(group).contains { HistoryLabel.matches($0, query: query) }
+        }.sorted { a, b in
+            if (a.status == .collecting) != (b.status == .collecting) { return a.status == .collecting }
+            return a.createdAt > b.createdAt
+        }
     }
 
     private var groups: [HistoryDay] {

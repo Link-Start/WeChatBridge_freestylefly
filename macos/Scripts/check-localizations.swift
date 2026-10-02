@@ -102,12 +102,12 @@ for (directory, label, tables) in groups {
 /// Every place a literal becomes a lookup key: explicit `L10n` calls, and the
 /// SwiftUI views that take a `LocalizedStringKey`.
 let keyPatterns = [
-    "L10n\\.text\\(\"([^\"\\\\]*)\"",
-    "L10n\\.format\\(\"([^\"\\\\]*)\"",
-    "Text\\(\"([^\"\\\\]*)\"",
-    "Button\\(\"([^\"\\\\]*)\"",
-    "Toggle\\(\"([^\"\\\\]*)\"",
-    "Label\\(\"([^\"\\\\]*)\"",
+    "L10n\\.text\\(\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
+    "L10n\\.format\\(\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
+    "Text\\(\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
+    "Button\\(\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
+    "Toggle\\(\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
+    "Label\\(\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
 ].map { try! NSRegularExpression(pattern: $0) }
 
 var referenced: Set<String> = []
@@ -118,7 +118,9 @@ for case let url as URL in enumerator where url.pathExtension == "swift" {
     for pattern in keyPatterns {
         for match in pattern.matches(in: text, range: range) {
             guard let captured = Range(match.range(at: 1), in: text) else { continue }
-            referenced.insert(String(text[captured]))
+            let literal = String(text[captured])
+            let decoded = try? JSONDecoder().decode(String.self, from: Data(("\"" + literal + "\"").utf8))
+            referenced.insert(decoded ?? literal)
         }
     }
 }

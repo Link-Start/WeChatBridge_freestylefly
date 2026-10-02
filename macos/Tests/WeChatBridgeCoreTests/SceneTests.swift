@@ -83,6 +83,7 @@ final class SceneTests: XCTestCase {
         XCTAssertEqual(decodedV2.compatibleAgents, [.chatGPTCodex])
         XCTAssertTrue(decodedV2.isOfficial)
         XCTAssertEqual(AgentID.matching(.weSight), .weSight)
+        XCTAssertNil(AgentID.matching(.deepSeekHarness))
     }
 
     func testOfficialTaskCopiesToAnEditableUserTask() {
@@ -103,21 +104,24 @@ final class SceneTests: XCTestCase {
         XCTAssertEqual(copied.compatibleAgents, official.compatibleAgents)
     }
 
-    func testPromptIncludesSkillRequirementAndFallback() {
+    func testPromptListsDeclaredOnlySkillUnderSkillRequirements() {
         let scene = WeChatScene(
             name: "提取文章",
             instruction: "整理",
             outputSpec: "输出",
-            requiredSkillIDs: ["skill.id"],
+            requiredSkillIDs: ["article-extract"],
             isOfficial: true
         )
+        let context = SkillRenderContext(agent: nil) { id in
+            SkillResolution(id: id, displayName: "文章提取", mode: .native)
+        }
         let prompt = ScenePrompt.render(
             scene: scene,
             previousSummaryAt: nil,
-            skillNames: ["skill.id": "文章提取"]
+            skills: context
         )
-        XCTAssertTrue(prompt?.contains("文章提取") == true)
-        XCTAssertTrue(prompt?.contains("如果 Skill 不可用") == true)
+        XCTAssertTrue(prompt?.contains("技能要求：") == true)
+        XCTAssertTrue(prompt?.contains("- 使用「文章提取」技能（article-extract）") == true)
     }
 
     func testMatchingPrefersBindingThenLongestKeyword() {

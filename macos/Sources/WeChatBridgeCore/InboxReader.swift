@@ -236,6 +236,30 @@ public struct InboxReader {
         try trashOrRemove(directory(for: batchID))
     }
 
+    /// Quick deletion must remain reversible; unlike ordinary cleanup this
+    /// never falls back to permanent removal when Trash is unavailable.
+    public func trashRecoverably(batchID: UUID) throws -> URL {
+        let source = directory(for: batchID)
+        guard manifest(at: source)?.batchID == batchID else { throw InboxError.manifestUnreadable(reason: BatchStaging.manifestFileName) }
+        if removal == .delete {
+            // Tests keep recoverable removals inside their temporary inbox.
+            let folder = inbox.root.appendingPathComponent("TestTrash", isDirectory: true)
+            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+            let target = folder.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try fileManager.moveItem(at: source, to: target)
+            return target
+        }
+        var result: NSURL?
+        try fileManager.trashItem(at: source, resultingItemURL: &result)
+        guard let result else { throw CocoaError(.fileWriteUnknown) }
+        return result as URL
+    }
+
+    public func restoreTrashedBatch(_ batchID: UUID, from url: URL) throws {
+        guard url.isFileURL, manifest(at: url)?.batchID == batchID else { throw InboxError.manifestUnreadable(reason: BatchStaging.manifestFileName) }
+        try fileManager.moveItem(at: url, to: directory(for: batchID))
+    }
+
     /// Removes one item and rewrites the batch manifest; the batch itself goes
     /// away once its last item does.
     public func discard(item: ReadyItem) throws {
@@ -274,12 +298,13 @@ public struct InboxReader {
     ///
     /// Returns how many batches were removed.
     @discardableResult
-    public func pruneHistory(olderThan interval: TimeInterval, now: Date = Date()) -> Int {
+    public func pruneHistory(olderThan interval: TimeInterval, now: Date = Date(), excluding protected: Set<UUID> = []) -> Int {
         // A non-positive window means "keep forever", not "delete everything":
         // the preference's 0 is the "从不" option.
         guard interval > 0 else { return 0 }
         var removed = 0
         for batch in batches(initializing: false) {
+            guard !protected.contains(batch.id), !(batch.action == .collect && batch.outcome == nil) else { continue }
             guard now.timeIntervalSince(batch.createdAt) > interval else { continue }
             if (try? discard(batchID: batch.id)) != nil { removed += 1 }
         }
