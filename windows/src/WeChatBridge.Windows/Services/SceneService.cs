@@ -298,7 +298,7 @@ public sealed class SceneService : IDisposable
     public WeChatScene AddScene()
     {
         var settings = Scenes.Load();
-        var scene = new WeChatScene { Name = "新场景", Enabled = true };
+        var scene = new WeChatScene { Name = L10n.Text("新场景"), Enabled = true };
         settings.Add(scene);
         Scenes.Save(settings);
         RaiseChanged();
@@ -496,7 +496,7 @@ public sealed class SceneService : IDisposable
     public string ExportPackageJson(WeChatScene scene)
     {
         if (SceneVersion.Parse(scene.PackageVersion) is null)
-            throw new ScenePackageException("版本号必须是 1.0.0 这样的数字格式。");
+            throw new ScenePackageException(L10n.Text("版本号必须是 1.0.0 这样的数字格式。"));
         return JsonSerializer.Serialize(ScenePackage.FromScene(scene), PackageJsonOptions);
     }
 
@@ -532,7 +532,7 @@ public sealed class SceneService : IDisposable
             }
             if (package is null)
             {
-                errors.Add("场景包缺少 id、名称、版本、指令或版本格式无效。");
+                errors.Add(L10n.Text("场景包缺少 id、名称、版本、指令或版本格式无效。"));
                 return Report(0, errors);
             }
             try
@@ -549,7 +549,7 @@ public sealed class SceneService : IDisposable
         if (packages.Count == 0)
         {
             if (errors.Count == 0)
-                errors.Add("没有找到可导入的场景包。");
+                errors.Add(L10n.Text("没有找到可导入的场景包。"));
             return Report(0, errors);
         }
 
@@ -599,12 +599,12 @@ public sealed class SceneService : IDisposable
     private static void ValidatePackage(ScenePackage package)
     {
         if (package.SchemaVersion is < 1 or > ScenePackage.CurrentSchemaVersion)
-            throw new ScenePackageException("这个场景包由更新版本生成，当前微信流无法导入。");
+            throw new ScenePackageException(L10n.Text("这个场景包由更新版本生成，当前微信流无法导入。"));
         if (string.IsNullOrWhiteSpace(package.Id)
             || string.IsNullOrWhiteSpace(package.Name)
             || string.IsNullOrWhiteSpace(package.Instruction)
             || SceneVersion.Parse(package.Version) is null)
-            throw new ScenePackageException("场景包缺少 id、名称、版本、指令或版本格式无效。");
+            throw new ScenePackageException(L10n.Text("场景包缺少 id、名称、版本、指令或版本格式无效。"));
     }
 
     /// <summary>

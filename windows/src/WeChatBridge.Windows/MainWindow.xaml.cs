@@ -1,3 +1,4 @@
+using WeChatBridge.Windows.Core;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -50,12 +51,12 @@ public partial class MainWindow : Window
         var skillsPane = new SkillsPane();
         _panes = new Dictionary<AppTab, (string, string, UIElement)>
         {
-            [AppTab.History] = ("记录", "每一批转发的去向与结果", new HistoryPane()),
-            [AppTab.General] = ("通用", "运行状态、启动项与保留策略", new GeneralPane()),
-            [AppTab.Entries] = ("入口", "微信「转发到其他应用」里的可用操作", new EntriesPane()),
-            [AppTab.Scenes] = ("场景", "按群聊绑定提示词与适用 Agent", scenesPane),
-            [AppTab.Skills] = ("技能中心", "微信流统一管理的技能库", skillsPane),
-            [AppTab.About] = ("关于", "版本信息与项目链接", new AboutPane()),
+            [AppTab.History] = (L10n.Text("记录"), L10n.Text("每一批转发的去向与结果"), new HistoryPane()),
+            [AppTab.General] = (L10n.Text("通用"), L10n.Text("运行状态、启动项与保留策略"), new GeneralPane()),
+            [AppTab.Entries] = (L10n.Text("入口"), L10n.Text("微信「转发到其他应用」里的可用操作"), new EntriesPane()),
+            [AppTab.Scenes] = (L10n.Text("场景"), L10n.Text("按群聊绑定提示词与适用 Agent"), scenesPane),
+            [AppTab.Skills] = (L10n.Text("技能中心"), L10n.Text("微信流统一管理的技能库"), skillsPane),
+            [AppTab.About] = (L10n.Text("关于"), L10n.Text("版本信息与项目链接"), new AboutPane()),
         };
         scenesPane.Bind(model.Scenes, model.Skills);
         skillsPane.ScenesRequested += skillId =>

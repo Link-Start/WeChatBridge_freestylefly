@@ -192,7 +192,7 @@ public partial class ScenePickerWindow : Window
         public WeChatScene Scene { get; } = scene;
         public string Name => Scene.Name;
         public string SummaryText =>
-            string.IsNullOrWhiteSpace(Scene.Summary) ? "没有一句话说明" : Scene.Summary;
+            string.IsNullOrWhiteSpace(Scene.Summary) ? L10n.Text("没有一句话说明") : Scene.Summary;
         public string Shortcut =>
             index < 9 ? (index + 1).ToString(CultureInfo.InvariantCulture) : string.Empty;
     }

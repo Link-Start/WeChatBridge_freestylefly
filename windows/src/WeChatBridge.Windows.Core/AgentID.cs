@@ -1,3 +1,4 @@
+using WeChatBridge.Windows.Core;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -16,6 +17,7 @@ public enum AgentId
     QwenWork,
     WorkBuddy,
     WeSight,
+    DeepSeekHarness,
 }
 
 public static class AgentIds
@@ -27,6 +29,7 @@ public static class AgentIds
         AgentId.Doubao => "doubao",
         AgentId.QwenWork => "qwenWork",
         AgentId.WorkBuddy => "workBuddy",
+        AgentId.DeepSeekHarness => "deepSeekHarness",
         AgentId.WeSight => "weSight",
         _ => throw new ArgumentOutOfRangeException(nameof(id)),
     };
@@ -38,6 +41,7 @@ public static class AgentIds
         "doubao" => AgentId.Doubao,
         "qwenWork" => AgentId.QwenWork,
         "workBuddy" => AgentId.WorkBuddy,
+        "deepSeekHarness" => AgentId.DeepSeekHarness,
         "weSight" => AgentId.WeSight,
         _ => null,
     };
@@ -46,9 +50,10 @@ public static class AgentIds
     {
         AgentId.ChatGptCodex => "ChatGPT / Codex",
         AgentId.Claude => "Claude",
-        AgentId.Doubao => "豆包",
-        AgentId.QwenWork => "千问",
+        AgentId.Doubao => L10n.Text("豆包"),
+        AgentId.QwenWork => L10n.Text("千问"),
         AgentId.WorkBuddy => "WorkBuddy",
+        AgentId.DeepSeekHarness => "DeepSeek Harness",
         AgentId.WeSight => "WeSight",
         _ => throw new ArgumentOutOfRangeException(nameof(id)),
     };
@@ -60,6 +65,7 @@ public static class AgentIds
         ShareAction.Doubao => AgentId.Doubao,
         ShareAction.Qwen => AgentId.QwenWork,
         ShareAction.WorkBuddy => AgentId.WorkBuddy,
+        ShareAction.DeepSeekHarness => AgentId.DeepSeekHarness,
         ShareAction.WeSight => AgentId.WeSight,
         _ => null,
     };
@@ -71,6 +77,7 @@ public static class AgentIds
     /// </summary>
     public static AgentId? MatchingBundleId(string? bundleId) => bundleId switch
     {
+        var id when id is not null && id.Contains("DeepSeek", StringComparison.OrdinalIgnoreCase) => AgentId.DeepSeekHarness,
         null => null,
         var id when id.StartsWith("OpenAI.Codex_", StringComparison.Ordinal) => AgentId.ChatGptCodex,
         var id when id.StartsWith("Claude_", StringComparison.Ordinal) => AgentId.Claude,
@@ -129,15 +136,15 @@ public sealed record OfficialSkillCatalog(int SchemaVersion, IReadOnlyList<Offic
         var path = Path.Combine(resourcesRoot, "Skills", "catalog.json");
         var catalog = JsonSerializer.Deserialize<OfficialSkillCatalog>(
             File.ReadAllText(path), CatalogJsonOptions)
-            ?? throw new SkillException("技能清单内容无效。");
+            ?? throw new SkillException(L10n.Text("技能清单内容无效。"));
         if (catalog.SchemaVersion != CurrentSchemaVersion)
-            throw new SkillException("技能清单版本不受支持。");
+            throw new SkillException(L10n.Text("技能清单版本不受支持。"));
         if (catalog.Skills.Select(s => s.Id).Distinct().Count() != catalog.Skills.Count
             || catalog.Skills.Any(s => string.IsNullOrEmpty(s.Id)))
-            throw new SkillException("技能清单内容无效。");
+            throw new SkillException(L10n.Text("技能清单内容无效。"));
         if (catalog.Skills.FirstOrDefault(s => !SkillId.IsValid(s.Id)) is { } invalid)
             throw new SkillException(
-                $"技能 ID「{invalid.Id}」不符合规范：只能包含小写字母、数字和连字符。");
+                L10n.Format($"技能 ID「{invalid.Id}」不符合规范：只能包含小写字母、数字和连字符。"));
         return catalog;
     }
 }

@@ -102,6 +102,7 @@ public partial class EntryPickerWindow : Window
         // Before InitializeComponent: the XAML's StaticResource lookups resolve
         // during the load, so the merge must already be in place.
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source = ThemeSource });
+        L10n.Language = new AppSettingsStore().Load().Language;
         InitializeComponent();
         Root.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
         Root.RenderTransform = _entranceScale;

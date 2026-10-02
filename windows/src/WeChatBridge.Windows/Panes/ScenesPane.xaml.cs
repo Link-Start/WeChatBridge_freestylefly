@@ -97,9 +97,9 @@ public partial class ScenesPane : UserControl
         public string? Hotkey { get; init; }
         public bool Enabled => Scene.Enabled;
         public string NameText =>
-            string.IsNullOrWhiteSpace(Scene.Name) ? "未命名场景" : Scene.Name;
+            string.IsNullOrWhiteSpace(Scene.Name) ? L10n.Text("未命名场景") : Scene.Name;
         public string SummaryText =>
-            string.IsNullOrWhiteSpace(Scene.Summary) ? "没有一句话说明" : Scene.Summary;
+            string.IsNullOrWhiteSpace(Scene.Summary) ? L10n.Text("没有一句话说明") : Scene.Summary;
     }
 
     private sealed class GroupRow
@@ -110,7 +110,7 @@ public partial class ScenesPane : UserControl
         public bool Selected { get; init; }
         public string NameText => Memory.DisplayName;
         public string BindingText =>
-            BoundNames.Count == 0 ? "转发时选择或直接转发" : string.Join("、", BoundNames);
+            BoundNames.Count == 0 ? L10n.Text("转发时选择或直接转发") : string.Join("、", BoundNames);
     }
 
     private sealed class AgentRow
@@ -132,9 +132,9 @@ public partial class ScenesPane : UserControl
         /// <summary>Last row in the list — hides its trailing hairline divider.</summary>
         public bool IsLast { get; init; }
         public string NameText =>
-            string.IsNullOrWhiteSpace(Scene.Name) ? "未命名场景" : Scene.Name;
+            string.IsNullOrWhiteSpace(Scene.Name) ? L10n.Text("未命名场景") : Scene.Name;
         public string SummaryText =>
-            string.IsNullOrWhiteSpace(Scene.Summary) ? "没有一句话说明" : Scene.Summary;
+            string.IsNullOrWhiteSpace(Scene.Summary) ? L10n.Text("没有一句话说明") : Scene.Summary;
         public string AgentsText =>
             string.Join(" · ", Scene.CompatibleAgents.Select(a => a.DisplayName()));
     }
@@ -155,9 +155,9 @@ public partial class ScenesPane : UserControl
         if (_selectedGroupKey is null || !_memories.ContainsKey(_selectedGroupKey))
             _selectedGroupKey = SortedGroupKeys().FirstOrDefault();
 
-        SceneCount.Text = $"{_settings.Scenes.Count} 个";
+        SceneCount.Text = L10n.Format($"{_settings.Scenes.Count} 个");
         var boundCount = _memories.Values.Count(m => m.BoundSceneIDs.Count > 0);
-        GroupCount.Text = $"{boundCount} 个已绑定";
+        GroupCount.Text = L10n.Format($"{boundCount} 个已绑定");
 
         RebuildSceneList();
         RebuildSceneEditor();
@@ -209,9 +209,9 @@ public partial class ScenesPane : UserControl
         EditorEmpty.Visibility = Visibility.Collapsed;
         EditorContent.Visibility = Visibility.Visible;
 
-        var name = string.IsNullOrWhiteSpace(scene.Name) ? "未命名场景" : scene.Name;
+        var name = string.IsNullOrWhiteSpace(scene.Name) ? L10n.Text("未命名场景") : scene.Name;
         EditorTitle.Text = name;
-        EditorStatus.Text = scene.Enabled ? "已启用" : "已停用";
+        EditorStatus.Text = scene.Enabled ? L10n.Text("已启用") : L10n.Text("已停用");
         EditorStatus.Foreground = scene.Enabled
             ? (Brush)FindResource("LiveInkColor")
             : (Brush)FindResource("InkTertiaryColor");
@@ -224,9 +224,9 @@ public partial class ScenesPane : UserControl
             EditFields.Visibility = Visibility.Collapsed;
             ReadFields.Visibility = Visibility.Visible;
             OfficialHint.Visibility = Visibility.Visible;
-            ReadName.Text = string.IsNullOrWhiteSpace(scene.Name) ? "无" : scene.Name;
-            ReadSummary.Text = string.IsNullOrWhiteSpace(scene.Summary) ? "无" : scene.Summary;
-            ReadPrompt.Text = string.IsNullOrWhiteSpace(prompt) ? "无" : prompt;
+            ReadName.Text = string.IsNullOrWhiteSpace(scene.Name) ? L10n.Text("无") : scene.Name;
+            ReadSummary.Text = string.IsNullOrWhiteSpace(scene.Summary) ? L10n.Text("无") : scene.Summary;
+            ReadPrompt.Text = string.IsNullOrWhiteSpace(prompt) ? L10n.Text("无") : prompt;
         }
         else
         {
@@ -286,7 +286,7 @@ public partial class ScenesPane : UserControl
             new[]
             {
                 scene.Instruction,
-                string.IsNullOrWhiteSpace(scene.OutputSpec) ? "" : $"输出规范：\n{scene.OutputSpec}",
+                string.IsNullOrWhiteSpace(scene.OutputSpec) ? "" : L10n.Format($"输出规范：\n{scene.OutputSpec}"),
             }.Where(part => part.Trim().Length > 0));
 
     /// <summary>
@@ -319,7 +319,7 @@ public partial class ScenesPane : UserControl
     private void BuildPreviewAgents()
     {
         PreviewAgentBox.Items.Clear();
-        PreviewAgentBox.Items.Add(new ComboBoxItem { Content = "无 Agent（剪贴板 / 自定义）" });
+        PreviewAgentBox.Items.Add(new ComboBoxItem { Content = L10n.Text("无 Agent（剪贴板 / 自定义）") });
         foreach (var agent in AgentIds.All)
             PreviewAgentBox.Items.Add(new ComboBoxItem { Content = agent.DisplayName(), Tag = agent });
         PreviewAgentBox.SelectedIndex = 1;
@@ -356,29 +356,29 @@ public partial class ScenesPane : UserControl
 
         var resolved = draft.EffectiveSkillIDs().Select(context.Resolve).ToList();
         SkillRefsText.Text = resolved.Count == 0
-            ? "没有引用技能。点「插入技能」可在光标处插入 {{skill:id}}。"
+            ? L10n.Text("没有引用技能。点「插入技能」可在光标处插入 {{skill:id}}。")
             : string.Join("\n", resolved.Select(r => $"• {r.DisplayName}（{r.Id}）：{ModeText(r.Mode, agent)}"));
 
         var warnings = SkillReference.Invalid(draft.Instruction)
-            .Select(id => $"「{id}」不是有效的技能 ID（只能使用小写字母、数字和连字符）。")
+            .Select(id => L10n.Format($"「{id}」不是有效的技能 ID（只能使用小写字母、数字和连字符）。"))
             .Concat(resolved.Where(r => r.Mode == SkillRenderMode.Unknown)
-                .Select(r => $"未找到技能「{r.Id}」，转发时会提示 Agent 该技能不存在。"))
+                .Select(r => L10n.Format($"未找到技能「{r.Id}」，转发时会提示 Agent 该技能不存在。")))
             .ToList();
         SkillWarnText.Text = string.Join("\n", warnings);
         SkillWarnBar.Visibility = warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         PreviewPrompt.Text = agent is { } target && !draft.CompatibleAgents.Contains(target)
-            ? $"这个场景不适用于 {target.DisplayName()}，转发时不会附加提示词。"
-            : ScenePrompt.Render(draft, null, skills: context) ?? "（提示词为空）";
+            ? L10n.Format($"这个场景不适用于 {target.DisplayName()}，转发时不会附加提示词。")
+            : ScenePrompt.Render(draft, null, skills: context) ?? L10n.Text("（提示词为空）");
     }
 
     private static string ModeText(SkillRenderMode mode, AgentId? agent) => mode switch
     {
-        SkillRenderMode.Native => "已安装到该 Agent",
-        SkillRenderMode.Path => "通过技能库中的 SKILL.md 引用",
-        SkillRenderMode.Missing when agent is null => "技能库中暂无技能包",
-        SkillRenderMode.Missing => "该 Agent 无法使用，转发时会要求说明未完成部分",
-        _ => "未找到该技能",
+        SkillRenderMode.Native => L10n.Text("已安装到该 Agent"),
+        SkillRenderMode.Path => L10n.Text("通过技能库中的 SKILL.md 引用"),
+        SkillRenderMode.Missing when agent is null => L10n.Text("技能库中暂无技能包"),
+        SkillRenderMode.Missing => L10n.Text("该 Agent 无法使用，转发时会要求说明未完成部分"),
+        _ => L10n.Text("未找到该技能"),
     };
 
     private void EditPrompt_TextChanged(object sender, TextChangedEventArgs e)
@@ -407,14 +407,14 @@ public partial class ScenesPane : UserControl
         var menu = new ContextMenu();
         var choices = skills.ReferenceableSkills();
         if (choices.Count == 0)
-            menu.Items.Add(new MenuItem { Header = "没有可引用的技能", IsEnabled = false });
+            menu.Items.Add(new MenuItem { Header = L10n.Text("没有可引用的技能"), IsEnabled = false });
         foreach (var (id, name) in choices)
         {
             var state = skills.Library.State(id) switch
             {
                 SkillLibraryState.Ready => "",
-                SkillLibraryState.Conflict => " · 技能库中已被修改",
-                _ => " · 暂无技能包",
+                SkillLibraryState.Conflict => L10n.Text(" · 技能库中已被修改"),
+                _ => L10n.Text(" · 暂无技能包"),
             };
             AddItem(menu, $"{name}（{id}）{state}", (_, _) => InsertToken(SkillReference.Token(id)));
         }
@@ -506,7 +506,7 @@ public partial class ScenesPane : UserControl
         if (copy is not null)
         {
             _selectedSceneId = copy.Id;
-            ShowNotice("已复制为我的场景。", good: true);
+            ShowNotice(L10n.Text("已复制为我的场景。"), good: true);
         }
         ReloadAll();
     }
@@ -523,7 +523,7 @@ public partial class ScenesPane : UserControl
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         CommitEdits();
-        ShowNotice("已保存更改。", good: true);
+        ShowNotice(L10n.Text("已保存更改。"), good: true);
     }
 
     private void EditorMenu_Click(object sender, RoutedEventArgs e)
@@ -533,21 +533,21 @@ public partial class ScenesPane : UserControl
             return;
         var menu = new ContextMenu();
         if (scene.IsOfficial)
-            AddItem(menu, "复制为我的场景", (_, _) => Duplicate_Click(sender, e));
-        AddItem(menu, "导出场景包", (_, _) => ExportScene(scene));
+            AddItem(menu, L10n.Text("复制为我的场景"), (_, _) => Duplicate_Click(sender, e));
+        AddItem(menu, L10n.Text("导出场景包"), (_, _) => ExportScene(scene));
         AddSeparator(menu);
         if (scene.Enabled)
         {
             var isDefault = _settings.DefaultSceneID == scene.Id;
-            AddItem(menu, isDefault ? "取消默认场景" : "设为默认场景",
+            AddItem(menu, isDefault ? L10n.Text("取消默认场景") : L10n.Text("设为默认场景"),
                 (_, _) => service.SetDefaultScene(isDefault ? null : scene.Id));
         }
-        AddItem(menu, "上移", (_, _) => MoveSelected(-1));
-        AddItem(menu, "下移", (_, _) => MoveSelected(1));
+        AddItem(menu, L10n.Text("上移"), (_, _) => MoveSelected(-1));
+        AddItem(menu, L10n.Text("下移"), (_, _) => MoveSelected(1));
         if (!scene.IsOfficial)
         {
             AddSeparator(menu);
-            AddItem(menu, "删除场景", (_, _) => RemoveScene(scene));
+            AddItem(menu, L10n.Text("删除场景"), (_, _) => RemoveScene(scene));
         }
         menu.PlacementTarget = EditorMenu;
         menu.IsOpen = true;
@@ -594,8 +594,8 @@ public partial class ScenesPane : UserControl
         }
         var dialog = new SaveFileDialog
         {
-            Title = "导出场景包",
-            Filter = "场景包 (*.json)|*.json",
+            Title = L10n.Text("导出场景包"),
+            Filter = L10n.Text("场景包 (*.json)|*.json"),
             FileName = $"{scene.Name}.wechatflow-scene.json",
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true)
@@ -603,7 +603,7 @@ public partial class ScenesPane : UserControl
         try
         {
             File.WriteAllText(dialog.FileName, json);
-            ShowNotice("场景包已导出。", good: true);
+            ShowNotice(L10n.Text("场景包已导出。"), good: true);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
@@ -615,8 +615,8 @@ public partial class ScenesPane : UserControl
     {
         var dialog = new OpenFileDialog
         {
-            Title = "导入场景包",
-            Filter = "场景包 (*.json)|*.json",
+            Title = L10n.Text("导入场景包"),
+            Filter = L10n.Text("场景包 (*.json)|*.json"),
             Multiselect = true,
             CheckFileExists = true,
         };
@@ -645,8 +645,8 @@ public partial class ScenesPane : UserControl
         var report = service.ImportScenePackages(paths, package =>
             MessageBox.Show(
                 Window.GetWindow(this),
-                $"「{package.Name}」已安装同版本场景。覆盖将更新场景内容，本地的启用状态和群绑定会保留。",
-                "场景版本已存在",
+                L10n.Format($"「{package.Name}」已安装同版本场景。覆盖将更新场景内容，本地的启用状态和群绑定会保留。"),
+                L10n.Text("场景版本已存在"),
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Question) == MessageBoxResult.OK);
         if (report.Errors.Count > 0)
@@ -655,18 +655,18 @@ public partial class ScenesPane : UserControl
         }
         else if (report.Imported > 0)
         {
-            var message = $"已导入 {report.Imported} 个场景。";
+            var message = L10n.Format($"已导入 {report.Imported} 个场景。");
             if (report.SkippedOlder > 0)
-                message += "已安装的场景版本更新，未导入较旧版本。";
+                message += L10n.Text("已安装的场景版本更新，未导入较旧版本。");
             ShowNotice(message, good: true);
         }
         else if (report.SkippedOlder > 0)
         {
-            ShowNotice("已安装的场景版本更新，未导入较旧版本。", good: false);
+            ShowNotice(L10n.Text("已安装的场景版本更新，未导入较旧版本。"), good: false);
         }
         else if (report.Declined > 0)
         {
-            ShowNotice("已取消导入。", good: false);
+            ShowNotice(L10n.Text("已取消导入。"), good: false);
         }
         ReloadAll();
     }
@@ -691,7 +691,7 @@ public partial class ScenesPane : UserControl
         Memory = _memories[key],
         BoundNames = _settings
             .ScenesFor(_memories[key].BoundSceneIDs)
-            .Select(s => string.IsNullOrWhiteSpace(s.Name) ? "未命名场景" : s.Name)
+            .Select(s => string.IsNullOrWhiteSpace(s.Name) ? L10n.Text("未命名场景") : s.Name)
             .ToList(),
         Selected = key == _selectedGroupKey,
     };
@@ -710,7 +710,7 @@ public partial class ScenesPane : UserControl
 
         GroupTitle.Text = memory.DisplayName;
         var bound = _settings.ScenesFor(memory.BoundSceneIDs);
-        GroupBoundCount.Text = $"已关联 {bound.Count} 个可选场景";
+        GroupBoundCount.Text = L10n.Format($"已关联 {bound.Count} 个可选场景");
         var boundIds = memory.BoundSceneIDs.ToHashSet(StringComparer.Ordinal);
         var enabled = _settings.EnabledScenes;
         BoundSceneList.ItemsSource = enabled

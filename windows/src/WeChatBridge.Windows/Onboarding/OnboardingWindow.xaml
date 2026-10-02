@@ -1,7 +1,8 @@
 <Window x:Class="WeChatBridge.Windows.Onboarding.OnboardingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="微信流" Width="920" MinHeight="600" SizeToContent="Height"
+        xmlns:loc="clr-namespace:WeChatBridge.Windows"
+        Title="{loc:Loc Key='微信流'}" Width="920" MinHeight="600" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
 
@@ -30,7 +31,7 @@
             <Button x:Name="CloseButton" Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top"
                     Margin="0,12,14,0" Width="24" Height="24" Padding="0" Content="✕" FontSize="10"
                     BorderThickness="0" Background="Transparent" IsCancel="True" Cursor="Hand"
-                    Foreground="{StaticResource InkTertiaryColor}" ToolTip="关闭"
+                    Foreground="{StaticResource InkTertiaryColor}" ToolTip="{loc:Loc Key='关闭'}"
                     Click="OnCloseClicked" />
 
             <Border Grid.Row="1" Height="1" Background="{StaticResource StrokeColor}" />
@@ -92,7 +93,7 @@
                             </Border>
                             <TextBlock Margin="0,16,0,0" FontSize="12"
                                        Foreground="{StaticResource InkTertiaryColor}"
-                                       Text="接住 · 转发 · 送达" />
+                                       Text="{loc:Loc Key='接住 · 转发 · 送达'}" />
                         </StackPanel>
 
                         <!-- Steps 1 & 3 art: the ShareMenuArt port — what the
@@ -109,7 +110,7 @@
                                 <DropShadowEffect BlurRadius="16" ShadowDepth="6" Opacity="0.08" />
                             </Border.Effect>
                             <StackPanel>
-                                <TextBlock Text="转发到其他应用" FontSize="11" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key='转发到其他应用'}" FontSize="11" FontWeight="SemiBold"
                                            Foreground="{StaticResource InkTertiaryColor}"
                                            Margin="0,0,0,10" />
                                 <ItemsControl x:Name="EntriesArtList">
@@ -149,7 +150,7 @@
                                            Foreground="{StaticResource BrandColor}" />
                                 <TextBlock Margin="0,12,0,0" FontSize="13" TextWrapping="Wrap"
                                            Foreground="{StaticResource InkSecondaryColor}"
-                                           Text="Windows 不需要系统授权——让微信流常驻后台，分享进来时几乎立即转发。" />
+                                           Text="{loc:Loc Key='Windows 不需要系统授权——让微信流常驻后台，分享进来时几乎立即转发。'}" />
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -170,10 +171,10 @@
                         <StackPanel x:Name="StepWelcome" Margin="40,28,40,24">
                             <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkColor}"
-                                       Text="把微信的转发菜单接到你要去的地方" />
+                                       Text="{loc:Loc Key='把微信的转发菜单接到你要去的地方'}" />
                             <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkSecondaryColor}"
-                                       Text="微信流接住微信「转发到其他应用」分享的聊天记录压缩包，再交给目标应用。" />
+                                       Text="{loc:Loc Key='微信流接住微信「转发到其他应用」分享的聊天记录压缩包，再交给目标应用。'}" />
                             <Border Style="{StaticResource Card}" Margin="0,20,0,0" Padding="16,8">
                                 <StackPanel>
                                     <Grid Margin="0,8">
@@ -189,10 +190,10 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                                             <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                                                       Text="在微信里多选聊天记录" />
+                                                       Text="{loc:Loc Key='在微信里多选聊天记录'}" />
                                             <TextBlock FontSize="12" TextWrapping="Wrap"
                                                        Foreground="{StaticResource InkSecondaryColor}"
-                                                       Text="勾选消息后，选「转发到其他应用」。" />
+                                                       Text="{loc:Loc Key='勾选消息后，选「转发到其他应用」。'}" />
                                         </StackPanel>
                                     </Grid>
                                     <Grid Margin="0,8">
@@ -208,10 +209,10 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                                             <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                                                       Text="挑一个入口" />
+                                                       Text="{loc:Loc Key='挑一个入口'}" />
                                             <TextBlock FontSize="12" TextWrapping="Wrap"
                                                        Foreground="{StaticResource InkSecondaryColor}"
-                                                       Text="下一步能看到全部 9 个。" />
+                                                       Text="{loc:Loc Key='下一步能看到全部 12 个。'}" />
                                         </StackPanel>
                                     </Grid>
                                     <Grid Margin="0,8">
@@ -227,10 +228,10 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                                             <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                                                       Text="其余的交给微信流" />
+                                                       Text="{loc:Loc Key='其余的交给微信流'}" />
                                             <TextBlock FontSize="12" TextWrapping="Wrap"
                                                        Foreground="{StaticResource InkSecondaryColor}"
-                                                       Text="接住压缩包、激活目标应用并自动粘贴；失败时文件已在剪贴板。" />
+                                                       Text="{loc:Loc Key='接住压缩包、激活目标应用并自动粘贴；失败时文件已在剪贴板。'}" />
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
@@ -242,15 +243,15 @@
                         <StackPanel x:Name="StepEntries" Visibility="Collapsed" Margin="40,28,40,24">
                             <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkColor}"
-                                       Text="转发菜单里的「微信流」入口已备好" />
+                                       Text="{loc:Loc Key='转发菜单里的「微信流」入口已备好'}" />
                             <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkSecondaryColor}"
-                                       Text="它们就在微信「转发到其他应用」里，看到即可用。" />
+                                       Text="{loc:Loc Key='它们就在微信「转发到其他应用」里，看到即可用。'}" />
                             <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="16,10">
                                 <StackPanel>
                                     <TextBlock Margin="0,0,0,6" FontSize="11"
                                                Foreground="{StaticResource InkTertiaryColor}"
-                                               Text="转发到其他应用" />
+                                               Text="{loc:Loc Key='转发到其他应用'}" />
                                     <ItemsControl x:Name="EntriesList">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -272,7 +273,7 @@
                             </Border>
                             <TextBlock Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkTertiaryColor}"
-                                       Text="随时可以在「入口」页关掉用不到的。" />
+                                       Text="{loc:Loc Key='随时可以在「入口」页关掉用不到的。'}" />
                         </StackPanel>
 
                         <!-- Step 2 — residency: the slot macOS spends on
@@ -284,7 +285,7 @@
                         <StackPanel x:Name="StepResidency" Visibility="Collapsed" Margin="40,28,40,24">
                             <TextBlock FontSize="26" FontWeight="Bold" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkColor}"
-                                       Text="常驻后台，转发几乎零等待" />
+                                       Text="{loc:Loc Key='常驻后台，转发几乎零等待'}" />
                             <Border Style="{StaticResource Card}" Margin="0,20,0,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -303,22 +304,22 @@
                                     <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                         <TextBlock FontSize="13.5" FontWeight="SemiBold"
                                                    Foreground="{StaticResource InkColor}"
-                                                   Text="开机自动启动" />
+                                                   Text="{loc:Loc Key='开机自动启动'}" />
                                         <TextBlock Margin="0,3,0,0" FontSize="12" TextWrapping="Wrap"
                                                    Foreground="{StaticResource InkSecondaryColor}"
-                                                   Text="登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。" />
+                                                   Text="{loc:Loc Key='登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。'}" />
                                     </StackPanel>
                                     <Border x:Name="AutoStartPill" Grid.Column="2" VerticalAlignment="Center"
                                             Margin="12,0,0,0" CornerRadius="9" Padding="8,2"
                                             Background="{StaticResource LiveFillColor}">
-                                        <TextBlock x:Name="AutoStartPillText" FontSize="11" Text="已开启"
+                                        <TextBlock x:Name="AutoStartPillText" FontSize="11" Text="{loc:Loc Key='已开启'}"
                                                    Foreground="{StaticResource LiveInkColor}" />
                                     </Border>
                                 </Grid>
                             </Border>
                             <TextBlock Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap"
                                        Foreground="{StaticResource InkTertiaryColor}"
-                                       Text="可以在「通用」页里随时改。" />
+                                       Text="{loc:Loc Key='可以在「通用」页里随时改。'}" />
                         </StackPanel>
 
                         <!-- Step 3 — done: the same menu step 2 promised, said
@@ -333,12 +334,12 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Margin="0,20,0,0" FontSize="36" FontWeight="Bold"
-                                       Foreground="{StaticResource InkColor}" Text="好了" />
+                                       Foreground="{StaticResource InkColor}" Text="{loc:Loc Key='好了'}" />
                             <TextBlock Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap" MaxWidth="460"
                                        Foreground="{StaticResource InkSecondaryColor}"
-                                       Text="去微信多选聊天记录 → 转发到其他应用 → 微信流，就能挑一个入口了。" />
+                                       Text="{loc:Loc Key='去微信多选聊天记录 → 转发到其他应用 → 微信流，就能挑一个入口了。'}" />
                             <Button x:Name="DoneButton" Margin="0,26,0,0" HorizontalAlignment="Left"
-                                    Style="{StaticResource PrimaryButton}" Content="完成"
+                                    Style="{StaticResource PrimaryButton}" Content="{loc:Loc Key='完成'}"
                                     Click="OnDoneClicked" />
                         </StackPanel>
                     </Grid>
@@ -347,10 +348,10 @@
                          on forward. -->
                     <Grid x:Name="Footer" Grid.Row="1" Margin="40,0,40,26">
                         <Button x:Name="BackButton" HorizontalAlignment="Left"
-                                Style="{StaticResource SettingsButton}" Content="上一步"
+                                Style="{StaticResource SettingsButton}" Content="{loc:Loc Key='上一步'}"
                                 Visibility="Collapsed" Click="OnBackClicked" />
                         <Button x:Name="NextButton" HorizontalAlignment="Right"
-                                Style="{StaticResource PrimaryButton}" Content="继续"
+                                Style="{StaticResource PrimaryButton}" Content="{loc:Loc Key='继续'}"
                                 IsDefault="True" Click="OnNextClicked" />
                     </Grid>
                 </Grid>

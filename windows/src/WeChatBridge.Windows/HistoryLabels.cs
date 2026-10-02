@@ -42,7 +42,7 @@ public static class HistoryLabels
         if (first is null)
             return string.Empty;
         var name = limit is { } n ? MiddleTruncate(first.DisplayName, n) : first.DisplayName;
-        return batch.Items.Count > 1 ? $"{name} 等 {batch.Items.Count} 个" : name;
+        return batch.Items.Count > 1 ? L10n.Format($"{name} 等 {batch.Items.Count} 个") : name;
     }
 
     /// <summary>Group name wins, then scene, then the filename.</summary>
@@ -88,7 +88,7 @@ public static class HistoryLabels
 
     /// <summary>Where the batch went, in the words that were on screen when it was sent.</summary>
     public static string Destination(ReadyBatch batch) =>
-        Clean(batch.TargetName) is { } name ? $"发给 {name}" : batch.Action.EntryTitle();
+        Clean(batch.TargetName) is { } name ? L10n.Format($"发给 {name}") : batch.Action.EntryTitle();
 
     /// <summary>
     /// Whether every whitespace-separated search term hits something the row can
@@ -122,12 +122,12 @@ public static class HistoryLabels
         var local = day.Date;
         var today = (now ?? DateTime.Now).Date;
         if (local == today)
-            return "今天";
+            return L10n.Text("今天");
         if (local == today.AddDays(-1))
-            return "昨天";
+            return L10n.Text("昨天");
         return local.Year == today.Year
-            ? local.ToString("M月d日", CultureInfo.GetCultureInfo("zh-CN"))
-            : local.ToString("yyyy年M月d日", CultureInfo.GetCultureInfo("zh-CN"));
+            ? local.ToString(L10n.Text("M月d日"), L10n.Culture)
+            : local.ToString(L10n.Text("yyyy年M月d日"), L10n.Culture);
     }
 
     /// <summary>The clock alone, for a row already sitting under a day heading.</summary>
@@ -145,7 +145,7 @@ public static class HistoryLabels
     }
 
     private static string FileCount(ReadyBatch batch) =>
-        batch.Items.Count == 1 ? "1 个文件" : $"{batch.Items.Count} 个文件";
+        batch.Items.Count == 1 ? L10n.Text("1 个文件") : L10n.Format($"{batch.Items.Count} 个文件");
 
     private static string? Clean(string? value)
     {

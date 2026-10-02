@@ -50,7 +50,7 @@ public partial class HistoryPane : UserControl
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(MainViewModel.HasHistory) or nameof(MainViewModel.SummaryText))
+        if (e.PropertyName is nameof(MainViewModel.HasHistory) or nameof(MainViewModel.SummaryText) or nameof(MainViewModel.CollectionRows))
             UpdateEmptyState();
     }
 
@@ -59,11 +59,16 @@ public partial class HistoryPane : UserControl
         if (!IsLoaded || Model is null)
             return;
         var searching = Model.Query.Trim().Length > 0;
-        var any = Model.Groups.Count > 0;
+        var any = Model.Groups.Count > 0 || Model.CollectionRows.Count > 0;
         EmptyAll.Visibility = !any && !searching ? Visibility.Visible : Visibility.Collapsed;
         EmptyFilter.Visibility = !any && searching ? Visibility.Visible : Visibility.Collapsed;
         RecordList.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         ClearButton.IsEnabled = Model.HasHistory;
+    }
+
+    private void OpenCollection_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MainViewModel.CollectionHistoryRow row) Model?.ShowCollection(row.Id);
     }
 
     private static BatchRow? RowOf(object sender) =>
@@ -102,7 +107,7 @@ public partial class HistoryPane : UserControl
         var menu = new ContextMenu();
         foreach (var destination in model.Destinations())
         {
-            var item = new MenuItem { Header = $"发给 {destination.Title}" };
+            var item = new MenuItem { Header = L10n.Format($"发给 {destination.Title}") };
             var picked = destination;
             item.Click += (_, _) =>
             {
@@ -114,7 +119,7 @@ public partial class HistoryPane : UserControl
         if (model.TargetRows.Count == 0)
         {
             menu.Items.Add(new Separator());
-            var add = new MenuItem { Header = "添加应用…" };
+            var add = new MenuItem { Header = L10n.Text("添加应用…") };
             add.Click += (_, _) => model.Navigate(AppTab.Entries);
             menu.Items.Add(add);
         }
@@ -127,25 +132,25 @@ public partial class HistoryPane : UserControl
             return;
         var menu = new ContextMenu();
 
-        var copy = new MenuItem { Header = "复制到剪贴板" };
+        var copy = new MenuItem { Header = L10n.Text("复制到剪贴板") };
         copy.Click += (_, _) => model.CopyBatchToClipboard(row.Batch);
         menu.Items.Add(copy);
 
         // macOS exposes resend only through the original share's own intent;
         // the row menu is where Windows keeps the same gesture reachable.
-        var resend = new MenuItem { Header = "重新发送" };
+        var resend = new MenuItem { Header = L10n.Text("重新发送") };
         resend.Click += (_, _) => _ = model.Resend(row.Batch);
         menu.Items.Add(resend);
 
         menu.Items.Add(new Separator());
 
-        var reveal = new MenuItem { Header = "在文件夹中显示" };
+        var reveal = new MenuItem { Header = L10n.Text("在文件夹中显示") };
         reveal.Click += (_, _) => model.Reveal(row.Batch);
         menu.Items.Add(reveal);
 
         menu.Items.Add(new Separator());
 
-        var discard = new MenuItem { Header = "移到回收站" };
+        var discard = new MenuItem { Header = L10n.Text("移到回收站") };
         discard.Click += (_, _) => model.Discard(row.Batch);
         menu.Items.Add(discard);
 
@@ -161,7 +166,7 @@ public partial class HistoryPane : UserControl
         if (Model is null)
             return;
         var menu = new ContextMenu();
-        var clear = new MenuItem { Header = "清空记录…" };
+        var clear = new MenuItem { Header = L10n.Text("清空记录…") };
         clear.Click += Clear_Click;
         menu.Items.Add(clear);
         OpenMenu(sender, menu);
@@ -195,11 +200,11 @@ public partial class HistoryPane : UserControl
         if (Model is not { } model || !model.HasHistory)
             return;
         var message =
-            $"将 {model.Batches.Count} 条记录（{ByteText.Format(model.Batches.Sum(b => b.ByteCount))}）移到回收站，可从回收站恢复。";
+            L10n.Format($"将 {model.Batches.Count} 条记录（{ByteText.Format(model.Batches.Sum(b => b.ByteCount))}）移到回收站，可从回收站恢复。");
         var answer = MessageBox.Show(
             Window.GetWindow(this),
             message,
-            "清空全部记录？",
+            L10n.Text("清空全部记录？"),
             MessageBoxButton.OKCancel,
             MessageBoxImage.Warning);
         if (answer == MessageBoxResult.OK)

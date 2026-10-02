@@ -40,6 +40,9 @@
 | 剪贴板 | `FilePasteboard.swift` | `Delivery/WindowsClipboard.cs`（CF_HDROP / CF_UNICODETEXT，STA） |
 | 豆包附件 | `DoubaoAttachment.swift` | `WindowsForwardTarget.ReadsLocalArchives`（豆包+千问；ZIP 走路径文本） |
 | Obsidian | `KnowledgeDelivery.swift` | `Obsidian/`（vault 直写） |
+| 文件夹归档 | `KnowledgeDelivery.swift` | `Obsidian/KnowledgeDelivery.cs` + `DeliveryFolderPath`（无需 Obsidian，多级子文件夹） |
+| 分批收集 | `BatchCollection.swift` `BatchCollectionPanel.swift` | `Core/Collections/` + `CollectionWindow`（冻结、恢复、撤销、统一交付） |
+| 本地化 | en / zh-Hans `.strings` | `Core/Localization/` + `LocExtension`（中文、English、跟随系统） |
 | 群名识别 | `WeChatTitleReader.swift`（AX 标签 / 截屏 OCR） | `Services/WeChatUiTitleReader.cs`（UIA 读 mmui::MainWindow） |
 | 场景决策 | `SceneCoordinator.swift` `SceneResolver` `Preferences.swift` | `Services/SceneService.cs` + `Core/Scenes/` |
 | 场景快捷键 | `SceneShortcutController.swift`（⌃⌥1–9） | `SceneShortcutController.cs`（Ctrl+Alt+1–9） |
@@ -57,5 +60,6 @@
 
 - **辅助功能/屏幕录制权限页**——Windows 不需要这些授权。
 - **自动更新**——Windows 走 MSIX 发布链路，不引 Sparkle 等价物。
-- **本地化**——macOS 是 en + zh-Hans 双资源；Windows 目前硬编码中文。
 - **豆包非 ZIP 上传器**——微信导出永远是 ZIP；ZIP 已走 pathOnly 捷径。
+
+功能核对、上游合并范围和实机验证项目见 `windows/docs/MACOS_PARITY.zh-CN.md`。收集请求只追加原始文件，不因 90 秒转发窗口过期而丢弃；完成时才冻结并串行交付。未完成收集的文件受保护，不参与普通历史清理。

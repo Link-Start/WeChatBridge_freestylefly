@@ -1,6 +1,7 @@
 <UserControl x:Class="WeChatBridge.Windows.Panes.GeneralPane"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:WeChatBridge.Windows">
     <UserControl.Resources>
         <!-- The retention dropdown, drawn like the rest of the settings
              chrome: white rounded face, hairline border, chevron, white popup.
@@ -104,7 +105,7 @@
     <StackPanel>
         <!-- 运行状态 — the one real card: a block, not a settings row. -->
         <StackPanel>
-            <TextBlock Style="{StaticResource SectionLabel}" Text="运行状态" />
+            <TextBlock Style="{StaticResource SectionLabel}" Text="{loc:Loc Key='运行状态'}" />
             <Border Height="1" Background="{StaticResource StrokeColor}" Margin="0,8,0,10" />
             <Border Style="{StaticResource Card}">
                 <Grid>
@@ -121,16 +122,14 @@
                                    Text="{Binding SummaryText}" />
                     </StackPanel>
                     <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
-                            Style="{StaticResource SettingsButton}" Click="RevealInbox_Click">
-                        打开 Inbox 文件夹
-                    </Button>
+                            Style="{StaticResource SettingsButton}" Click="RevealInbox_Click"><Button.Content><loc:Loc Key="打开 Inbox 文件夹"/></Button.Content></Button>
                 </Grid>
             </Border>
         </StackPanel>
 
         <!-- 应用行为 -->
         <StackPanel Margin="0,24,0,0">
-            <TextBlock Style="{StaticResource SectionLabel}" Text="应用行为" />
+            <TextBlock Style="{StaticResource SectionLabel}" Text="{loc:Loc Key='应用行为'}" />
             <Border Height="1" Background="{StaticResource StrokeColor}" Margin="0,8,0,10" />
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -139,10 +138,10 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                               Text="开机自动启动" />
+                               Text="{loc:Loc Key='开机自动启动'}" />
                     <TextBlock Margin="0,3,0,0" FontSize="12"
                                Foreground="{StaticResource InkSecondaryColor}" TextWrapping="Wrap"
-                               Text="登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。" />
+                               Text="{loc:Loc Key='登录后后台驻留，分享进来时几乎立即转发；关掉则每次分享要冷启动。'}" />
                 </StackPanel>
                 <CheckBox Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
                           Style="{StaticResource MacToggle}"
@@ -155,24 +154,31 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                               Text="记录保留时间" />
+                               Text="{loc:Loc Key='记录保留时间'}" />
                     <TextBlock Margin="0,3,0,0" FontSize="12"
                                Foreground="{StaticResource InkSecondaryColor}" TextWrapping="Wrap"
-                               Text="到期的记录会移入回收站；回收站里的内容仍可以恢复。" />
+                               Text="{loc:Loc Key='到期的记录会移入回收站；回收站里的内容仍可以恢复。'}" />
                 </StackPanel>
                 <ComboBox Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
                           Style="{StaticResource MacCombo}"
                           SelectedIndex="{Binding RetentionIndex, Mode=TwoWay}">
-                    <ComboBoxItem>永久保留</ComboBoxItem>
-                    <ComboBoxItem>保留 7 天</ComboBoxItem>
-                    <ComboBoxItem>保留 30 天</ComboBoxItem>
+                    <ComboBoxItem><ComboBoxItem.Content><loc:Loc Key="永久保留"/></ComboBoxItem.Content></ComboBoxItem>
+                    <ComboBoxItem><ComboBoxItem.Content><loc:Loc Key="保留 7 天"/></ComboBoxItem.Content></ComboBoxItem>
+                    <ComboBoxItem><ComboBoxItem.Content><loc:Loc Key="保留 30 天"/></ComboBoxItem.Content></ComboBoxItem>
                 </ComboBox>
             </Grid>
         </StackPanel>
 
+        <DockPanel Margin="0,20,0,0">
+            <ComboBox DockPanel.Dock="Right" Width="150" Style="{StaticResource MacCombo}" SelectedIndex="{Binding LanguageIndex}">
+                <ComboBoxItem Content="{loc:Loc Key='跟随系统'}"/><ComboBoxItem Content="{loc:Loc Key='简体中文'}"/><ComboBoxItem Content="English"/>
+            </ComboBox>
+            <TextBlock Text="{loc:Loc Key='界面语言（重启后生效）'}" Foreground="{StaticResource InkColor}" VerticalAlignment="Center"/>
+        </DockPanel>
+
         <!-- 软件与帮助 -->
         <StackPanel Margin="0,24,0,0">
-            <TextBlock Style="{StaticResource SectionLabel}" Text="软件与帮助" />
+            <TextBlock Style="{StaticResource SectionLabel}" Text="{loc:Loc Key='软件与帮助'}" />
             <Border Height="1" Background="{StaticResource StrokeColor}" Margin="0,8,0,10" />
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -181,14 +187,12 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                               Text="当前版本" />
+                               Text="{loc:Loc Key='当前版本'}" />
                     <TextBlock x:Name="VersionText" Margin="0,3,0,0" FontSize="12"
                                Foreground="{StaticResource InkSecondaryColor}" />
                 </StackPanel>
                 <Button Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
-                        Style="{StaticResource SettingsButton}" Click="OpenProject_Click">
-                    访问项目
-                </Button>
+                        Style="{StaticResource SettingsButton}" Click="OpenProject_Click"><Button.Content><loc:Loc Key="访问项目"/></Button.Content></Button>
             </Grid>
             <Border Height="1" Background="{StaticResource StrokeSoftColor}" Margin="0,14" />
             <Grid>
@@ -198,15 +202,13 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock FontSize="13.5" Foreground="{StaticResource InkColor}"
-                               Text="重新运行设置向导" />
+                               Text="{loc:Loc Key='重新运行设置向导'}" />
                     <TextBlock Margin="0,3,0,0" FontSize="12"
                                Foreground="{StaticResource InkSecondaryColor}" TextWrapping="Wrap"
-                               Text="再走一遍欢迎、入口和驻留说明，不改动已设置的偏好。" />
+                               Text="{loc:Loc Key='再走一遍欢迎、入口和驻留说明，不改动已设置的偏好。'}" />
                 </StackPanel>
                 <Button Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0"
-                        Style="{StaticResource SettingsButton}" Click="RestartOnboarding_Click">
-                    重新运行
-                </Button>
+                        Style="{StaticResource SettingsButton}" Click="RestartOnboarding_Click"><Button.Content><loc:Loc Key="重新运行"/></Button.Content></Button>
             </Grid>
         </StackPanel>
     </StackPanel>

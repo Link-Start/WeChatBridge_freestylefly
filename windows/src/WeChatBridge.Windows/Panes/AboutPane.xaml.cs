@@ -1,3 +1,4 @@
+using WeChatBridge.Windows.Core;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -14,7 +15,7 @@ public partial class AboutPane : UserControl
         InitializeComponent();
         var informational = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        VersionText.Text = $"版本 {ShortVersion(informational)} · Windows";
+        VersionText.Text = L10n.Format($"版本 {ShortVersion(informational)} · Windows");
 
         // The sparse package ships Assets\Square150x150Logo.png in the install
         // root; a bare dotnet build output does not, so the brand tile stays.

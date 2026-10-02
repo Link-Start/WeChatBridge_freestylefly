@@ -142,6 +142,11 @@ public static class WindowsForwardTargets
                     "WorkBuddy.exe",
                 ],
                 Aumid: "WorkBuddy.WorkBuddy"),
+            [ShareAction.DeepSeekHarness] = new(
+                "DeepSeek Harness",
+                ["DeepSeek Harness", "DeepSeekHarness"],
+                [@"%LOCALAPPDATA%\Programs\DeepSeek Harness\DeepSeek Harness.exe",
+                 "DeepSeek Harness.exe", "DeepSeekHarness.exe"]),
             [ShareAction.WeSight] = new(
                 "WeSight",
                 ["WeSight"],

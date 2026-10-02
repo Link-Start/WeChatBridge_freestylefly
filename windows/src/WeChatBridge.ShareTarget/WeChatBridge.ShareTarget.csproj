@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -25,6 +25,7 @@
        AppTheme.xaml stays under Themes/ because EntryPickerWindow.ThemeSource
        resolves it relative to the running assembly. -->
   <ItemGroup>
+    <Compile Include="..\WeChatBridge.Windows\Localization\LocExtension.cs" Link="Shared\LocExtension.cs" />
     <Compile Include="..\WeChatBridge.Windows\AppLogos.cs" Link="Shared\AppLogos.cs" />
     <Compile Include="..\WeChatBridge.Windows\AppSettings.cs" Link="Shared\AppSettings.cs" />
     <Compile Include="..\WeChatBridge.Windows\Converters.cs" Link="Shared\Converters.cs" />

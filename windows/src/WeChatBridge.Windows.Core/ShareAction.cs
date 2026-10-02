@@ -1,3 +1,4 @@
+using WeChatBridge.Windows.Core;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -23,7 +24,10 @@ public enum ShareAction
     Qwen,
     WorkBuddy,
     WeSight,
+    DeepSeekHarness,
     Obsidian,
+    Folder,
+    Collect,
     Clipboard,
     Custom,
     /// <summary>
@@ -46,6 +50,9 @@ public static class ShareActions
         ShareAction.Qwen => "qwen",
         ShareAction.WorkBuddy => "workBuddy",
         ShareAction.WeSight => "weSight",
+        ShareAction.DeepSeekHarness => "deepSeekHarness",
+        ShareAction.Folder => "folder",
+        ShareAction.Collect => "collect",
         ShareAction.Obsidian => "obsidian",
         ShareAction.Clipboard => "clipboard",
         ShareAction.Custom => "custom",
@@ -61,6 +68,9 @@ public static class ShareActions
         "qwen" => ShareAction.Qwen,
         "workBuddy" => ShareAction.WorkBuddy,
         "weSight" => ShareAction.WeSight,
+        "deepSeekHarness" => ShareAction.DeepSeekHarness,
+        "folder" => ShareAction.Folder,
+        "collect" => ShareAction.Collect,
         "obsidian" => ShareAction.Obsidian,
         "clipboard" => ShareAction.Clipboard,
         // macOS compatibility: the retired shelf entry decodes as clipboard.
@@ -84,6 +94,9 @@ public static class ShareActions
         ShareAction.Qwen => "Share.Qwen",
         ShareAction.WorkBuddy => "Share.WorkBuddy",
         ShareAction.WeSight => "Share.WeSight",
+        ShareAction.DeepSeekHarness => "Share.DeepSeekHarness",
+        ShareAction.Folder => "Share.Folder",
+        ShareAction.Collect => "Share.Collection",
         ShareAction.Obsidian => "Share.Obsidian",
         ShareAction.Clipboard => "Share.Clipboard",
         ShareAction.Custom => "Share.Custom",
@@ -103,13 +116,16 @@ public static class ShareActions
     {
         ShareAction.Codex => "Codex",
         ShareAction.Claude => "Claude",
-        ShareAction.Doubao => "豆包",
-        ShareAction.Qwen => "千问",
+        ShareAction.Doubao => L10n.Text("豆包"),
+        ShareAction.Qwen => L10n.Text("千问"),
         ShareAction.WorkBuddy => "WorkBuddy",
         ShareAction.WeSight => "WeSight",
+        ShareAction.DeepSeekHarness => "DeepSeek Harness",
+        ShareAction.Folder => L10n.Text("文件夹"),
+        ShareAction.Collect => L10n.Text("微信流收集"),
         ShareAction.Obsidian => "Obsidian",
-        ShareAction.Clipboard => "剪贴板",
-        ShareAction.Custom => "所选应用",
+        ShareAction.Clipboard => L10n.Text("剪贴板"),
+        ShareAction.Custom => L10n.Text("所选应用"),
         ShareAction.Hub => "微信流",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
@@ -117,15 +133,18 @@ public static class ShareActions
     /// <summary>The entry as worded in the share menu — history reuses these words.</summary>
     public static string EntryTitle(this ShareAction action) => action switch
     {
-        ShareAction.Codex => "发给 Codex",
-        ShareAction.Claude => "发给 Claude",
-        ShareAction.Doubao => "发给豆包",
-        ShareAction.Qwen => "发给千问",
-        ShareAction.WorkBuddy => "发给 WorkBuddy",
-        ShareAction.WeSight => "发给 WeSight",
-        ShareAction.Obsidian => "沉淀到 Obsidian",
-        ShareAction.Clipboard => "复制到剪贴板",
-        ShareAction.Custom => "发送到自定义",
+        ShareAction.Codex => L10n.Text("发给 Codex"),
+        ShareAction.Claude => L10n.Text("发给 Claude"),
+        ShareAction.Doubao => L10n.Text("发给豆包"),
+        ShareAction.Qwen => L10n.Text("发给千问"),
+        ShareAction.WorkBuddy => L10n.Text("发给 WorkBuddy"),
+        ShareAction.WeSight => L10n.Text("发给 WeSight"),
+        ShareAction.DeepSeekHarness => L10n.Text("发给 DeepSeek Harness"),
+        ShareAction.Folder => L10n.Text("沉淀到文件夹"),
+        ShareAction.Collect => L10n.Text("分批收集到微信流"),
+        ShareAction.Obsidian => L10n.Text("沉淀到 Obsidian"),
+        ShareAction.Clipboard => L10n.Text("复制到剪贴板"),
+        ShareAction.Custom => L10n.Text("发送到自定义"),
         ShareAction.Hub => "微信流",
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };

@@ -165,6 +165,15 @@ public sealed class InboxReader
     public void RecordContext(Guid batchId, string? chatName = null, string? sceneId = null, string? sceneName = null) =>
         MutateState(batchId, s => s.WithContext(chatName, sceneId, sceneName));
 
+    public void ClearSceneContext(Guid batchId) =>
+        MutateState(batchId, state => state with { SceneID = null, SceneName = null });
+
+    public void RecordChatName(Guid batchId, string? chatName) =>
+        MutateState(batchId, state => state with { ChatName = chatName });
+
+    public void RecordAction(Guid batchId, ShareAction action) =>
+        MutateState(batchId, state => state with { Action = action });
+
     public BatchState? StateFor(Guid batchId) => StateAt(DirectoryFor(batchId));
 
     /// <summary>Moves a whole batch to the Recycle Bin — the archive may be the only copy.</summary>
@@ -196,7 +205,7 @@ public sealed class InboxReader
     }
 
     /// <summary>Ages out finished history. A non-positive window means keep forever.</summary>
-    public int PruneHistory(TimeSpan olderThan, DateTimeOffset? now = null)
+    public int PruneHistory(TimeSpan olderThan, DateTimeOffset? now = null, IReadOnlySet<Guid>? protectedBatchIDs = null)
     {
         if (olderThan <= TimeSpan.Zero)
             return 0;
@@ -204,25 +213,26 @@ public sealed class InboxReader
         var removed = 0;
         foreach (var batch in Batches(initializing: false))
         {
-            if (reference - batch.CreatedAt <= olderThan)
+            if (protectedBatchIDs?.Contains(batch.Id) == true || reference - batch.CreatedAt <= olderThan)
                 continue;
             try { Discard(batch.Id); removed++; } catch { }
         }
-        return removed + PruneUnreadable(olderThan, reference);
+        return removed + PruneUnreadable(olderThan, reference, protectedBatchIDs);
     }
 
     /// <summary>
     /// Debris no ReadyBatch can be built from — crash-truncated manifests or batches
     /// whose files were deleted by hand. A manifest with a newer schema is left alone.
     /// </summary>
-    private int PruneUnreadable(TimeSpan olderThan, DateTimeOffset now)
+    private int PruneUnreadable(TimeSpan olderThan, DateTimeOffset now, IReadOnlySet<Guid>? protectedBatchIDs)
     {
         if (!Directory.Exists(_paths.Ready))
             return 0;
         var removed = 0;
         foreach (var directory in Directory.EnumerateDirectories(_paths.Ready))
         {
-            if (Batch(directory, initializing: false) is not null)
+            if ((Guid.TryParse(Path.GetFileName(directory), out var protectedId) && protectedBatchIDs?.Contains(protectedId) == true)
+                || Batch(directory, initializing: false) is not null)
                 continue;
             var manifest = ManifestAt(directory, allowNewerSchema: true);
             if (manifest is { SchemaVersion: > BatchManifest.CurrentSchemaVersion })

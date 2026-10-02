@@ -23,7 +23,7 @@ namespace WeChatBridge.Windows.Onboarding;
 /// </summary>
 public partial class OnboardingWindow : Window
 {
-    private static readonly string[] StepTitles = ["欢迎", "入口", "驻留", "完成"];
+    private static readonly string[] StepTitles = [L10n.Text("欢迎"), L10n.Text("入口"), L10n.Text("驻留"), L10n.Text("完成")];
     private const int LastStep = 3;
 
     private readonly OnboardingStateStore _store;
@@ -130,7 +130,7 @@ public partial class OnboardingWindow : Window
         AutoStartTickText.Visibility = registered ? Visibility.Visible : Visibility.Collapsed;
         AutoStartPill.Background = (Brush)FindResource(registered ? "LiveFillColor" : "NeutralFillColor");
         AutoStartPillText.Foreground = (Brush)FindResource(registered ? "LiveInkColor" : "NeutralInkColor");
-        AutoStartPillText.Text = registered ? "已开启" : "未开启";
+        AutoStartPillText.Text = registered ? L10n.Text("已开启") : L10n.Text("未开启");
     }
 
     private void OnDragMove(object sender, MouseButtonEventArgs e) => DragMove();

@@ -59,7 +59,7 @@ public sealed class SkillRow : INotifyPropertyChanged
     public bool IsUserSkill { get; }
 
     /// <summary>The source capsule text under the card title.</summary>
-    public string OriginText => IsUserSkill ? "导入的技能" : "官方技能";
+    public string OriginText => IsUserSkill ? L10n.Text("导入的技能") : L10n.Text("官方技能");
 
     /// <summary>Absolute SKILL.md path while the library copy is ready; the exact file scenes point at.</summary>
     public string? LibraryFile { get; }
@@ -70,8 +70,8 @@ public sealed class SkillRow : INotifyPropertyChanged
     /// <summary>Library badge text; null hides it (a missing package already has its explainer).</summary>
     public string? LibraryText => LibraryState switch
     {
-        SkillLibraryState.Ready => "技能库已就绪",
-        SkillLibraryState.Conflict => "技能库副本已被修改",
+        SkillLibraryState.Ready => L10n.Text("技能库已就绪"),
+        SkillLibraryState.Conflict => L10n.Text("技能库副本已被修改"),
         _ => null,
     };
 
@@ -91,15 +91,15 @@ public sealed class SkillRow : INotifyPropertyChanged
     }
 
     /// <summary>Card glyph, mirroring SkillMark's symbol pick by skill id.</summary>
-    public string Mark => Skill.Id.Contains("article", StringComparison.Ordinal) ? "文"
+    public string Mark => Skill.Id.Contains("article", StringComparison.Ordinal) ? L10n.Text("文")
         : Skill.Id.Contains("video", StringComparison.Ordinal) ? "▶"
         : "◇";
 
     public string StatusTitle => LibraryState switch
     {
-        SkillLibraryState.Ready => "已就绪",
-        SkillLibraryState.Conflict => "副本冲突",
-        _ => "缺技能包",
+        SkillLibraryState.Ready => L10n.Text("已就绪"),
+        SkillLibraryState.Conflict => L10n.Text("副本冲突"),
+        _ => L10n.Text("缺技能包"),
     };
 
     public SkillTone Tone =>
@@ -110,8 +110,8 @@ public sealed class SkillRow : INotifyPropertyChanged
 
     /// <summary>The explainer wording — imported skills fail differently than unshipped ones.</summary>
     public string PackageMissingText => IsUserSkill
-        ? "技能库中的副本不可用或被外部修改，重新导入压缩包可恢复。"
-        : "技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。";
+        ? L10n.Text("技能库中的副本不可用或被外部修改，重新导入压缩包可恢复。")
+        : L10n.Text("技能包尚未随当前构建提供；场景仍可转发，提示词会要求 Agent 在不可用时说明未完成部分。");
 
     /// <summary>Search over id/name/summary, case-insensitive — mirrors scopedRecords.</summary>
     public bool MatchesQuery(string needle) =>
@@ -223,7 +223,7 @@ public sealed class SkillService : INotifyPropertyChanged
         if (ResourcesRoot is not { } root)
         {
             _catalog = new OfficialSkillCatalog(OfficialSkillCatalog.CurrentSchemaVersion, []);
-            LoadError = "没有找到内置技能清单。";
+            LoadError = L10n.Text("没有找到内置技能清单。");
         }
         else
         {
@@ -310,7 +310,7 @@ public sealed class SkillService : INotifyPropertyChanged
             {
                 if (_catalog.Skills.Any(s => s.Id == parsed.Id))
                     throw new SkillException(
-                        $"「{parsed.Id}」是内置技能，请修改 SKILL.md 的 name 后再导入。");
+                        L10n.Format($"「{parsed.Id}」是内置技能，请修改 SKILL.md 的 name 后再导入。"));
                 Library.Import(staging, parsed.Id, parsed.Version);
                 return parsed;
             }
@@ -332,7 +332,7 @@ public sealed class SkillService : INotifyPropertyChanged
     public async Task RemoveSkillAsync(SkillRow row)
     {
         if (!row.IsUserSkill)
-            throw new SkillException("内置技能不能移除。");
+            throw new SkillException(L10n.Text("内置技能不能移除。"));
         await Task.Run(() => Library.Remove(row.Skill.Id));
         Reload();
     }
@@ -425,7 +425,7 @@ public sealed class SkillService : INotifyPropertyChanged
             var report = Library.SyncOfficial(_catalog, resourcesRoot);
             LibraryIssue = report.Conflicts.Count == 0
                 ? null
-                : $"技能库中的 {string.Join("、", report.Conflicts)} 被外部修改，未自动更新。";
+                : L10n.Format($"技能库中的 {string.Join("、", report.Conflicts)} 被外部修改，未自动更新。");
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException
             or SkillException)

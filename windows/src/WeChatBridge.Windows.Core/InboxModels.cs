@@ -43,6 +43,7 @@ public sealed record BatchManifest(
             new ShareActionConverter(),
             new BatchOutcomeKindConverter(),
             new AgentIdConverter(),
+            new CollectionStatusConverter(),
             new JsonStringEnumConverter()
         }
     };

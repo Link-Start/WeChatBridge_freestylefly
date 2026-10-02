@@ -1,6 +1,7 @@
-﻿<UserControl x:Class="WeChatBridge.Windows.Panes.SkillsPane"
+<UserControl x:Class="WeChatBridge.Windows.Panes.SkillsPane"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:WeChatBridge.Windows">
     <UserControl.Resources>
         <!-- 官方技能 / 用于 N 个场景 capsules — the port of SkillBadge. -->
         <Style x:Key="SkillBadge" TargetType="Border">
@@ -26,7 +27,7 @@
                         <!-- Disclosure — the ▸/▾ toggle. -->
                         <Button Grid.Column="0" VerticalAlignment="Top" Padding="4" Margin="0,4,6,0"
                                 Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                Click="ToggleDetails_Click" ToolTip="展开或收起详情">
+                                Click="ToggleDetails_Click" ToolTip="{loc:Loc Key='展开或收起详情'}">
                             <TextBlock FontSize="11" Foreground="{StaticResource InkTertiaryColor}"
                                        Text="{Binding IsExpanded, Converter={StaticResource ExpandGlyph}}" />
                         </Button>
@@ -69,7 +70,7 @@
                             <!-- Clicking jumps to the first scene that references this skill. -->
                             <Button Padding="0" Margin="0" Background="Transparent" BorderThickness="0"
                                     Cursor="Hand" IsEnabled="{Binding HasScenes}"
-                                    ToolTip="查看引用这个技能的场景" Click="SceneBadge_Click">
+                                    ToolTip="{loc:Loc Key='查看引用这个技能的场景'}" Click="SceneBadge_Click">
                                 <Border Style="{StaticResource SkillBadge}">
                                     <TextBlock FontSize="11" FontWeight="Medium"
                                                Foreground="{StaticResource InkSecondaryColor}"
@@ -78,7 +79,7 @@
                             </Button>
                             <Border Style="{StaticResource SkillBadge}"
                                     Visibility="{Binding LibraryText, Converter={StaticResource StringToVisibility}}"
-                                    ToolTip="场景提示词通过技能库中的 SKILL.md 引用这个技能">
+                                    ToolTip="{loc:Loc Key='场景提示词通过技能库中的 SKILL.md 引用这个技能'}">
                                 <TextBlock FontSize="11" FontWeight="Medium" Text="{Binding LibraryText}">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
@@ -109,20 +110,20 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Width="72" FontSize="12" Foreground="{StaticResource InkTertiaryColor}"
-                                           Text="技能 ID" />
+                                           Text="{loc:Loc Key='技能 ID'}" />
                                 <TextBlock FontSize="12" Foreground="{StaticResource InkColor}"
                                            Text="{Binding Skill.Id}" />
                             </StackPanel>
                             <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                 <TextBlock Width="72" FontSize="12" Foreground="{StaticResource InkTertiaryColor}"
-                                           Text="引用方式" />
+                                           Text="{loc:Loc Key='引用方式'}" />
                                 <TextBlock FontSize="12" Foreground="{StaticResource InkColor}"
                                            Text="{Binding ReferenceToken}" />
                             </StackPanel>
                             <StackPanel Margin="0,6,0,0" Orientation="Horizontal"
                                         Visibility="{Binding LibraryFile, Converter={StaticResource StringToVisibility}}">
                                 <TextBlock Width="72" FontSize="12" Foreground="{StaticResource InkTertiaryColor}"
-                                           Text="技能库" />
+                                           Text="{loc:Loc Key='技能库'}" />
                                 <TextBlock FontSize="12" Foreground="{StaticResource InkColor}"
                                            TextWrapping="Wrap" Text="{Binding LibraryFile}" />
                             </StackPanel>
@@ -131,7 +132,7 @@
                         <!-- Imported skills are the user's to keep or drop. -->
                         <Button Margin="0,10,0,0" HorizontalAlignment="Left"
                                 Style="{StaticResource SettingsButton}" Padding="10,3" FontSize="11.5"
-                                Content="从技能库移除"
+                                Content="{loc:Loc Key='从技能库移除'}"
                                 Visibility="{Binding IsUserSkill, Converter={StaticResource BoolToVisibility}}"
                                 Click="RemoveSkill_Click" />
                     </StackPanel>
@@ -196,7 +197,7 @@
                 <TextBox x:Name="SearchBox" Style="{StaticResource MacField}"
                          Padding="10,5" FontSize="12.5"
                          TextChanged="Search_Changed" />
-                <TextBlock Text="搜索技能名、描述或标识" FontSize="12.5" IsHitTestVisible="False"
+                <TextBlock Text="{loc:Loc Key='搜索技能名、描述或标识'}" FontSize="12.5" IsHitTestVisible="False"
                            Foreground="{StaticResource InkTertiaryColor}"
                            Margin="13,0,0,0" VerticalAlignment="Center">
                     <TextBlock.Style>
@@ -216,12 +217,10 @@
             <!-- 导入 ZIP + the reference-only explainer. -->
             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                 <Button Style="{StaticResource SettingsButton}" Padding="14,5" FontSize="12.5"
-                        Click="Import_Click">
-                    导入 ZIP…
-                </Button>
+                        Click="Import_Click"><Button.Content><loc:Loc Key="导入 ZIP…"/></Button.Content></Button>
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource InkTertiaryColor}"
-                           Text="技能由微信流统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。" />
+                           Text="{loc:Loc Key='技能由微信流统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。'}" />
             </StackPanel>
 
             <!-- Skill cards. -->
@@ -233,7 +232,7 @@
                 <TextBlock FontSize="26" HorizontalAlignment="Center"
                            Foreground="{StaticResource InkTertiaryColor}" Text="◇" />
                 <TextBlock Margin="0,8,0,0" FontSize="13.5" FontWeight="Medium" HorizontalAlignment="Center"
-                           Foreground="{StaticResource InkColor}" Text="没有找到匹配的技能。" />
+                           Foreground="{StaticResource InkColor}" Text="{loc:Loc Key='没有找到匹配的技能。'}" />
             </StackPanel>
 
             <!-- Inline notice — the port of the macOS Notice banner. -->

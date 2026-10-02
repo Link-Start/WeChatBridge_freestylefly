@@ -25,9 +25,9 @@ public static class KnowledgeDelivery
 
         private static string Describe(FailureKind kind) => kind switch
         {
-            FailureKind.NotConfigured => "还没有选择 Obsidian 知识库文件夹。",
-            FailureKind.UnreadableArchive => "微信导出的文件无法读取，原始文件已保留。",
-            _ => "微信导出的文件无法读取，原始文件已保留。",
+            FailureKind.NotConfigured => L10n.Text("还没有选择 Obsidian 知识库文件夹。"),
+            FailureKind.UnreadableArchive => L10n.Text("微信导出的文件无法读取，原始文件已保留。"),
+            _ => L10n.Text("微信导出的文件无法读取，原始文件已保留。"),
         };
     }
 
@@ -62,7 +62,8 @@ public static class KnowledgeDelivery
             throw new FailureException(FailureKind.UnreadableArchive);
         FolderDelivery.ValidateFolder(vaultPath);
 
-        var folderName = DisplayName.Sanitize(string.IsNullOrEmpty(subfolder) ? "微信流" : subfolder);
+        var folderName = DisplayName.SubfolderPath(subfolder);
+        if (folderName.Length == 0) folderName = "微信流";
         var root = Path.Combine(vaultPath, folderName);
         var attachments = Path.Combine(root, "附件");
         Directory.CreateDirectory(root);

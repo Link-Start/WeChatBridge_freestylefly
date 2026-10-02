@@ -27,6 +27,7 @@ public static class TrayMenu
         OpenHistory,
         ClearHistory,
         OpenInbox,
+        Collections,
         Settings,
         About,
         Quit,
@@ -52,29 +53,30 @@ public static class TrayMenu
     {
         return
         [
-            new Entry(windowVisible ? "隐藏主窗口" : "显示主窗口", Action: Command.ToggleWindow),
-            new Entry("最近记录", Children: BuildRecent(batches, now)),
+            new Entry(windowVisible ? L10n.Text("隐藏主窗口") : L10n.Text("显示主窗口"), Action: Command.ToggleWindow),
+            new Entry(L10n.Text("分批收集…"), Action: Command.Collections),
+            new Entry(L10n.Text("最近记录"), Children: BuildRecent(batches, now)),
             new Entry(null),
-            new Entry("打开 Inbox", Action: Command.OpenInbox),
-            new Entry("设置…", Action: Command.Settings),
-            new Entry("关于 WeChatBridge…", Action: Command.About),
+            new Entry(L10n.Text("打开 Inbox"), Action: Command.OpenInbox),
+            new Entry(L10n.Text("设置…"), Action: Command.Settings),
+            new Entry(L10n.Text("关于 WeChatBridge…"), Action: Command.About),
             new Entry(null),
-            new Entry("退出 WeChatBridge", Action: Command.Quit),
+            new Entry(L10n.Text("退出 WeChatBridge"), Action: Command.Quit),
         ];
     }
 
     private static IReadOnlyList<Entry> BuildRecent(IReadOnlyList<ReadyBatch> batches, DateTimeOffset now)
     {
         if (batches.Count == 0)
-            return [new Entry("暂无记录", Enabled: false)];
+            return [new Entry(L10n.Text("暂无记录"), Enabled: false)];
 
         var entries = batches.Take(RecentLimit)
             .Select(batch => new Entry(RecentTitle(batch, now), Action: Command.OpenHistory))
             .ToList();
         entries.Add(new Entry(null));
-        entries.Add(new Entry("全部记录…", Action: Command.OpenHistory));
+        entries.Add(new Entry(L10n.Text("全部记录…"), Action: Command.OpenHistory));
         // Reaching here at all means there is history to discard.
-        entries.Add(new Entry("清空记录", Action: Command.ClearHistory));
+        entries.Add(new Entry(L10n.Text("清空记录"), Action: Command.ClearHistory));
         return entries;
     }
 
@@ -103,10 +105,10 @@ public static class TrayMenu
         var clock = HistoryLabels.ClockTime(createdAt);
         if (local.Date == today)
             return clock;
-        var zh = CultureInfo.GetCultureInfo("zh-CN");
+        var zh = L10n.Culture;
         var day = local.Year == today.Year
-            ? local.ToString("M月d日", zh)
-            : local.ToString("yyyy年M月d日", zh);
+            ? local.ToString(L10n.Text("M月d日"), zh)
+            : local.ToString(L10n.Text("yyyy年M月d日"), zh);
         return $"{day} {clock}";
     }
 }
@@ -199,6 +201,7 @@ public sealed class TrayIconService : IDisposable
         // window is hidden — the resident app's normal state — a tray balloon
         // says it instead, or a failure would go unnoticed.
         _model.ToastRequested += OnToastRequested;
+        _model.DeliveryNotificationRequested += OnDeliveryNotification;
 
         InboxLogger.Write(new InboxPaths(), $"tray icon registered: {_added}, v4={versioned}, hwnd={_hwnd}");
     }
@@ -281,6 +284,7 @@ public sealed class TrayIconService : IDisposable
             case TrayMenu.Command.ToggleWindow: ToggleWindow(); break;
             case TrayMenu.Command.OpenHistory: OpenTab(AppTab.History); break;
             case TrayMenu.Command.ClearHistory: _model.DiscardAll(); break;
+            case TrayMenu.Command.Collections: _model.ShowCollection(); break;
             case TrayMenu.Command.OpenInbox: _model.RevealInbox(); break;
             case TrayMenu.Command.Settings: OpenTab(AppTab.General); break;
             case TrayMenu.Command.About: OpenTab(AppTab.About); break;
@@ -295,15 +299,24 @@ public sealed class TrayIconService : IDisposable
     /// the toast becomes a tray balloon. Its action — 去添加应用 and friends —
     /// rides along: a click on the balloon runs it.
     /// </summary>
+    private void OnDeliveryNotification(string message, string actionTitle, Action action) =>
+        ShowNotification(message, actionTitle, action, false);
+
     private void OnToastRequested(string message, string? actionTitle, Action? action, bool warning)
     {
-        if (!_added || _window()?.IsVisible == true)
+        if (_window()?.IsVisible == true) return;
+        ShowNotification(message, actionTitle, action, warning);
+    }
+
+    private void ShowNotification(string message, string? actionTitle, Action? action, bool warning)
+    {
+        if (!_added)
             return;
         _balloonAction = action;
         _balloonRequestedAt = Environment.TickCount64;
         var data = IconData(Native.NifInfo);
         data.szInfoTitle = "微信流";
-        data.szInfo = actionTitle is null ? message : $"{message}（点击：{actionTitle}）";
+        data.szInfo = actionTitle is null ? message : L10n.Format($"{message}（点击：{actionTitle}）");
         data.dwInfoFlags = warning ? Native.NiifWarning : Native.NiifInfo;
         if (!Native.Shell_NotifyIcon(Native.NimModify, ref data))
             _balloonAction = null;
@@ -538,6 +551,7 @@ public sealed class TrayIconService : IDisposable
     public void Dispose()
     {
         _model.ToastRequested -= OnToastRequested;
+        _model.DeliveryNotificationRequested -= OnDeliveryNotification;
         if (_added)
         {
             var data = IconData(0);

@@ -1,7 +1,8 @@
 <Window x:Class="WeChatBridge.Windows.TargetPickerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="发给…" Width="280" SizeToContent="Height"
+        xmlns:loc="clr-namespace:WeChatBridge.Windows"
+        Title="{loc:Loc Key='发给…'}" Width="280" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Opacity="0" ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
         WindowStartupLocation="Manual" Loaded="OnLoaded">
@@ -30,7 +31,7 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
-                    <TextBlock Text="发给…" FontWeight="SemiBold" FontSize="13"
+                    <TextBlock Text="{loc:Loc Key='发给…'}" FontWeight="SemiBold" FontSize="13"
                                Foreground="{StaticResource InkColor}" />
                     <TextBlock x:Name="ContextText" FontSize="10.5" Margin="0,1,0,0"
                                Foreground="{StaticResource InkTertiaryColor}"
@@ -130,17 +131,17 @@
                         <TextBlock Text="Esc" FontSize="9.5" FontWeight="SemiBold"
                                    Foreground="{StaticResource InkSecondaryColor}" />
                     </Border>
-                    <TextBlock Text="取消" FontSize="10.5" Margin="4,0,10,0"
+                    <TextBlock Text="{loc:Loc Key='取消'}" FontSize="10.5" Margin="4,0,10,0"
                                VerticalAlignment="Center"
                                Foreground="{StaticResource InkTertiaryColor}" />
                     <Border Style="{StaticResource KeycapChip}">
                         <TextBlock Text="1–9" FontSize="9.5" FontWeight="SemiBold"
                                    Foreground="{StaticResource InkSecondaryColor}" />
                     </Border>
-                    <TextBlock Text="直选" FontSize="10.5" Margin="4,0,10,0"
+                    <TextBlock Text="{loc:Loc Key='直选'}" FontSize="10.5" Margin="4,0,10,0"
                                VerticalAlignment="Center"
                                Foreground="{StaticResource InkTertiaryColor}" />
-                    <TextBlock Text="90 秒内有效" FontSize="10.5"
+                    <TextBlock Text="{loc:Loc Key='90 秒内有效'}" FontSize="10.5"
                                VerticalAlignment="Center"
                                Foreground="{StaticResource InkTertiaryColor}" />
                 </StackPanel>

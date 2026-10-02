@@ -11,6 +11,12 @@ namespace WeChatBridge.Windows.Core;
 /// </summary>
 public static class DisplayName
 {
+    public static string SubfolderPath(string? raw) => string.Join(
+        Path.DirectorySeparatorChar,
+        (raw ?? "").Replace('\\', '/').Split('/')
+            .Select(s => s.Trim()).Where(s => s.Length > 0 && s != "." && s != "..")
+            .Select(s => Sanitize(s).TrimEnd('.', ' ')));
+
     public const string FallbackBaseName = "共享文件";
 
     private static readonly HashSet<char> WindowsInvalid = new(Path.GetInvalidFileNameChars());

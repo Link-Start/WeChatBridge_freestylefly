@@ -65,12 +65,12 @@ public sealed class BatchRow : INotifyPropertyChanged
 
     private static string StatusTextFor(ReadyBatch batch) => batch.Outcome?.Kind switch
     {
-        BatchOutcomeKind.Delivered => $"{HistoryLabels.DestinationName(batch)} · 已送达",
-        BatchOutcomeKind.Copied => "已复制",
+        BatchOutcomeKind.Delivered => L10n.Format($"{HistoryLabels.DestinationName(batch)} · 已送达"),
+        BatchOutcomeKind.Copied => L10n.Text("已复制"),
         BatchOutcomeKind.Failed => batch.Outcome.Detail is { Length: > 0 } detail
-            ? $"未送达 · {detail}"
-            : "未送达",
-        _ => "未执行",
+            ? L10n.Format($"未送达 · {detail}")
+            : L10n.Text("未送达"),
+        _ => batch.Action == ShareAction.Collect ? L10n.Text("收集中") : L10n.Text("未执行"),
     };
 
     private static StatusTone StatusToneFor(ReadyBatch batch) => batch.Outcome?.Kind switch
@@ -147,7 +147,7 @@ public sealed class ForwardTargetRow
 /// rebuilds both lists, so a lost notification, a crash mid-import or a user
 /// deleting a batch in Explorer all recover to the same state.
 /// </summary>
-public sealed class MainViewModel : INotifyPropertyChanged
+public sealed partial class MainViewModel : INotifyPropertyChanged
 {
     private readonly InboxPaths _paths;
     private readonly InboxReader _reader;
@@ -157,6 +157,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private AppSettings _settings;
     private List<ReadyBatch> _batches = [];
     private DeliveryEngine? _delivery;
+    private readonly Action<PastePayload>? _copyPayload;
     private SceneService? _scenes;
     private CustomTargetService? _customTargets;
     private SkillService? _skills;
@@ -178,17 +179,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _query = string.Empty;
     private string? _inboxFailure;
 
-    public MainViewModel(InboxPaths paths)
+    public MainViewModel(InboxPaths paths, string? configDirectory = null, bool manageLogin = true,
+        DeliveryEngine? delivery = null, SceneService? scenes = null, Action<PastePayload>? copyPayload = null)
     {
         _paths = paths;
         _reader = new InboxReader(paths);
-        _settingsStore = new AppSettingsStore();
-        _targetStore = new ForwardTargetStore();
+        _settingsStore = new AppSettingsStore(configDirectory);
+        _targetStore = new ForwardTargetStore(configDirectory);
+        _delivery = delivery;
+        _copyPayload = copyPayload;
+        _scenes = scenes;
         _settings = _settingsStore.Load();
         // Residency is the whole point of the background instance: reconcile
         // the stored preference with the Run key at every start so a fresh
         // install self-registers and a user deletion stays deleted.
-        if (_settings.LaunchAtLogin != WeChatBridge.Windows.LaunchAtLogin.IsRegistered())
+        if (manageLogin && _settings.LaunchAtLogin != WeChatBridge.Windows.LaunchAtLogin.IsRegistered())
             WeChatBridge.Windows.LaunchAtLogin.Apply(_settings.LaunchAtLogin);
     }
 
@@ -315,18 +320,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set
         {
             if (Set(ref _query, value))
-                RebuildGroups();
+            { RebuildGroups(); RefreshCollectionRows(); }
         }
     }
 
     /// <summary>「共 4 条 · 占用 12 MB · 默认保留 7 天」.</summary>
     public string SummaryText =>
-        $"共 {_batches.Count} 条 · 占用 {ByteText.Format(_batches.Sum(b => b.ByteCount))} · {RetentionText}";
+        L10n.Format($"共 {_batches.Count} 条 · 占用 {ByteText.Format(_batches.Sum(b => b.ByteCount))} · {RetentionText}");
 
     public bool HasHistory => _batches.Count > 0;
 
     private string RetentionText =>
-        _settings.HistoryRetentionDays == 0 ? "永久保留" : $"默认保留 {_settings.HistoryRetentionDays} 天";
+        _settings.HistoryRetentionDays == 0 ? L10n.Text("永久保留") : L10n.Format($"默认保留 {_settings.HistoryRetentionDays} 天");
 
     private static int RetentionIndexOf(int days)
     {
@@ -374,7 +379,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             _paths.EnsureCreated();
             InboxFailure = null;
+            _ = Collections;
             Publish(_reader.LoadBatches());
+            foreach (var collected in _batches.Where(b => b.Action == ShareAction.Collect
+                         && !Collections.Ledger.SeenBatchIDs.Contains(b.Id)).OrderBy(b => b.CreatedAt))
+                Collections.Append(collected, null);
 
             // IsFirstSeen comes from state.json having had to be written, so it
             // is true exactly once for a given batch — across relaunches, rescans
@@ -389,14 +398,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
             // Read and deleted in one go, so a message is said exactly once
             // however many times the inbox is rescanned.
             foreach (var failure in _reader.ConsumeFailures())
-                ToastRequested?.Invoke($"没能接住这次转发：{failure.Message}", null, null, true);
+                ToastRequested?.Invoke(L10n.Format($"没能接住这次转发：{failure.Message}"), null, null, true);
 
             PruneHistory();
         }
         catch (Exception error)
         {
             InboxFailure = error.Message;
-            InboxLogger.Write(_paths, "主程序读取 Inbox 失败", error);
+            InboxLogger.Write(_paths, L10n.Text("主程序读取 Inbox 失败"), error);
         }
     }
 
@@ -408,6 +417,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         // already on disk is the batch's answer; nothing here may overwrite it.
         if (batch.Outcome is not null)
             return false;
+        if (batch.Action == ShareAction.Collect)
+        {
+            _reader.ConsumeIntent(batch.Id);
+            EnqueueForward(batch, new BatchIntent { Action = ShareAction.Collect, RequestedAt = DateTimeOffset.UtcNow });
+            return false;
+        }
         switch (_reader.ConsumeIntent(batch.Id))
         {
             case { Kind: ConsumedIntentKind.Ready, Intent: { } intent }:
@@ -474,7 +489,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 // A failed forward must not stall the queue behind it.
             }
-            if (!intent.IsFresh())
+            if (intent.Action != ShareAction.Collect && !intent.IsFresh())
             {
                 Record(BatchOutcomeKind.Expired, batch.Id);
                 Reload();
@@ -482,14 +497,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
             try
             {
-                await PerformForward(batch, intent.Action, ResolveTarget(intent),
+                await PerformForwardCore(batch, intent.Action, ResolveTarget(intent),
                     freshShare: true, prefetch: prefetch);
             }
             catch (Exception error)
             {
                 // A forward that faults must not vanish silently: the batch
                 // needs a recorded outcome and the queue needs to move on.
-                InboxLogger.Write(_paths, "转发执行异常", error);
+                InboxLogger.Write(_paths, L10n.Text("转发执行异常"), error);
                 Record(BatchOutcomeKind.Failed, batch.Id, error.Message);
                 Reload();
             }
@@ -502,7 +517,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (_settings.HistoryRetentionDays <= 0)
             return;
         var window = TimeSpan.FromDays(_settings.HistoryRetentionDays);
-        if (_reader.PruneHistory(window) > 0)
+        if (_reader.PruneHistory(window, protectedBatchIDs: Collections.Ledger.ProtectedBatchIDs) > 0)
             Publish(_reader.LoadBatches());
     }
 
@@ -512,11 +527,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RebuildGroups();
         OnPropertyChanged(nameof(SummaryText));
         OnPropertyChanged(nameof(HasHistory));
+        RefreshCollectionRows();
+        CollectionsChanged?.Invoke();
     }
 
     private void RebuildGroups()
     {
-        var filtered = _batches.Where(b => HistoryLabels.Matches(b, _query)).ToList();
+        var collected = Collections.Ledger.Collections.SelectMany(c => c.BatchIDs).ToHashSet();
+        var filtered = _batches.Where(b => !collected.Contains(b.Id) && HistoryLabels.Matches(b, _query)).ToList();
         var groups = filtered
             .GroupBy(b => b.CreatedAt.LocalDateTime.Date)
             .OrderByDescending(g => g.Key)
@@ -552,7 +570,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!CopyItems(batch.Items, pathsOnly: false))
             return;
         Record(BatchOutcomeKind.Copied, batch.Id);
-        ToastRequested?.Invoke("已复制到剪贴板", null, null, false);
+        ToastRequested?.Invoke(L10n.Text("已复制到剪贴板"), null, null, false);
         Reload();
     }
 
@@ -565,7 +583,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// the intent-driven path — the one moment reading the WeChat window title
     /// is honest — while resends and 「发给…」 reuse what the batch recorded.
     /// </summary>
-    public async Task PerformForward(ReadyBatch batch, ShareAction action, ForwardTarget? target,
+    private async Task PerformForwardCore(ReadyBatch batch, ShareAction action, ForwardTarget? target,
         bool freshShare = false, SceneService.ShareContextPrefetch? prefetch = null)
     {
         // 「微信流」 intent: the share menu names no destination, so the app asks
@@ -586,10 +604,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
                     Reload();
                     return;
                 default:
-                    Record(BatchOutcomeKind.Failed, batch.Id, "已取消选择入口。");
+                    Record(BatchOutcomeKind.Failed, batch.Id, L10n.Text("已取消选择入口。"));
                     Reload();
                     return;
             }
+        }
+
+        // The selected destination must reach target resolution and state, not the old Hub action.
+        batch = batch with { Action = action };
+        _reader.RecordAction(batch.Id, action);
+        if (action == ShareAction.Collect)
+        {
+            if (!_settings.IsEntryEnabled(action))
+            {
+                CopyItems(batch.Items, false);
+                Record(BatchOutcomeKind.Failed, batch.Id, L10n.Text("入口已停用，文件已在剪贴板"));
+                Reload();
+                return;
+            }
+            var context = await Scenes.ResolveForShareAsync(batch.Items.Select(i => i.FullPath).ToList(),
+                groupName: batch.ChatName, captureTitle: freshShare, prefetch: prefetch, resolveScenes: false);
+            var id = Collections.Append(batch, context?.GroupName);
+            Reload();
+            ShowCollection(id);
+            return;
         }
 
         var pathsOnly = action == ShareAction.Custom
@@ -600,8 +638,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!_settings.IsEntryEnabled(action))
         {
             CopyItems(batch.Items, pathsOnly);
-            Record(BatchOutcomeKind.Failed, batch.Id, "入口已停用，文件已在剪贴板", target?.DisplayName);
-            ToastRequested?.Invoke($"{action.EntryTitle()} 已在入口设置中停用；文件已复制到剪贴板", null, null, true);
+            Record(BatchOutcomeKind.Failed, batch.Id, L10n.Text("入口已停用，文件已在剪贴板"), target?.DisplayName);
+            ToastRequested?.Invoke(L10n.Format($"{action.EntryTitle()} 已在入口设置中停用；文件已复制到剪贴板"), null, null, true);
             Reload();
             return;
         }
@@ -626,8 +664,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                     target = picked;
                     break;
                 case CustomTargetResolutionKind.NoTargets:
-                    Record(BatchOutcomeKind.Failed, batch.Id, "还没有添加自定义应用。");
-                    ToastRequested?.Invoke("还没有添加自定义应用。", "去入口页添加", () => Navigate(AppTab.Entries), true);
+                    Record(BatchOutcomeKind.Failed, batch.Id, L10n.Text("还没有添加自定义应用。"));
+                    ToastRequested?.Invoke(L10n.Text("还没有添加自定义应用。"), L10n.Text("去入口页添加"), () => Navigate(AppTab.Entries), true);
                     Reload();
                     return;
                 case CustomTargetResolutionKind.Expired:
@@ -635,7 +673,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                     Reload();
                     return;
                 default:
-                    Record(BatchOutcomeKind.Failed, batch.Id, "已取消选择目标。");
+                    Record(BatchOutcomeKind.Failed, batch.Id, L10n.Text("已取消选择目标。"));
                     Reload();
                     return;
             }
@@ -648,13 +686,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         // Obsidian takes notes, not scenes — its decision is only the title
         // read that names the group, so the scene picker never pops for it.
-        var resolveScenes = action != ShareAction.Obsidian;
+        var resolveScenes = action is not (ShareAction.Obsidian or ShareAction.Folder);
 
         // The scene decision — pending shortcut → group binding → picker →
         // optional default. Null means the picker let the share expire; macOS
         // records that as expired rather than forwarding it bare.
         var choice = await Scenes.ResolveForShareAsync(
             batch.Items.Select(i => i.FullPath).ToList(),
+            groupName: batch.ChatName,
             captureTitle: freshShare,
             prefetch: prefetch,
             resolveScenes: resolveScenes);
@@ -670,13 +709,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         // Obsidian writes the note with the group name from the title read —
         // the front matter gets no scene, since Obsidian never picks one.
-        if (action == ShareAction.Obsidian)
+        if (action is ShareAction.Obsidian or ShareAction.Folder)
         {
-            var vault = _settings.ObsidianVaultPath;
+            var vault = action == ShareAction.Obsidian ? _settings.ObsidianVaultPath : _settings.DeliveryFolderPath;
+            var destinationName = action.TargetDisplayName();
+            _reader.ClearSceneContext(batch.Id);
             if (string.IsNullOrEmpty(vault))
             {
-                Record(BatchOutcomeKind.Failed, batch.Id, "尚未选择 Obsidian 知识库", "Obsidian");
-                ToastRequested?.Invoke("还没有选择 Obsidian 知识库", "去入口页设置", () => Navigate(AppTab.Entries), true);
+                Record(BatchOutcomeKind.Failed, batch.Id, L10n.Text("尚未选择归档文件夹"), destinationName);
+                ToastRequested?.Invoke(L10n.Format($"还没有设置{destinationName}路径"), L10n.Text("去入口页设置"), () => Navigate(AppTab.Entries), true);
             }
             else
             {
@@ -684,20 +725,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 {
                     var paths = batch.Items.Select(i => i.FullPath).ToList();
                     var written = KnowledgeDelivery.Deliver(
-                        paths, vault, _settings.ObsidianSubfolder, choice.GroupName, choice.Scene?.Name);
-                    OpenInObsidian(vault, written);
+                        paths, vault, action == ShareAction.Obsidian ? _settings.ObsidianSubfolder : _settings.DeliverySubfolder,
+                        choice.GroupName, null);
+                    if (action == ShareAction.Obsidian && _settings.OpenObsidianAfterDelivery)
+                        OpenInObsidian(vault, written);
                     // No scene or insights to advance; the call still stamps
                     // the group's memory entry (name + last-seen), the same
                     // bookkeeping every other destination performs.
                     Scenes.CompleteForward(choice);
-                    Record(BatchOutcomeKind.Delivered, batch.Id, null, "Obsidian");
-                    ToastRequested?.Invoke($"已沉淀到 Obsidian（{written.Count} 篇笔记）", null, null, false);
+                    Record(BatchOutcomeKind.Delivered, batch.Id, null, destinationName);
+                    DeliveryNotificationRequested?.Invoke(L10n.Format($"已沉淀到{destinationName}（{written.Distinct().Count()} 篇笔记）"),
+                        action == ShareAction.Obsidian ? L10n.Text("打开笔记") : L10n.Text("查看文件"),
+                        () => { if (action == ShareAction.Obsidian) OpenInObsidian(vault, written); else RevealFile(written[0]); });
                 }
                 catch (KnowledgeDelivery.FailureException error)
                 {
                     CopyItems(batch.Items, pathsOnly: false);
-                    Record(BatchOutcomeKind.Failed, batch.Id, error.Message, "Obsidian");
-                    ToastRequested?.Invoke($"{error.Message} 文件已复制到剪贴板", null, null, true);
+                    Record(BatchOutcomeKind.Failed, batch.Id, error.Message, destinationName);
+                    ToastRequested?.Invoke(L10n.Format($"{error.Message} 文件已复制到剪贴板"), null, null, true);
                 }
             }
             Reload();
@@ -727,14 +772,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 {
                     var names = string.Join("、", missing);
                     ToastRequested?.Invoke(
-                        $"场景「{choice.Scene!.Name}」引用的技能不可用：{names}",
-                        "查看技能", () => Navigate(AppTab.Skills), true);
+                        L10n.Format($"场景「{choice.Scene!.Name}」引用的技能不可用：{names}"),
+                        L10n.Text("查看技能"), () => Navigate(AppTab.Skills), true);
                 }
             }
             else
             {
                 ToastRequested?.Invoke(
-                    $"{result.Outcome.Detail ?? $"没能发给 {name}"}；文件已在剪贴板",
+                    L10n.Format($"{result.Outcome.Detail ?? $"没能发给 {name}"}；文件已在剪贴板"),
                     null, null, true);
             }
         }
@@ -742,8 +787,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             CopyItems(batch.Items, pathsOnly);
             Record(BatchOutcomeKind.Failed, batch.Id, error.Message, target?.DisplayName);
-            ToastRequested?.Invoke($"转发失败：{error.Message}；文件已在剪贴板", null, null, true);
-            InboxLogger.Write(_paths, "投递引擎异常", error);
+            ToastRequested?.Invoke(L10n.Format($"转发失败：{error.Message}；文件已在剪贴板"), null, null, true);
+            InboxLogger.Write(_paths, L10n.Text("投递引擎异常"), error);
         }
         Reload();
     }
@@ -809,7 +854,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         switch (options.Count)
         {
             case 0:
-                ToastRequested?.Invoke("还没有开启任何入口。", "去入口页开启", () => Navigate(AppTab.Entries), true);
+                ToastRequested?.Invoke(L10n.Text("还没有开启任何入口。"), L10n.Text("去入口页开启"), () => Navigate(AppTab.Entries), true);
                 return EntryPickerAnswer.Cancelled;
             case 1:
             {
@@ -826,7 +871,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static string BatchContextLine(ReadyBatch batch) => batch.Items.Count switch
     {
         1 => $"{batch.Items[0].DisplayName} · {ByteText.Format(batch.ByteCount)}",
-        var count => $"{count} 个文件 · {ByteText.Format(batch.ByteCount)}",
+        var count => L10n.Format($"{count} 个文件 · {ByteText.Format(batch.ByteCount)}"),
     };
 
     /// <summary>发给… menu contents: built-ins first, then the user's own order.</summary>
@@ -835,7 +880,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var builtIns = new[]
         {
             ShareAction.Codex, ShareAction.Claude, ShareAction.Doubao, ShareAction.Qwen,
-            ShareAction.WorkBuddy, ShareAction.WeSight, ShareAction.Obsidian,
+            ShareAction.WorkBuddy, ShareAction.WeSight, ShareAction.DeepSeekHarness, ShareAction.Obsidian, ShareAction.Folder,
         }.Select(a => new ForwardDestination { Action = a });
         return builtIns
             .Concat(TargetRows.Select(t => new ForwardDestination { Action = ShareAction.Custom, Target = t.Target }))
@@ -850,8 +895,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
             var existing = items.Where(i => File.Exists(i.FullPath)).ToList();
             if (existing.Count == 0)
             {
-                ToastRequested?.Invoke("批次文件已不在磁盘上", null, null, true);
+                ToastRequested?.Invoke(L10n.Text("批次文件已不在磁盘上"), null, null, true);
                 return false;
+            }
+            if (_copyPayload is not null)
+            {
+                _copyPayload(pathsOnly ? new PastePayload.Text(WindowsClipboard.ShellLine(existing.Select(i => i.FullPath).ToList()))
+                    : new PastePayload.Files(existing.Select(i => i.FullPath).ToList()));
+                return true;
             }
             if (pathsOnly)
             {
@@ -868,8 +919,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception error)
         {
-            InboxLogger.Write(_paths, "写入剪贴板失败", error);
-            ToastRequested?.Invoke($"写入剪贴板失败：{error.Message}", null, null, true);
+            InboxLogger.Write(_paths, L10n.Text("写入剪贴板失败"), error);
+            ToastRequested?.Invoke(L10n.Format($"写入剪贴板失败：{error.Message}"), null, null, true);
             return false;
         }
     }
@@ -885,7 +936,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception error)
         {
-            InboxLogger.Write(_paths, "写入批次状态失败", error);
+            InboxLogger.Write(_paths, L10n.Text("写入批次状态失败"), error);
         }
     }
 
@@ -897,7 +948,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var first = batch.Items.FirstOrDefault(i => File.Exists(i.FullPath));
         if (first is null)
         {
-            ToastRequested?.Invoke("批次文件已不在磁盘上", null, null, true);
+            ToastRequested?.Invoke(L10n.Text("批次文件已不在磁盘上"), null, null, true);
             return;
         }
         RevealFile(first.FullPath);
@@ -919,7 +970,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception error)
         {
-            ToastRequested?.Invoke($"无法打开文件夹：{error.Message}", null, null, true);
+            ToastRequested?.Invoke(L10n.Format($"无法打开文件夹：{error.Message}"), null, null, true);
         }
     }
 
@@ -936,7 +987,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception error)
         {
-            ToastRequested?.Invoke($"无法打开文件夹：{error.Message}", null, null, true);
+            ToastRequested?.Invoke(L10n.Format($"无法打开文件夹：{error.Message}"), null, null, true);
         }
     }
 
@@ -945,6 +996,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         try
         {
+            if (Collections.Ledger.ProtectedBatchIDs.Contains(batch.Id))
+                throw new InvalidOperationException(L10n.Text("这批文件仍在收集中，请从收集窗口移除（可撤销）。"));
             _reader.Discard(batch.Id);
         }
         catch (Exception error)
@@ -957,7 +1010,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>清空记录 — every batch to the Recycle Bin. The caller confirms first.</summary>
     public void DiscardAll()
     {
-        foreach (var batch in _batches)
+        foreach (var batch in _batches.Where(b => !Collections.Ledger.ProtectedBatchIDs.Contains(b.Id)))
         {
             try { _reader.Discard(batch.Id); }
             catch (Exception error) { InboxFailure = error.Message; }
@@ -990,8 +1043,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 DetailIsWarning = EntryDetailIsWarning(action, targets),
                 ConfigureTitle = action switch
                 {
-                    ShareAction.Obsidian => "设置…",
-                    ShareAction.Custom => "管理…",
+                    ShareAction.Obsidian or ShareAction.Folder => L10n.Text("设置…"),
+                    ShareAction.Custom => L10n.Text("管理…"),
                     _ => null,
                 },
             });
@@ -1005,6 +1058,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool EntryDetailIsWarning(ShareAction action, IReadOnlyList<ForwardTarget> targets) => action switch
     {
         ShareAction.Obsidian => string.IsNullOrEmpty(_settings.ObsidianVaultPath),
+        ShareAction.Folder => string.IsNullOrEmpty(_settings.DeliveryFolderPath),
         ShareAction.Custom => targets.Count == 0,
         _ => false,
     };
@@ -1027,7 +1081,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var targets = _targetStore.Load();
         if (targets.Any(t => t.BundleIdentifier == bundleIdentifier))
         {
-            ToastRequested?.Invoke($"「{displayName}」已在列表中", null, null, false);
+            ToastRequested?.Invoke(L10n.Format($"「{displayName}」已在列表中"), null, null, false);
             return;
         }
         targets.Add(new ForwardTarget(

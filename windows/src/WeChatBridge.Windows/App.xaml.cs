@@ -7,6 +7,7 @@ namespace WeChatBridge.Windows;
 
 public partial class App : Application
 {
+    public App() => L10n.Language = new AppSettingsStore().Load().Language;
     private const string MutexName = "Local\\WeChatBridge.Windows.Main";
     private const string ChangeEventName = "Local\\WeChatBridge.Windows.InboxChanged";
     /// <summary>
@@ -166,7 +167,7 @@ public partial class App : Application
             catch (Exception error)
             {
                 if (_paths is not null)
-                    InboxLogger.Write(_paths, "监听 Inbox 失败", error);
+                    InboxLogger.Write(_paths, L10n.Text("监听 Inbox 失败"), error);
                 return;
             }
         }

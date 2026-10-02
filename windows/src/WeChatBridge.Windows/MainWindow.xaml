@@ -1,8 +1,9 @@
 <Window x:Class="WeChatBridge.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:WeChatBridge.Windows"
         xmlns:panes="clr-namespace:WeChatBridge.Windows.Panes"
-        Title="微信流" Height="640" Width="780"
+        Title="{loc:Loc Key='微信流'}" Height="640" Width="780"
         MinHeight="640" MinWidth="780"
         Background="{StaticResource BackgroundColor}">
     <Grid>
@@ -80,37 +81,37 @@
                 <ListBoxItem Tag="General">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE713;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="通用" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="{loc:Loc Key='通用'}" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="Scenes">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE8A5;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="场景" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="{loc:Loc Key='场景'}" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="Skills">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE8EF;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="技能" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="{loc:Loc Key='技能'}" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="Entries">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE72D;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="入口" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="{loc:Loc Key='入口'}" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="History">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE81C;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="记录" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="{loc:Loc Key='记录'}" />
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem Tag="About">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource NavIcon}" Text="&#xE946;" />
-                        <TextBlock Style="{StaticResource NavLabel}" Text="关于" />
+                        <TextBlock Style="{StaticResource NavLabel}" Text="{loc:Loc Key='关于'}" />
                     </StackPanel>
                 </ListBoxItem>
             </ListBox>
@@ -126,10 +127,10 @@
                  one-line caption, matching the macOS settings pages. -->
             <StackPanel Grid.Row="0" Margin="24,22,24,0">
                 <TextBlock x:Name="PaneTitle" FontSize="21" FontWeight="SemiBold"
-                           Foreground="{StaticResource InkColor}" Text="记录" />
+                           Foreground="{StaticResource InkColor}" Text="{loc:Loc Key='记录'}" />
                 <TextBlock x:Name="PaneCaption" Margin="0,4,0,0" FontSize="12"
                            Foreground="{StaticResource InkSecondaryColor}"
-                           Text="每一批转发的去向与结果" />
+                           Text="{loc:Loc Key='每一批转发的去向与结果'}" />
             </StackPanel>
 
             <Border Grid.Row="1" Margin="24,14,24,24">

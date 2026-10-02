@@ -82,8 +82,8 @@ public partial class SkillsPane : UserControl
     {
         var dialog = new OpenFileDialog
         {
-            Title = "导入技能包",
-            Filter = "ZIP 压缩包 (*.zip)|*.zip",
+            Title = L10n.Text("导入技能包"),
+            Filter = L10n.Text("ZIP 压缩包 (*.zip)|*.zip"),
             CheckFileExists = true,
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true)
@@ -97,7 +97,7 @@ public partial class SkillsPane : UserControl
         {
             var info = await _service.ImportArchiveAsync(path);
             ShowNotice(
-                $"已导入技能「{info.DisplayName}」，场景提示词里可用 {{{{skill:{info.Id}}}}} 引用。",
+                L10n.Format($"已导入技能「{info.DisplayName}」，场景提示词里可用 {{{{skill:{info.Id}}}}} 引用。"),
                 warning: false);
         }
         catch (Exception error) when (error is SkillException or IOException
@@ -114,12 +114,12 @@ public partial class SkillsPane : UserControl
         if (CardOf(sender) is not { } row)
             return;
         var scenes = row.SceneCount > 0
-            ? $"\n仍有 {row.SceneCount} 个场景引用它，移除后这些场景的提示词将找不到技能文件。"
+            ? L10n.Format($"\n仍有 {row.SceneCount} 个场景引用它，移除后这些场景的提示词将找不到技能文件。")
             : "";
         var answer = MessageBox.Show(
             Window.GetWindow(this),
-            $"技能包会先移入备份目录，不会直接删除。{scenes}",
-            $"移除技能「{row.Skill.Name}」？",
+            L10n.Format($"技能包会先移入备份目录，不会直接删除。{scenes}"),
+            L10n.Format($"移除技能「{row.Skill.Name}」？"),
             MessageBoxButton.OKCancel,
             MessageBoxImage.Warning);
         if (answer == MessageBoxResult.OK)
@@ -131,7 +131,7 @@ public partial class SkillsPane : UserControl
         try
         {
             await _service.RemoveSkillAsync(row);
-            ShowNotice("技能已从技能库移除，原包在备份目录中可恢复。", warning: false);
+            ShowNotice(L10n.Text("技能已从技能库移除，原包在备份目录中可恢复。"), warning: false);
         }
         catch (Exception error)
         {

@@ -68,7 +68,14 @@ public partial class EntriesPane : UserControl
     {
         if ((sender as FrameworkElement)?.DataContext is not EntryRow row)
             return;
-        (row.Action == ShareAction.Obsidian ? ObsidianCard : CustomCard).BringIntoView();
+        (row.Action == ShareAction.Obsidian ? ObsidianCard : row.Action == ShareAction.Folder ? FolderCard : CustomCard).BringIntoView();
+    }
+
+    private void ChooseDeliveryFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = L10n.Text("选择沉淀文件夹"), Multiselect = false };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true && Model is { } model)
+            model.DeliveryFolderPath = dialog.FolderName;
     }
 
     private void ChooseVault_Click(object sender, RoutedEventArgs e)
@@ -77,7 +84,7 @@ public partial class EntriesPane : UserControl
             return;
         var dialog = new OpenFolderDialog
         {
-            Title = "选择知识库",
+            Title = L10n.Text("选择知识库"),
             Multiselect = false,
         };
         if (model.ObsidianVaultPath is { Length: > 0 } current && Directory.Exists(current))
@@ -109,8 +116,8 @@ public partial class EntriesPane : UserControl
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择应用",
-            Filter = "可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*",
+            Title = L10n.Text("选择应用"),
+            Filter = L10n.Text("可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*"),
             CheckFileExists = true,
             Multiselect = false,
         };
@@ -128,7 +135,7 @@ public partial class EntriesPane : UserControl
         var identifier = NewTargetPath.Text.Trim();
         if (identifier.Length == 0)
         {
-            model.ShowToast("请填写 .exe 路径或应用 AUMID", warning: true);
+            model.ShowToast(L10n.Text("请填写 .exe 路径或应用 AUMID"), warning: true);
             return;
         }
         model.AddForwardTarget(identifier, NewTargetName.Text);
