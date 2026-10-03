@@ -18,53 +18,6 @@
             <Setter Property="Padding" Value="10,7"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
-        <Style x:Key="CollectionCombo" TargetType="ComboBox">
-            <Setter Property="Foreground" Value="{StaticResource InkColor}"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBox">
-                        <Grid>
-                            <Border x:Name="Chrome" Background="{StaticResource SurfaceColor}"
-                                    BorderBrush="{StaticResource StrokeColor}" BorderThickness="1" CornerRadius="9"/>
-                            <Grid Margin="10,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="⌄" Foreground="{StaticResource InkSecondaryColor}" Margin="8,0,0,0"/>
-                            </Grid>
-                            <ToggleButton Focusable="False" ClickMode="Press"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
-                                <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent"/></ControlTemplate></ToggleButton.Template>
-                            </ToggleButton>
-                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}">
-                                <Border MinWidth="{Binding ActualWidth, ElementName=Chrome}" Background="{StaticResource SurfaceColor}"
-                                        BorderBrush="{StaticResource StrokeColor}" BorderThickness="1" CornerRadius="9" Padding="4" Margin="0,4,0,0">
-                                    <ScrollViewer MaxHeight="200"><ItemsPresenter/></ScrollViewer>
-                                </Border>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="ItemContainerStyle">
-                <Setter.Value>
-                    <Style TargetType="ComboBoxItem">
-                        <Setter Property="Padding" Value="8,7"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ComboBoxItem">
-                                    <Border x:Name="Row" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Row" Property="Background" Value="{StaticResource HoverColor}"/></Trigger>
-                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="{StaticResource BrandTintColor}"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
     <Border Margin="14" CornerRadius="18" Background="{StaticResource SurfaceColor}"
             BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
@@ -81,7 +34,7 @@
                     <TextBlock x:Name="Status" FontSize="10.5" Foreground="{StaticResource InkSecondaryColor}" Margin="0,3,0,0"/>
                 </StackPanel>
                 <Button x:Name="CloseButton" Grid.Column="2" Style="{StaticResource PickerCloseButton}"
-                        ToolTip="{loc:Loc Key='暂停并收起，可从记录页恢复'}" Click="Close_Click" Cursor="Hand"/>
+                        ToolTip="{loc:Loc Key='隐藏浮条，保留收集'}" Click="Close_Click" Cursor="Hand"/>
             </Grid>
             <Border Background="{StaticResource SunkenColor}" CornerRadius="12" Padding="12" Margin="16,0,16,0">
                 <StackPanel>
@@ -103,16 +56,7 @@
             <TextBlock x:Name="Hint" Margin="18,10,18,0" FontSize="10.5" TextWrapping="Wrap" Foreground="{StaticResource InkSecondaryColor}"/>
             <Border x:Name="ManagementPanel" Visibility="Collapsed" Margin="16,12,16,0" Padding="0,12,0,0" BorderThickness="0,1,0,0" BorderBrush="{StaticResource StrokeColor}">
                 <StackPanel>
-                    <ComboBox x:Name="CollectionList" Style="{StaticResource CollectionCombo}" SelectedValuePath="Id"
-                              ToolTip="{loc:Loc Key='切换收集'}" SelectionChanged="CollectionList_SelectionChanged">
-                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" FontSize="11"/></DataTemplate></ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock Text="{loc:Loc Key='收集名称'}" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource InkSecondaryColor}"/>
-                        <TextBox x:Name="CollectionName" Grid.Column="1" FontSize="11" ToolTip="{loc:Loc Key='这组收集的名称'}" LostFocus="CollectionName_LostFocus"/>
-                    </Grid>
-                    <ScrollViewer x:Name="BatchScroll" MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer x:Name="BatchScroll" MaxHeight="220" VerticalScrollBarVisibility="Auto">
                         <ItemsControl x:Name="BatchList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

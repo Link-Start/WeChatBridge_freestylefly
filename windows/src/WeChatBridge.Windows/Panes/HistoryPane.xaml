@@ -334,10 +334,20 @@
                             <Border Style="{StaticResource Card}" Margin="0,0,0,10">
                                 <StackPanel>
                                     <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="{loc:Loc Key='修改名称'}" FontSize="11"
+                                                ToolTip="{loc:Loc Key='修改名称'}" Click="CollectionRename_Click" Margin="6,0,0,0"/>
                                         <Button DockPanel.Dock="Right" Content="{loc:Loc Key='查看 / 恢复收集…'}" Click="OpenCollection_Click"/>
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
                                     </DockPanel>
                                     <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    <StackPanel x:Name="CollectionRenamePanel" Visibility="Collapsed" Margin="0,10,0,0">
+                                        <TextBox x:Name="CollectionName" Style="{StaticResource MacField}"
+                                                 ToolTip="{loc:Loc Key='收集名称'}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button Content="{loc:Loc Key='保存'}" Click="CollectionRenameSave_Click" Margin="0,0,6,0"/>
+                                            <Button Content="{loc:Loc Key='取消'}" Click="CollectionRenameCancel_Click"/>
+                                        </StackPanel>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

@@ -15,7 +15,7 @@ public sealed partial class MainViewModel
         foreach (var c in Collections.Ledger.Collections.AsEnumerable().Reverse())
         {
             var title = c.Name.Length > 0 ? c.Name : L10n.Format($"收集 · {c.CreatedAt.LocalDateTime:MM-dd HH:mm}");
-            var status = L10n.Text(c.Status switch { CollectionStatus.Collecting => "收集中", CollectionStatus.Draft => "已暂停", CollectionStatus.Delivering => "正在交付", CollectionStatus.Delivered => "已交付", _ => "可重试" });
+            var status = L10n.Text(c.Status switch { CollectionStatus.Collecting => "收集中", CollectionStatus.Draft => "待发送", CollectionStatus.Delivering => "正在交付", CollectionStatus.Delivered => "已交付", _ => "可重试" });
             var detail = L10n.Format($"{c.BatchIDs.Count} 批 · {status} · {c.TargetName} {c.Detail}");
             if (_query.Length == 0 || (title + detail).Contains(_query, StringComparison.OrdinalIgnoreCase)
                 || _batches.Where(b => c.BatchIDs.Contains(b.Id)).Any(b => HistoryLabels.Matches(b, _query)))
@@ -88,6 +88,18 @@ public sealed partial class MainViewModel
             if (activate) _collectionWindow.Activate();
         }
         catch (Exception error) { ShowToast(error.Message, warning: true); }
+    }
+
+    public bool RenameCollection(Guid id, string name)
+    {
+        try
+        {
+            Collections.Ledger.Rename(id, name);
+            Collections.Save();
+            Reload();
+            return true;
+        }
+        catch (Exception error) { ShowToast(error.Message, warning: true); return false; }
     }
 
     public Task DeliverCollection(Guid id, ShareAction action, ForwardTarget? target)

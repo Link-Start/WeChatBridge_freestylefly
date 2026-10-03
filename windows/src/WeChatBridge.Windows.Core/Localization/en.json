@@ -727,7 +727,7 @@
   "批次已在收集中。": "This batch is already in a collection.",
   "收集没有正在交付。": "This collection is not being delivered.",
   "收集状态无效。": "Invalid collection status.",
-  "暂停并收起，可从记录页恢复": "Pause and hide; resume from History",
+  "这组待发送，可直接发送或在管理批次中继续收集。": "This collection is ready to send. Send it now or resume collecting in Manage batches.",
   "首条": "First",
   "末条": "Last",
   "未命名聊天": "Unnamed chat",

@@ -16,7 +16,6 @@ public partial class CollectionWindow : Window
     private int _revision;
     private bool _positioned;
     private List<CollectionBatchRow> _rows = [];
-    private sealed record CollectionOption(Guid Id, string Label);
     public sealed class CollectionBatchRow : System.ComponentModel.INotifyPropertyChanged
     {
         public required ReadyBatch Batch { get; init; }
@@ -56,20 +55,7 @@ public partial class CollectionWindow : Window
             if (IsVisible) Dispatcher.BeginInvoke(PositionAtCorner, DispatcherPriority.Loaded);
         };
         SizeChanged += (_, _) => { if (IsVisible && _positioned) KeepOnScreen(); };
-        Closed += (_, _) =>
-        {
-            _model.CollectionsChanged -= Refresh;
-            try
-            {
-                if (_model.Collections.Ledger.Current?.Id == _id)
-                {
-                    _model.Collections.Ledger.ParkCurrent();
-                    _model.Collections.Save();
-                    _model.Reload();
-                }
-            }
-            catch (Exception error) { _model.ShowToast(error.Message, warning: true); }
-        };
+        Closed += (_, _) => _model.CollectionsChanged -= Refresh;
     }
 
     public void SelectCollection(Guid id) { _id = id; Refresh(); }
@@ -81,15 +67,11 @@ public partial class CollectionWindow : Window
         _refreshing = true;
         var revision = ++_revision;
         var group = _model.Collections.Ledger.Collections.FirstOrDefault(c => c.Id == _id);
-        CollectionList.ItemsSource = _model.Collections.Ledger.Collections.AsEnumerable().Reverse()
-            .Select(c => new CollectionOption(c.Id, L10n.Format($"{(c.Name.Length > 0 ? c.Name : c.CreatedAt.LocalDateTime.ToString("MM-dd HH:mm"))} · {c.BatchIDs.Count} 批 · {StatusName(c.Status)}"))).ToList();
-        CollectionList.SelectedValue = _id;
-        if (!CollectionName.IsKeyboardFocusWithin) CollectionName.Text = group?.Name ?? "";
         var busy = group?.Status == CollectionStatus.Delivering;
-        CollectionName.IsEnabled = !busy;
         BatchList.IsEnabled = !busy;
         DeliverButton.IsEnabled = group?.BatchIDs.Count > 0 && !busy;
         ResumeButton.IsEnabled = group?.BatchIDs.Count > 0 && !busy && group?.Status != CollectionStatus.Collecting;
+        ResumeButton.Visibility = group?.Status is CollectionStatus.Draft or CollectionStatus.Retry ? Visibility.Visible : Visibility.Collapsed;
         UndoButton.IsEnabled = !busy && _model.Collections.CanUndo;
         CloseButton.IsEnabled = !busy;
         var batches = _model.Batches.ToDictionary(b => b.Id);
@@ -110,6 +92,7 @@ public partial class CollectionWindow : Window
         var unnamed = _rows.Count(r => string.IsNullOrWhiteSpace(r.ChatName));
         Hint.Text = !string.IsNullOrWhiteSpace(group?.Detail) ? group.Detail
             : unnamed > 0 ? L10n.Format($"有 {unnamed} 批未命名，请在管理批次中补充。")
+            : group?.Status == CollectionStatus.Draft ? L10n.Text("这组待发送，可直接发送或在管理批次中继续收集。")
             : L10n.Text("继续在微信分享下一批，收齐后统一发送。");
         _refreshing = false;
         try
@@ -159,10 +142,10 @@ public partial class CollectionWindow : Window
             if (element is Button) return;
         if (e.LeftButton == MouseButtonState.Pressed) DragMove();
     }
-    private void Close_Click(object sender, RoutedEventArgs e) { Keyboard.ClearFocus(); Close(); }
+    private void Close_Click(object sender, RoutedEventArgs e) { Keyboard.ClearFocus(); Hide(); }
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && CloseButton.IsEnabled) { Keyboard.ClearFocus(); Close(); e.Handled = true; }
+        if (e.Key == Key.Escape && CloseButton.IsEnabled) { Keyboard.ClearFocus(); Hide(); e.Handled = true; }
     }
     private void Manage_Click(object sender, RoutedEventArgs e) => SetManagement(ManagementPanel.Visibility != Visibility.Visible);
     private void SetManagement(bool expanded)
@@ -170,13 +153,13 @@ public partial class CollectionWindow : Window
         ManagementPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         ManageButton.Content = L10n.Text(expanded ? "收起详情" : "管理批次");
         var area = SystemParameters.WorkArea;
-        BatchScroll.MaxHeight = Math.Min(220, Math.Max(80, area.Height - 460));
+        BatchScroll.MaxHeight = Math.Min(220, Math.Max(80, area.Height - 360));
         if (IsVisible) Dispatcher.BeginInvoke(KeepOnScreen, DispatcherPriority.Loaded);
     }
 
     private static string StatusName(CollectionStatus status) => status switch
     {
-        CollectionStatus.Collecting => L10n.Text("收集中"), CollectionStatus.Draft => L10n.Text("已暂停"),
+        CollectionStatus.Collecting => L10n.Text("收集中"), CollectionStatus.Draft => L10n.Text("待发送"),
         CollectionStatus.Delivering => L10n.Text("正在交付"), CollectionStatus.Delivered => L10n.Text("已交付"),
         _ => L10n.Text("可重试"),
     };
@@ -184,14 +167,6 @@ public partial class CollectionWindow : Window
     {
         try { action(); Message.Text = ""; _model.Reload(); }
         catch (Exception error) { Message.Text = error.Message; }
-    }
-    private void CollectionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_refreshing && CollectionList.SelectedValue is Guid id) SelectCollection(id);
-    }
-    private void CollectionName_LostFocus(object sender, RoutedEventArgs e)
-    {
-        if (!_refreshing) Try(() => { _model.Collections.Ledger.Rename(_id, CollectionName.Text); _model.Collections.Save(); });
     }
     private void ChatName_LostFocus(object sender, RoutedEventArgs e)
     {

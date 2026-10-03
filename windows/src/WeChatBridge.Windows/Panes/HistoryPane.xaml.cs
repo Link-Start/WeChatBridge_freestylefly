@@ -71,6 +71,41 @@ public partial class HistoryPane : UserControl
         if ((sender as FrameworkElement)?.DataContext is MainViewModel.CollectionHistoryRow row) Model?.ShowCollection(row.Id);
     }
 
+    private static StackPanel? CollectionRenamePanel(object sender)
+    {
+        for (var element = sender as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
+            if (element is Border { Child: StackPanel card })
+                foreach (var panel in card.Children.OfType<StackPanel>())
+                    if (panel.Name == "CollectionRenamePanel") return panel;
+        return null;
+    }
+
+    private void CollectionRename_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is not { } model || (sender as FrameworkElement)?.DataContext is not MainViewModel.CollectionHistoryRow row
+            || CollectionRenamePanel(sender) is not { } panel) return;
+        var collection = model.Collections.Ledger.Collections.FirstOrDefault(c => c.Id == row.Id);
+        if (collection is null || collection.Status == CollectionStatus.Delivering) return;
+        var editor = panel.Children.OfType<TextBox>().Single();
+        editor.Text = collection.Name;
+        panel.Visibility = Visibility.Visible;
+        editor.Focus();
+        editor.SelectAll();
+    }
+
+    private void CollectionRenameSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is not { } model || (sender as FrameworkElement)?.DataContext is not MainViewModel.CollectionHistoryRow row
+            || CollectionRenamePanel(sender) is not { } panel) return;
+        if (model.RenameCollection(row.Id, panel.Children.OfType<TextBox>().Single().Text))
+            panel.Visibility = Visibility.Collapsed;
+    }
+
+    private void CollectionRenameCancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (CollectionRenamePanel(sender) is { } panel) panel.Visibility = Visibility.Collapsed;
+    }
+
     private static BatchRow? RowOf(object sender) =>
         (sender as FrameworkElement)?.DataContext as BatchRow;
 
