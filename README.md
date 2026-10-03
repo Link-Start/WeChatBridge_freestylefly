@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="Resources/Screenshots/app-icon-rounded.png" width="144" alt="WeChatBridge 图标" />
+  <img src="shared/Screenshots/app-icon-rounded.png" width="144" alt="WeChatBridge 图标" />
   <h1>WeChatBridge（微信流）</h1>
   <p><strong>从微信转发菜单，把聊天记录送进 AI Agent 与本地知识库。</strong></p>
   <p>原生、轻量、完全本地的 macOS 微信聊天记录转发与归档工具。</p>
@@ -72,7 +72,7 @@ flowchart LR
 在微信「转发到其他应用」里直接选择目标，不需要先打开微信流主窗口：
 
 <div align="center">
-  <img src="Resources/Screenshots/usage-wechat-share-menu.png" width="380" alt="微信转发菜单中的微信流入口" />
+  <img src="shared/Screenshots/usage-wechat-share-menu.png" width="380" alt="微信转发菜单中的微信流入口" />
 </div>
 
 <table>
@@ -81,8 +81,8 @@ flowchart LR
     <th align="center">场景化</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/usage-entries.png" width="420" alt="入口设置页" /></td>
-    <td align="center"><img src="Resources/Screenshots/usage-scenes.png" width="420" alt="场景管理页" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-entries.png" width="420" alt="入口设置页" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-scenes.png" width="420" alt="场景管理页" /></td>
   </tr>
   <tr>
     <td align="center"><sub>十二个入口随时开关，未安装的应用直接标注</sub></td>
@@ -93,8 +93,8 @@ flowchart LR
     <th align="center">沉淀到 Obsidian</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/usage-skills.png" width="420" alt="技能中心" /></td>
-    <td align="center"><img src="Resources/Screenshots/usage-obsidian-attachments.png" width="420" alt="Obsidian 中的聊天记录与附件" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-skills.png" width="420" alt="技能中心" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-obsidian-attachments.png" width="420" alt="Obsidian 中的聊天记录与附件" /></td>
   </tr>
   <tr>
     <td align="center"><sub>给 Agent 装上能力包，群里的链接和视频都能读</sub></td>
@@ -133,12 +133,12 @@ flowchart LR
 
 ```bash
 git clone https://github.com/freestylefly/WeChatBridge.git
-cd WeChatBridge
+cd WeChatBridge/macos
 swift test
 CONFIG=release Scripts/make-app.sh
 ```
 
-构建产物位于 `dist/微信流.app`。安装到当前用户的“应用程序”目录并注册分享扩展：
+构建产物位于 `macos/dist/微信流.app`。安装到当前用户的“应用程序”目录并注册分享扩展：
 
 ```bash
 Scripts/install-dev-build.sh
@@ -152,32 +152,47 @@ Scripts/install-dev-build.sh
 ## 项目结构
 
 ```text
-Sources/
-├── WeChatBridgeApp/      # 主应用、设置、转发编排与权限管理
-├── WeChatBridgeCore/     # 批次、场景、归档和剪贴板核心逻辑
-└── WeChatBridgeShare/    # macOS Share Extension
-Resources/                # 图标、Plist、entitlements 与内置技能
-Scripts/                  # 构建、安装、签名和发布脚本
-Tests/                    # Swift Testing / XCTest 测试
-site/                     # Sparkle 更新源与版本说明
+macos/                  # macOS 端 — 完整 SwiftPM 包
+├── Sources/
+│   ├── WeChatBridgeApp/      # 主应用、设置、转发编排与权限管理
+│   ├── WeChatBridgeCore/     # 批次、场景、归档和剪贴板核心逻辑
+│   └── WeChatBridgeShare/    # macOS Share Extension
+├── Resources/          # 图标、Plist、entitlements、本地化与 DMG 素材
+├── Scripts/            # 构建、安装、签名和发布脚本
+└── Tests/              # Swift Testing / XCTest 测试
+
+windows/                # Windows 端 — .NET WPF 解决方案
+├── src/WeChatBridge.Windows/        # 主程序（WPF）
+├── src/WeChatBridge.Windows.Core/   # Inbox 契约、投递、场景、技能（无 UI 依赖）
+├── src/WeChatBridge.ShareTarget/    # Windows Share Target 助手
+├── packaging/SparsePackage/         # 稀疏包 MSIX（Share Target 注册）
+├── scripts/            # 打包与开发注册脚本
+└── tests/              # xUnit 测试
+
+shared/                 # 两端共用的资产与契约
+├── AppLogos/           # 各 Agent 的 logo（两端 UI 都用）
+├── Design/             # 品牌源图与图标生成基准
+├── Screenshots/        # macOS 截图（Windows 视觉移植的对照基准）
+├── Skills/             # 技能目录与技能包
+└── README.md           # Inbox 共享契约 + 文件级端口对照表
+
+site/                   # Sparkle 更新源与版本说明
 ```
 
-项目使用 Swift Package Manager 管理源码和 Sparkle 依赖。`Scripts/make-app.sh` 会把主程序与十二个 Share Extension 组装成完整的 `.app`。
+项目使用 Swift Package Manager 管理 macOS 源码和 Sparkle 依赖。`macos/Scripts/make-app.sh` 会把主程序与十二个 Share Extension 组装成完整的 `.app`。Windows 侧见 `windows/AGENTS.md` 与 `windows/docs/README.zh-CN.md`。
 
 ## 开发与验证
 
 ```bash
-# 运行测试
-swift test
+# macOS（在 macos/ 目录下运行）
+cd macos
+swift test                                    # 运行测试
+swift Scripts/check-localizations.swift       # 校验中英文资源
+Scripts/check-release-config.sh               # 签名 / Bundle ID / App Group 检查
+Scripts/dev-preview.sh                        # 构建、安装并打开开发版本
 
-# 校验中英文资源
-swift Scripts/check-localizations.swift
-
-# 检查签名、Bundle ID、App Group 与发布配置
-Scripts/check-release-config.sh
-
-# 构建、安装并打开开发版本
-Scripts/dev-preview.sh
+# Windows
+dotnet test windows/WeChatBridge.Windows.sln -c Release
 ```
 
 ## 参与贡献
@@ -208,7 +223,7 @@ Scripts/dev-preview.sh
 欢迎加入 WeChatBridge 交流群，与开发者和社区用户交流使用经验、反馈问题与分享工作流。
 
 <div align="center">
-  <img src="Resources/Screenshots/wechat-community-group.png" width="280" alt="WeChatBridge 微信交流群二维码" />
+  <img src="shared/Screenshots/wechat-community-group.png" width="280" alt="WeChatBridge 微信交流群二维码" />
   <br />
   <sub>使用微信扫码加入交流群</sub>
 </div>
@@ -223,8 +238,8 @@ Scripts/dev-preview.sh
     <th align="center">苍何</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/wechat-xiangming.jpg" width="420" alt="向明微信二维码" /></td>
-    <td align="center"><img src="Resources/Screenshots/wechat-canghe.jpg" width="420" alt="苍何微信二维码" /></td>
+    <td align="center"><img src="shared/Screenshots/wechat-xiangming.jpg" width="420" alt="向明微信二维码" /></td>
+    <td align="center"><img src="shared/Screenshots/wechat-canghe.jpg" width="420" alt="苍何微信二维码" /></td>
   </tr>
 </table>
 

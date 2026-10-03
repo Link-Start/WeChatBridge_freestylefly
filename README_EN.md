@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="Resources/Screenshots/app-icon-rounded.png" width="144" alt="WeChatBridge icon" />
+  <img src="shared/Screenshots/app-icon-rounded.png" width="144" alt="WeChatBridge icon" />
   <h1>WeChatBridge (微信流)</h1>
   <p><strong>Send WeChat conversations to AI agents and local knowledge bases from the native share menu.</strong></p>
   <p>A native, lightweight, fully local WeChat hand-off and archiving tool for macOS.</p>
@@ -70,7 +70,7 @@ flowchart LR
 Pick a destination straight from WeChat's “Forward to other apps” menu, without opening the main window first:
 
 <div align="center">
-  <img src="Resources/Screenshots/usage-wechat-share-menu.png" width="380" alt="WeChatBridge entries in the WeChat forward menu" />
+  <img src="shared/Screenshots/usage-wechat-share-menu.png" width="380" alt="WeChatBridge entries in the WeChat forward menu" />
 </div>
 
 <table>
@@ -79,8 +79,8 @@ Pick a destination straight from WeChat's “Forward to other apps” menu, with
     <th align="center">Scenes</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/usage-entries.png" width="420" alt="Entries settings pane" /></td>
-    <td align="center"><img src="Resources/Screenshots/usage-scenes.png" width="420" alt="Scene management pane" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-entries.png" width="420" alt="Entries settings pane" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-scenes.png" width="420" alt="Scene management pane" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Toggle any of the twelve entries; missing apps are flagged</sub></td>
@@ -91,8 +91,8 @@ Pick a destination straight from WeChat's “Forward to other apps” menu, with
     <th align="center">Saving to Obsidian</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/usage-skills.png" width="420" alt="Skill Center" /></td>
-    <td align="center"><img src="Resources/Screenshots/usage-obsidian-attachments.png" width="420" alt="Conversation and attachments in Obsidian" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-skills.png" width="420" alt="Skill Center" /></td>
+    <td align="center"><img src="shared/Screenshots/usage-obsidian-attachments.png" width="420" alt="Conversation and attachments in Obsidian" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Install capability packs so agents can read links and videos</sub></td>
@@ -127,12 +127,12 @@ Download the latest DMG from [GitHub Releases](https://github.com/freestylefly/W
 
 ```bash
 git clone https://github.com/freestylefly/WeChatBridge.git
-cd WeChatBridge
+cd WeChatBridge/macos
 swift test
 CONFIG=release Scripts/make-app.sh
 ```
 
-The app is assembled at `dist/微信流.app`. Install it into the current user's Applications directory and register its Share Extensions with:
+The app is assembled at `macos/dist/微信流.app`. Install it into the current user's Applications directory and register its Share Extensions with:
 
 ```bash
 Scripts/install-dev-build.sh
@@ -146,22 +146,23 @@ Open “WeChatBridge → Settings → Entries” and enable the destinations you
 ## Project layout
 
 ```text
-Sources/
-├── WeChatBridgeApp/      # Main app, settings, routing, and permissions
-├── WeChatBridgeCore/     # Batches, scenes, archives, and clipboard logic
-└── WeChatBridgeShare/    # macOS Share Extension
-Resources/                # Artwork, plists, entitlements, and bundled skills
-Scripts/                  # Build, install, signing, and release tooling
-Tests/                    # Swift Testing / XCTest coverage
+macos/                    # macOS SwiftPM package
+├── Sources/              # App, core logic, and Share Extension
+├── Resources/            # Plists, entitlements, and localizations
+├── Scripts/              # Build, install, signing, and release tooling
+└── Tests/                # Swift Testing / XCTest coverage
+windows/                  # Windows .NET WPF solution, Share Target, and tests
+shared/                   # Agent logos, design assets, screenshots, and skills
 site/                     # Sparkle update feed and release notes
 ```
 
-Swift Package Manager owns the source layout and the Sparkle dependency. `Scripts/make-app.sh` assembles the host executable and twelve Share Extensions into a complete `.app` bundle.
+Swift Package Manager owns the source layout and the Sparkle dependency. `macos/Scripts/make-app.sh` assembles the host executable and twelve Share Extensions into a complete `.app` bundle.
 
 ## Development checks
 
 ```bash
 # Run tests
+cd macos
 swift test
 
 # Validate Simplified Chinese and English resources
@@ -181,7 +182,8 @@ Issues and pull requests are welcome:
 1. Check [Issues](https://github.com/freestylefly/WeChatBridge/issues) for an existing discussion.
 2. Fork the repository and create a focused branch from `main`.
 3. Keep changes scoped and add tests for behavior changes.
-4. Run `swift test` and the localization check before submitting.
+4. Run `cd macos
+swift test` and the localization check before submitting.
 5. Describe the motivation, verification, and any visual changes in the pull request.
 
 Please report security issues privately through [GitHub Security Advisories](https://github.com/freestylefly/WeChatBridge/security/advisories/new). Avoid posting sensitive details in a public issue.
@@ -202,7 +204,7 @@ Please report security issues privately through [GitHub Security Advisories](htt
 Join the WeChatBridge community group to share workflows, exchange tips, and report issues with developers and other users.
 
 <div align="center">
-  <img src="Resources/Screenshots/wechat-community-group.png" width="280" alt="QR code for the WeChatBridge community group" />
+  <img src="shared/Screenshots/wechat-community-group.png" width="280" alt="QR code for the WeChatBridge community group" />
   <br />
   <sub>Scan with WeChat to join the community group</sub>
 </div>
@@ -217,8 +219,8 @@ Follow project updates, join the discussion, or contact us on WeChat by searchin
     <th align="center">苍何</th>
   </tr>
   <tr>
-    <td align="center"><img src="Resources/Screenshots/wechat-xiangming.jpg" width="420" alt="WeChat QR code for 向明" /></td>
-    <td align="center"><img src="Resources/Screenshots/wechat-canghe.jpg" width="420" alt="WeChat QR code for 苍何" /></td>
+    <td align="center"><img src="shared/Screenshots/wechat-xiangming.jpg" width="420" alt="WeChat QR code for 向明" /></td>
+    <td align="center"><img src="shared/Screenshots/wechat-canghe.jpg" width="420" alt="WeChat QR code for 苍何" /></td>
   </tr>
 </table>
 
