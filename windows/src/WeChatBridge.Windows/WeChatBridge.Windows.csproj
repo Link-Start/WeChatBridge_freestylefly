@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- The exe itself carries the mark: taskbar buttons, task thumbnails and
+         any shell surface that reads the module icon get it without the
+         white-tile packaging logo. -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WeChatBridge.Windows.Core\WeChatBridge.Windows.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The shared skill catalog ships next to the exe so
+       SkillService.FindResourcesRoot resolves <out>/Resources/Skills at
+       runtime — the same catalog.json macOS reads from its bundle. -->
+  <ItemGroup>
+    <None Include="..\..\..\shared\Skills\**"
+          Link="Resources\Skills\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <!-- shared/AppLogos is the single source — AppLogos.PathFor resolves
+         <out>/Assets/AppLogos, so keep the linked layout identical. -->
+    <None Include="..\..\..\shared\AppLogos\*.png"
+          Link="Assets\AppLogos\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Assets\**" Exclude="Assets\AppLogos\**"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
