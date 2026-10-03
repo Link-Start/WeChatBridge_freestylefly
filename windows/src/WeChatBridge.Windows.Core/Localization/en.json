@@ -726,5 +726,17 @@
   "请填写群或联系人名称。": "Enter a group or contact name.",
   "批次已在收集中。": "This batch is already in a collection.",
   "收集没有正在交付。": "This collection is not being delivered.",
-  "收集状态无效。": "Invalid collection status."
+  "收集状态无效。": "Invalid collection status.",
+  "暂停并收起，可从记录页恢复": "Pause and hide; resume from History",
+  "首条": "First",
+  "末条": "Last",
+  "未命名聊天": "Unnamed chat",
+  "最近 · 第 {0} 批": "Latest · Batch {0}",
+  "管理批次": "Manage batches",
+  "完成并发送…": "Finish and send…",
+  "收起详情": "Hide details",
+  "切换收集": "Switch collection",
+  "{0} · {1} 批 · {2}": "{0} · {1} batches · {2}",
+  "有 {0} 批未命名，请在管理批次中补充。": "{0} batches need a chat name. Add names in Manage batches.",
+  "继续在微信分享下一批，收齐后统一发送。": "Share the next batch from WeChat. Send everything when ready."
 }

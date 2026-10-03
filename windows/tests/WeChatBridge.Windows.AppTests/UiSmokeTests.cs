@@ -53,10 +53,26 @@ public sealed class UiSmokeTests
                     }
                     var window = new CollectionWindow(model, collectionId);
                     window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+                    Assert.True(window.Topmost);
+                    Assert.False(window.ShowActivated);
+                    Assert.False(window.ShowInTaskbar);
+                    Assert.Equal(WindowStyle.None, window.WindowStyle);
+                    var management = (FrameworkElement)window.FindName("ManagementPanel");
+                    var manageButton = (Button)window.FindName("ManageButton");
+                    Assert.Equal(Visibility.Collapsed, management.Visibility);
                     var content = (FrameworkElement)window.Content;
+                    content.Resources.MergedDictionaries.Add(window.Resources);
                     window.Content = null;
-                    Render(content, "collection", language, previewDirectory);
+                    var compactHeight = Render(content, "collection", language, previewDirectory, width: 400);
+                    Assert.InRange(compactHeight, 180, 320);
+                    manageButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(Visibility.Visible, management.Visibility);
+                    var expandedHeight = Render(content, "collection-expanded", language, previewDirectory, width: 400);
+                    Assert.True(expandedHeight > compactHeight + 150, "Expanded batch controls must fit within the floating card.");
+                    manageButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(Visibility.Collapsed, management.Visibility);
                     window.Close();
+                    Assert.Equal(CollectionStatus.Draft, model.Collections.Ledger.Collections.Single(c => c.Id == collectionId).Status);
                 }
                 app.Shutdown();
             }
@@ -69,20 +85,31 @@ public sealed class UiSmokeTests
         Assert.Null(failure);
     }
 
-    private static void Render(FrameworkElement content, string name, string language, string? directory)
+    private static double Render(FrameworkElement content, string name, string language, string? directory, double width = 710)
     {
         var canvas = new Border { Background = (Brush)Application.Current.Resources["BackgroundColor"], Child = content };
-        canvas.Measure(new Size(710, 650));
-        canvas.Arrange(new Rect(0, 0, 710, 650));
-        canvas.UpdateLayout();
+        var height = 650.0;
+        // Reparented elements may retain their previous measurement. Resolve
+        // templates and visibility changes before sizing the exported bitmap.
+        for (var pass = 0; pass < 2; pass++)
+        {
+            content.InvalidateMeasure();
+            canvas.InvalidateMeasure();
+            canvas.Measure(new Size(width, double.PositiveInfinity));
+            height = width == 400 ? Math.Ceiling(canvas.DesiredSize.Height) : 650;
+            canvas.Arrange(new Rect(0, 0, width, height));
+            canvas.UpdateLayout();
+        }
         Assert.True(content.ActualWidth > 0);
-        if (directory is null) return;
+        if (directory is null) { canvas.Child = null; return height; }
         Directory.CreateDirectory(directory);
-        var bitmap = new RenderTargetBitmap(710, 650, 96, 96, PixelFormats.Pbgra32);
+        var bitmap = new RenderTargetBitmap((int)width, (int)height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(canvas);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(directory, $"{name}-{language}.png"));
         encoder.Save(stream);
+        canvas.Child = null;
+        return height;
     }
 }

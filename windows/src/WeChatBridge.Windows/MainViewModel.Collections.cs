@@ -69,7 +69,7 @@ public sealed partial class MainViewModel
         }
     }
 
-    public void ShowCollection(Guid? id = null)
+    public void ShowCollection(Guid? id = null, bool activate = true)
     {
         try
         {
@@ -79,12 +79,13 @@ public sealed partial class MainViewModel
             {
                 existing.SelectCollection(id.Value);
                 existing.Show();
-                existing.Activate();
+                if (activate) existing.Activate();
                 return;
             }
             _collectionWindow = new CollectionWindow(this, id.Value);
             _collectionWindow.Closed += (_, _) => _collectionWindow = null;
             _collectionWindow.Show();
+            if (activate) _collectionWindow.Activate();
         }
         catch (Exception error) { ShowToast(error.Message, warning: true); }
     }

@@ -626,7 +626,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 groupName: batch.ChatName, captureTitle: freshShare, prefetch: prefetch, resolveScenes: false);
             var id = Collections.Append(batch, context?.GroupName);
             Reload();
-            ShowCollection(id);
+            ShowCollection(id, activate: false);
             return;
         }
 

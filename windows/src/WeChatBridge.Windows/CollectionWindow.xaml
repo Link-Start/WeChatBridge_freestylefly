@@ -2,59 +2,151 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:WeChatBridge.Windows"
-        Title="{loc:Loc Key='分批收集到微信流'}" Width="710" Height="650" MinWidth="620" MinHeight="500"
-        Background="{StaticResource BackgroundColor}" Topmost="True">
+        Title="{loc:Loc Key='分批收集到微信流'}" Width="400" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" Topmost="True" ResizeMode="NoResize"
+        WindowStartupLocation="Manual" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
-        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource InkColor}"/></Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource InkColor}"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
         <Style TargetType="Button" BasedOn="{StaticResource SettingsButton}"/>
         <Style TargetType="TextBox" BasedOn="{StaticResource MacField}"/>
+        <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource SettingsButton}">
+            <Setter Property="Background" Value="{StaticResource SunkenColor}"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="CollectionCombo" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{StaticResource InkColor}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Chrome" Background="{StaticResource SurfaceColor}"
+                                    BorderBrush="{StaticResource StrokeColor}" BorderThickness="1" CornerRadius="9"/>
+                            <Grid Margin="10,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="⌄" Foreground="{StaticResource InkSecondaryColor}" Margin="8,0,0,0"/>
+                            </Grid>
+                            <ToggleButton Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent"/></ControlTemplate></ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}">
+                                <Border MinWidth="{Binding ActualWidth, ElementName=Chrome}" Background="{StaticResource SurfaceColor}"
+                                        BorderBrush="{StaticResource StrokeColor}" BorderThickness="1" CornerRadius="9" Padding="4" Margin="0,4,0,0">
+                                    <ScrollViewer MaxHeight="200"><ItemsPresenter/></ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Padding" Value="8,7"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="Row" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Row" Property="Background" Value="{StaticResource HoverColor}"/></Trigger>
+                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="{StaticResource BrandTintColor}"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Border Margin="14" CornerRadius="18" Background="{StaticResource SurfaceColor}"
+            BorderBrush="{StaticResource StrokeColor}" BorderThickness="1">
+        <Border.Effect><DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.16"/></Border.Effect>
         <StackPanel>
-            <TextBlock Text="{loc:Loc Key='分批收集'}" FontSize="22" FontWeight="SemiBold"/>
-            <TextBlock Margin="0,6,0,12" TextWrapping="Wrap"
-                       Text="{loc:Loc Key='在微信中手动选择每批消息，继续转发到「分批收集到微信流」。原始 ZIP 保持完整，完成时统一选择目标和场景。'}"/>
-            <ComboBox x:Name="CollectionList" DisplayMemberPath="Label" SelectedValuePath="Id"
-                      SelectionChanged="CollectionList_SelectionChanged"/>
-            <TextBox x:Name="CollectionName" Margin="0,8,0,0" ToolTip="{loc:Loc Key='这组收集的名称'}"
-                     LostFocus="CollectionName_LostFocus"/>
-            <TextBlock x:Name="Status" Margin="0,8,0,0" TextWrapping="Wrap"/>
+            <Grid Margin="16,14,12,10" Background="Transparent" MouseLeftButtonDown="Header_MouseLeftButtonDown" Cursor="SizeAll">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Border Width="34" Height="34" CornerRadius="11" Background="{StaticResource BrandTintColor}">
+                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="17"
+                               Foreground="{StaticResource BrandColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                    <TextBlock Text="{loc:Loc Key='分批收集'}" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Status" FontSize="10.5" Foreground="{StaticResource InkSecondaryColor}" Margin="0,3,0,0"/>
+                </StackPanel>
+                <Button x:Name="CloseButton" Grid.Column="2" Style="{StaticResource PickerCloseButton}"
+                        ToolTip="{loc:Loc Key='暂停并收起，可从记录页恢复'}" Click="Close_Click" Cursor="Hand"/>
+            </Grid>
+            <Border Background="{StaticResource SunkenColor}" CornerRadius="12" Padding="12" Margin="16,0,16,0">
+                <StackPanel>
+                    <Grid Margin="0,0,0,9">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="LatestChat" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <TextBlock x:Name="LatestBatch" Grid.Column="1" Margin="8,0,0,0" FontSize="10.5" Foreground="{StaticResource InkSecondaryColor}"/>
+                    </Grid>
+                    <Grid x:Name="LatestReference">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="{loc:Loc Key='首条'}" FontSize="10.5" Margin="0,0,9,7" Foreground="{StaticResource InkTertiaryColor}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding FirstPreview}" ToolTip="{Binding Boundaries}" TextTrimming="CharacterEllipsis" FontSize="11" Margin="0,0,0,7"/>
+                        <TextBlock Grid.Row="1" Text="{loc:Loc Key='末条'}" FontSize="10.5" Margin="0,0,9,0" Foreground="{StaticResource InkTertiaryColor}"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LastPreview}" ToolTip="{Binding Boundaries}" TextTrimming="CharacterEllipsis" FontSize="11"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <TextBlock x:Name="Hint" Margin="18,10,18,0" FontSize="10.5" TextWrapping="Wrap" Foreground="{StaticResource InkSecondaryColor}"/>
+            <Border x:Name="ManagementPanel" Visibility="Collapsed" Margin="16,12,16,0" Padding="0,12,0,0" BorderThickness="0,1,0,0" BorderBrush="{StaticResource StrokeColor}">
+                <StackPanel>
+                    <ComboBox x:Name="CollectionList" Style="{StaticResource CollectionCombo}" SelectedValuePath="Id"
+                              ToolTip="{loc:Loc Key='切换收集'}" SelectionChanged="CollectionList_SelectionChanged">
+                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" FontSize="11"/></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{loc:Loc Key='收集名称'}" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource InkSecondaryColor}"/>
+                        <TextBox x:Name="CollectionName" Grid.Column="1" FontSize="11" ToolTip="{loc:Loc Key='这组收集的名称'}" LostFocus="CollectionName_LostFocus"/>
+                    </Grid>
+                    <ScrollViewer x:Name="BatchScroll" MaxHeight="220" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <ItemsControl x:Name="BatchList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource SunkenColor}" CornerRadius="12" Padding="12" Margin="0,0,0,8">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Button DockPanel.Dock="Right" Content="{loc:Loc Key='删除'}" Padding="6,2" FontSize="10.5" Foreground="{StaticResource DangerColor}"
+                                                        ToolTip="{loc:Loc Key='删除（可撤销）'}" Click="Remove_Click"/>
+                                                <TextBlock Text="{Binding Title}" FontSize="10.5" Foreground="{StaticResource InkSecondaryColor}" VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                            <TextBox Text="{Binding ChatName, UpdateSourceTrigger=PropertyChanged}" FontSize="11" ToolTip="{loc:Loc Key='群或联系人名称'}" LostFocus="ChatName_LostFocus"/>
+                                            <CheckBox IsChecked="{Binding IsDefault}" Margin="0,9,0,0" Click="DefaultName_Click" FontSize="10.5"
+                                                      Content="{loc:Loc Key='用于本组未命名和后续批次'}" Foreground="{StaticResource InkSecondaryColor}"/>
+                                            <TextBlock Text="{Binding Boundaries}" FontSize="10.5" Foreground="{StaticResource InkSecondaryColor}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <WrapPanel Margin="0,4,0,0">
+                        <Button x:Name="ResumeButton" Style="{StaticResource QuietButton}" Content="{loc:Loc Key='继续收集'}" Click="Resume_Click" Margin="0,0,6,0"/>
+                        <Button x:Name="UndoButton" Style="{StaticResource QuietButton}" Content="{loc:Loc Key='撤销删除'}" Click="Undo_Click" Margin="0,0,6,0"/>
+                        <Button Style="{StaticResource QuietButton}" Content="{loc:Loc Key='查看原始文件'}" Click="Reveal_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+            <TextBlock x:Name="Message" TextWrapping="Wrap" Margin="18,10,18,0" FontSize="11" Foreground="{StaticResource WarnInkColor}"
+                       Visibility="{Binding Text, RelativeSource={RelativeSource Self}, Converter={StaticResource StringToVisibility}}"/>
+            <Grid Margin="16,12,16,14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Button x:Name="ManageButton" Style="{StaticResource QuietButton}" Content="{loc:Loc Key='管理批次'}" Click="Manage_Click" HorizontalAlignment="Left"/>
+                <Button Grid.Column="1" x:Name="DeliverButton" Style="{StaticResource PrimaryButton}" Content="{loc:Loc Key='完成并发送…'}" Click="Deliver_Click" Padding="14,8" FontSize="12"/>
+            </Grid>
         </StackPanel>
-        <WrapPanel Grid.Row="1" Margin="0,12">
-            <Button x:Name="ResumeButton" Content="{loc:Loc Key='继续收集'}" Click="Resume_Click" Margin="0,0,8,0"/>
-            <Button x:Name="UndoButton" Content="{loc:Loc Key='撤销删除'}" Click="Undo_Click" Margin="0,0,8,0"/>
-            <Button Content="{loc:Loc Key='查看原始文件'}" Click="Reveal_Click"/>
-        </WrapPanel>
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <ItemsControl x:Name="BatchList">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
-                            <StackPanel>
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="{loc:Loc Key='删除（可撤销）'}" Click="Remove_Click"/>
-                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                </DockPanel>
-                                <TextBlock Text="{loc:Loc Key='群或联系人名称'}" Margin="0,8,0,4"/>
-                                <TextBox Text="{Binding ChatName, UpdateSourceTrigger=PropertyChanged}"
-                                         LostFocus="ChatName_LostFocus"/>
-                                <CheckBox Content="{loc:Loc Key='用于本组未命名和后续批次'}" IsChecked="{Binding IsDefault}" Margin="0,6,0,0" Click="DefaultName_Click"/>
-                                <Expander Header="{loc:Loc Key='查看边界（首尾消息参考）'}" Margin="0,8,0,0">
-                                    <TextBlock Text="{Binding Boundaries}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                </Expander>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-        <DockPanel Grid.Row="3" Margin="0,12,0,0">
-            <Button DockPanel.Dock="Right" x:Name="DeliverButton" Style="{StaticResource PrimaryButton}" Content="{loc:Loc Key='完成并交付…'}" Click="Deliver_Click"/>
-            <TextBlock x:Name="Message" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center"/>
-        </DockPanel>
-    </Grid>
+    </Border>
 </Window>
