@@ -28,6 +28,7 @@ public partial class App : Application
     private EventWaitHandle? _changeEvent;
     private EventWaitHandle? _foregroundEvent;
     private EventWaitHandle? _prefetchEvent;
+    private EventWaitHandle? _collectionImportEvent;
     private CancellationTokenSource? _shutdown;
     private InboxPaths? _paths;
     private MainViewModel? _model;
@@ -61,6 +62,7 @@ public partial class App : Application
         _changeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ChangeEventName);
         _foregroundEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ForegroundEventName);
         _prefetchEvent = new EventWaitHandle(false, EventResetMode.AutoReset, PrefetchEventName);
+        _collectionImportEvent = new EventWaitHandle(false, EventResetMode.AutoReset, CollectionImportProgress.EventName);
         _shutdown = new CancellationTokenSource();
         var requestedBatch = ReadArgument(e.Args, "--batch-id");
         var model = new MainViewModel(_paths);
@@ -92,6 +94,7 @@ public partial class App : Application
             // A hint can predate this process — the share that launched us
             // staged while we were still starting. Draining it here starts
             // the scene reads before Reload announces the batch.
+            model.RefreshImportProgress();
             model.ConsumePrefetchHint();
             model.RebuildEntries();
             window.RefreshBatches();
@@ -124,6 +127,7 @@ public partial class App : Application
         _changeEvent?.Dispose();
         _foregroundEvent?.Dispose();
         _prefetchEvent?.Dispose();
+        _collectionImportEvent?.Dispose();
         if (_mutex is not null)
         {
             try { _mutex.ReleaseMutex(); } catch (ApplicationException) { }
@@ -139,16 +143,25 @@ public partial class App : Application
             try
             {
                 var signalled = await Task.Run(
-                    () => WaitHandle.WaitAny(new WaitHandle?[] { _changeEvent, _foregroundEvent, _prefetchEvent }
+                    () => WaitHandle.WaitAny(new WaitHandle?[] { _changeEvent, _foregroundEvent, _prefetchEvent, _collectionImportEvent }
                         .OfType<WaitHandle>().ToArray(), 500),
                     cancellationToken);
-                if (signalled == WaitHandle.WaitTimeout || cancellationToken.IsCancellationRequested)
+                if (cancellationToken.IsCancellationRequested) return;
+                if (signalled == WaitHandle.WaitTimeout)
+                {
+                    if (_model?.ImportProgress is not null) Dispatcher.Invoke(() => _model.RefreshImportProgress());
                     continue;
+                }
 
                 Dispatcher.Invoke(() =>
                 {
                     // A prefetch hint touches no window — the resident process
                     // is expected to be hidden while it runs the reads.
+                    if (signalled == 3)
+                    {
+                        _model?.RefreshImportProgress();
+                        return;
+                    }
                     if (signalled == 2)
                     {
                         _model?.ConsumePrefetchHint();

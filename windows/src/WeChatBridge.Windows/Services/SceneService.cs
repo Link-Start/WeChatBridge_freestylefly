@@ -265,6 +265,18 @@ public sealed class SceneService : IDisposable
         RaiseChanged();
     }
 
+    public async Task<SceneChoice> ExplicitCollectionChoiceAsync(ReadyBatch batch, WeChatScene? scene)
+    {
+        var insights = scene is null ? WeChatBatchInsights.Empty
+            : await _insightsReader(batch.Items.Select(i => i.FullPath).ToList(), CancellationToken.None);
+        var memory = batch.ChatName is { } name ? Memories.Load().GetValueOrDefault(GroupName.Normalize(name)) : null;
+        return new SceneChoice { Selection = new SceneCoordinator.Selection
+        {
+            GroupName = batch.ChatName, Scenes = scene is null ? [] : [scene],
+            Insights = insights, PreviousSummaryAt = memory?.LastSummaryAt,
+        } };
+    }
+
     /// <summary>
     /// The prompt text pasted ahead of the files, or null. Ported from
     /// <c>ActionRunner.forward</c>: a scene that does not list the current agent

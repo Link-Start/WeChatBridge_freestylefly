@@ -60,6 +60,7 @@ public partial class EntriesPane : UserControl
             && sender is CheckBox box)
         {
             model.SetEntryEnabled(row.Action, box.IsChecked == true);
+            box.SetCurrentValue(CheckBox.IsCheckedProperty, model.IsEntryEnabled(row.Action));
         }
     }
 

@@ -330,35 +330,67 @@ internal static class Program
         // What arrived, under the picker's title — known the moment the
         // file names are, while the user is still reading the rows.
         picker?.SetContext(ContextLine(sources));
+        var titleSnapshot = WeChatBridge.Windows.Services.WeChatUiTitleReader.ReadWithFallbackAsync();
         Trace(paths, $"share.sources count={sources.Count}");
 
         // Staging overlaps the pick: whatever the user answers, the batch
         // commits — only the intent/outcome written on top of it differs.
         var stageTask = InboxWriter.StageAsync(
             paths, sources, cancellationToken: default, limits: null, action: action);
-        var staged = await stageTask;
-        // Tell the resident app which batch is coming while the user is still
-        // weighing the rows — its title read and ZIP parse then finish inside
-        // the decision time instead of after the click.
-        PrefetchHint.Publish(paths, staged);
-        Trace(paths, $"share.staged batch={staged.BatchId:N}");
-        var answer = entryPick is null ? null : await entryPick;
-        Trace(paths, $"share.answer kind={answer?.Kind.ToString() ?? "none"}");
+        CollectionImportSession? receipt = null;
+        using var stopReceipt = new CancellationTokenSource();
+        var receiptChoice = StartReceiptAsync();
+        async Task StartReceiptAsync()
+        {
+            try
+            {
+                var choice = entryPick is null ? null : await entryPick.WaitAsync(stopReceipt.Token);
+                var (resolved, _) = ResolveForward(action, choice);
+                if (resolved?.Action != ShareAction.Collect) return;
+                receipt = new CollectionImportSession(paths);
+                try { StartMainProcess(paths, Guid.Empty); }
+                catch (Exception error) { InboxLogger.Write(paths, "保存进度唤醒主程序失败", error); }
+            }
+            catch (OperationCanceledException) { }
+        }
+        try
+        {
+            var staged = await stageTask;
+            // Tell the resident app which batch is coming while the user is still
+            // weighing the rows — its title read and ZIP parse then finish inside
+            // the decision time instead of after the click.
+            PrefetchHint.Publish(paths, staged);
+            Trace(paths, $"share.staged batch={staged.BatchId:N}");
+            var answer = entryPick is null ? null : await entryPick;
+            Trace(paths, $"share.answer kind={answer?.Kind.ToString() ?? "none"}");
 
-        var (intent, initialOutcome) = ResolveForward(action, answer);
-        var committed = await InboxWriter.CommitAsync(
-            paths, staged, intent, initialOutcome);
-        Trace(paths, $"share.committed batch={committed.BatchId:N}");
-        // The batch is durable at this point, so everything below is an
-        // optimisation that is allowed to fail. Sweeping here is what keeps
-        // debris from a share that was killed mid-copy from accumulating —
-        // off the dispatcher so it cannot stall the next pick.
-        _ = Task.Run(() => paths.PruneStaging());
-        var clipboardWritten = TryWriteClipboard(committed.Manifest.Items, committed.BatchDirectory, paths);
-        Trace(paths, $"share.clipboard ok={clipboardWritten}");
-        SignalMainProcess();
-        StartMainProcess(paths, committed.BatchId);
-        InboxLogger.Write(paths, $"分享批次已提交：{committed.BatchId}; action={action.RawValue()}; intent={intent?.Action.RawValue() ?? "none"}; clipboard={clipboardWritten}");
+            await receiptChoice;
+            var (intent, initialOutcome) = ResolveForward(action, answer);
+            string? chatName = null;
+            try { chatName = (await titleSnapshot.WaitAsync(TimeSpan.FromSeconds(3)))?.Name; } catch { }
+            var committed = await InboxWriter.CommitAsync(
+                paths, staged, intent, initialOutcome, chatName: chatName);
+            Trace(paths, $"share.committed batch={committed.BatchId:N}");
+            // The batch is durable at this point, so everything below is an
+            // optimisation that is allowed to fail. Sweeping here is what keeps
+            // debris from a share that was killed mid-copy from accumulating —
+            // off the dispatcher so it cannot stall the next pick.
+            _ = Task.Run(() => paths.PruneStaging());
+            // The final picker choice owns the action; Hub may have selected Collect.
+            var clipboardWritten = ShareActions.WritesClipboardOnReceipt(action, intent)
+                && TryWriteClipboard(committed.Manifest.Items, committed.BatchDirectory, paths);
+            Trace(paths, $"share.clipboard ok={clipboardWritten}");
+            receipt?.Finish(true);
+            SignalMainProcess();
+            StartMainProcess(paths, committed.BatchId);
+            InboxLogger.Write(paths, $"分享批次已提交：{committed.BatchId}; action={action.RawValue()}; intent={intent?.Action.RawValue() ?? "none"}; clipboard={clipboardWritten}");
+        }
+        finally
+        {
+            stopReceipt.Cancel();
+            await receiptChoice;
+            receipt?.Dispose();
+        }
     }
 
     /// <summary>

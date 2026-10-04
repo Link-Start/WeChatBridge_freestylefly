@@ -43,6 +43,9 @@ public sealed class AppSettings
     public bool OpenObsidianAfterDelivery { get; set; }
     public string? DeliveryFolderPath { get; set; }
     public string DeliverySubfolder { get; set; } = "微信流";
+    public string? LastCollectionTarget { get; set; }
+    public List<string> RecentCollectionFolders { get; set; } = [];
+    public string? LastCollectionScene { get; set; }
 
     /// <summary>
     /// Keep a hidden instance resident after sign-in. A share's latency is

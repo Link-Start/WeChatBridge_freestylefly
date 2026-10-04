@@ -19,6 +19,13 @@ namespace WeChatBridge.Windows.Services;
 /// </summary>
 public static class WeChatUiTitleReader
 {
+    public static async Task<GroupTitleParser.Title?> ReadWithFallbackAsync()
+    {
+        var title = await Task.Run(() => TryRead() ?? new WeChatWindowTitleReader().TryRead());
+        if (title is not null) return title;
+        try { return await WeChatOcrTitleReader.TryReadAsync(); }
+        catch { return null; }
+    }
     /// <summary>Weixin.exe is WeChat 4.x; WeChat.exe is the 3.x line.</summary>
     private static readonly string[] WeChatProcessNames = ["weixin", "wechat"];
 

@@ -61,15 +61,15 @@
     <Style x:Key="SettingsButton" TargetType="Button">
         <Setter Property="Padding" Value="12,5" />
         <Setter Property="FontSize" Value="12.5" />
-        <Setter Property="Foreground" Value="{StaticResource InkColor}" />
-        <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkColor}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceColor}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="border"
                             Background="{TemplateBinding Background}"
-                            BorderBrush="{StaticResource ButtonBorderColor}"
+                            BorderBrush="{DynamicResource ButtonBorderColor}"
                             BorderThickness="1"
                             CornerRadius="10"
                             Padding="{TemplateBinding Padding}">
@@ -77,7 +77,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource HoverColor}" />
+                            <Setter Property="Background" Value="{DynamicResource HoverColor}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -93,8 +93,8 @@
         <Setter Property="Padding" Value="14,6" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource OnBrandColor}" />
-        <Setter Property="Background" Value="{StaticResource BrandColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnBrandColor}" />
+        <Setter Property="Background" Value="{DynamicResource BrandColor}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
@@ -107,10 +107,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource BrandHoverColor}" />
+                            <Setter Property="Background" Value="{DynamicResource BrandHoverColor}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Background" Value="{StaticResource BrandPressedColor}" />
+                            <Setter Property="Background" Value="{DynamicResource BrandPressedColor}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -125,7 +125,7 @@
     <Style x:Key="DangerButton" TargetType="Button">
         <Setter Property="Padding" Value="12,5" />
         <Setter Property="FontSize" Value="12.5" />
-        <Setter Property="Foreground" Value="{StaticResource DangerColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource DangerColor}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Cursor" Value="Hand" />
@@ -140,9 +140,9 @@
                 <ControlTemplate TargetType="CheckBox">
                     <Grid>
                         <Border x:Name="track" Width="38" Height="22" CornerRadius="11"
-                                Background="{StaticResource DisabledColor}" />
+                                Background="{DynamicResource DisabledColor}" />
                         <Border x:Name="knob" Width="18" Height="18" CornerRadius="9"
-                                Background="{StaticResource SurfaceColor}"
+                                Background="{DynamicResource SurfaceColor}"
                                 HorizontalAlignment="Left" Margin="2,0,0,0">
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="3" ShadowDepth="1" Opacity="0.25" />
@@ -151,7 +151,7 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="track" Property="Background" Value="{StaticResource BrandColor}" />
+                            <Setter TargetName="track" Property="Background" Value="{DynamicResource BrandColor}" />
                             <Setter TargetName="knob" Property="Margin" Value="18,0,0,0" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
@@ -167,12 +167,12 @@
     <Style x:Key="MacField" TargetType="TextBox">
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="FontSize" Value="12.5" />
-        <Setter Property="Foreground" Value="{StaticResource InkColor}" />
-        <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
-        <Setter Property="BorderBrush" Value="{StaticResource StrokeColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkColor}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StrokeColor}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CaretBrush" Value="{StaticResource BrandColor}" />
-        <Setter Property="SelectionBrush" Value="{StaticResource BrandTintColor}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource BrandColor}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource BrandTintColor}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -186,7 +186,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter Property="BorderBrush" Value="{StaticResource BrandColor}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource BrandColor}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -198,7 +198,7 @@
     <Style x:Key="SectionLabel" TargetType="TextBlock">
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource InkSecondaryColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkSecondaryColor}" />
     </Style>
 
     <!-- Status pill kept for panes that still use it; new work draws the
@@ -206,46 +206,46 @@
     <Style x:Key="StatusPill" TargetType="Border">
         <Setter Property="CornerRadius" Value="9" />
         <Setter Property="Padding" Value="8,2" />
-        <Setter Property="Background" Value="{StaticResource NeutralFillColor}" />
+        <Setter Property="Background" Value="{DynamicResource NeutralFillColor}" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Tone}" Value="Live">
-                <Setter Property="Background" Value="{StaticResource LiveFillColor}" />
+                <Setter Property="Background" Value="{DynamicResource LiveFillColor}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Tone}" Value="Warn">
-                <Setter Property="Background" Value="{StaticResource WarnFillColor}" />
+                <Setter Property="Background" Value="{DynamicResource WarnFillColor}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
     <Style x:Key="StatusPillText" TargetType="TextBlock">
         <Setter Property="FontSize" Value="11" />
-        <Setter Property="Foreground" Value="{StaticResource NeutralInkColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource NeutralInkColor}" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Tone}" Value="Live">
-                <Setter Property="Foreground" Value="{StaticResource LiveInkColor}" />
+                <Setter Property="Foreground" Value="{DynamicResource LiveInkColor}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Tone}" Value="Warn">
-                <Setter Property="Foreground" Value="{StaticResource WarnInkColor}" />
+                <Setter Property="Foreground" Value="{DynamicResource WarnInkColor}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
     <Style x:Key="StatusDot" TargetType="Ellipse">
         <Setter Property="Width" Value="6" />
         <Setter Property="Height" Value="6" />
-        <Setter Property="Fill" Value="{StaticResource NeutralInkColor}" />
+        <Setter Property="Fill" Value="{DynamicResource NeutralInkColor}" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding Tone}" Value="Live">
-                <Setter Property="Fill" Value="{StaticResource BrandColor}" />
+                <Setter Property="Fill" Value="{DynamicResource BrandColor}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Tone}" Value="Warn">
-                <Setter Property="Fill" Value="{StaticResource WarningColor}" />
+                <Setter Property="Fill" Value="{DynamicResource WarningColor}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
 
     <!-- Card: the white rounded surface every pane section sits on. -->
     <Style x:Key="Card" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
-        <Setter Property="BorderBrush" Value="{StaticResource StrokeColor}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StrokeColor}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="16" />
@@ -253,7 +253,7 @@
 
     <!-- Soft explanatory panel (macOS Panel). -->
     <Style x:Key="Panel" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource SunkenColor}" />
+        <Setter Property="Background" Value="{DynamicResource SunkenColor}" />
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="16" />
     </Style>
@@ -272,7 +272,7 @@
         <Setter Property="Content" Value="&#xE106;" />
         <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
         <Setter Property="FontSize" Value="9" />
-        <Setter Property="Foreground" Value="{StaticResource InkTertiaryColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource InkTertiaryColor}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Cursor" Value="Hand" />
@@ -286,8 +286,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource SunkenColor}" />
-                            <Setter Property="Foreground" Value="{StaticResource InkSecondaryColor}" />
+                            <Setter Property="Background" Value="{DynamicResource SunkenColor}" />
+                            <Setter Property="Foreground" Value="{DynamicResource InkSecondaryColor}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -298,8 +298,8 @@
     <!-- A keycap: the little bordered chip a shortcut hint is printed on. -->
     <Style x:Key="KeycapChip" TargetType="Border">
         <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Background" Value="{StaticResource SunkenColor}" />
-        <Setter Property="BorderBrush" Value="{StaticResource StrokeStrongColor}" />
+        <Setter Property="Background" Value="{DynamicResource SunkenColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StrokeStrongColor}" />
         <Setter Property="BorderThickness" Value="1,1,1,1.5" />
         <Setter Property="Padding" Value="4,0" />
         <Setter Property="MinHeight" Value="16" />
@@ -311,8 +311,8 @@
          just horizontally centred text. -->
     <Style x:Key="ShortcutChip" TargetType="Border">
         <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
-        <Setter Property="BorderBrush" Value="{StaticResource StrokeColor}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceColor}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StrokeColor}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="3.5,0" />
         <Setter Property="MinHeight" Value="15" />
@@ -324,8 +324,8 @@
     <Style x:Key="PickerGhostButton" TargetType="Button">
         <Setter Property="Padding" Value="11,4" />
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="Foreground" Value="{StaticResource SecondaryActionTextColor}" />
-        <Setter Property="Background" Value="{StaticResource SunkenColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryActionTextColor}" />
+        <Setter Property="Background" Value="{DynamicResource SunkenColor}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
@@ -337,7 +337,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource SelectedColor}" />
+                            <Setter Property="Background" Value="{DynamicResource SelectedColor}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -350,8 +350,8 @@
         <Setter Property="Padding" Value="12,4" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource OnBrandColor}" />
-        <Setter Property="Background" Value="{StaticResource BrandColor}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnBrandColor}" />
+        <Setter Property="Background" Value="{DynamicResource BrandColor}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
@@ -363,10 +363,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource BrandHoverColor}" />
+                            <Setter Property="Background" Value="{DynamicResource BrandHoverColor}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Background" Value="{StaticResource BrandPressedColor}" />
+                            <Setter Property="Background" Value="{DynamicResource BrandPressedColor}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />

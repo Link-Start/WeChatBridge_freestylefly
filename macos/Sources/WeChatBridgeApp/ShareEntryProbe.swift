@@ -46,6 +46,17 @@ final class ShareEntryProbe: ObservableObject {
     /// what pkd actually did, so a refused election animates straight back.
     @Published private(set) var requested: [ShareAction: Bool] = [:]
     private var isRefreshing = false
+    @Published var enablingFailure: String?
+    private let isAppInstalled: @MainActor (String) -> Bool
+    private let customTargets: () -> [ForwardTarget]
+
+    init(
+        isAppInstalled: @escaping @MainActor (String) -> Bool = { InstalledApp.isInstalledNow($0) },
+        customTargets: @escaping () -> [ForwardTarget] = { ForwardTargetStore().load() }
+    ) {
+        self.isAppInstalled = isAppInstalled
+        self.customTargets = customTargets
+    }
 
     func state(of action: ShareAction) -> ShareEntryState? { states[action] }
 
@@ -94,6 +105,12 @@ final class ShareEntryProbe: ObservableObject {
     /// behind a spinner until then, which threw away the one animation a
     /// switch has — the user noticed (2026-09-06).
     func setEnabled(_ enabled: Bool, for action: ShareAction) {
+        guard !switching.contains(action) else { return }
+        enablingFailure = nil
+        if enabled, let failure = installationFailure(for: action) {
+            enablingFailure = failure
+            return
+        }
         guard !switching.contains(action), let base = Bundle.main.bundleIdentifier else { return }
         let identifier = "\(base).\(action.bundleIdentifierSuffix)"
         switching.insert(action)
@@ -107,6 +124,16 @@ final class ShareEntryProbe: ObservableObject {
                 self.switching.remove(action)
             }
         }
+    }
+
+    func installationFailure(for action: ShareAction) -> String? {
+        if let identifier = action.targetBundleIdentifier, !isAppInstalled(identifier) {
+            return L10n.format("请先安装 %@，再开启此入口。", action.targetDisplayName)
+        }
+        if action == .custom && !customTargets().contains(where: { isAppInstalled($0.bundleIdentifier) }) {
+            return L10n.text("请先添加至少一个已安装的应用，再开启自定义入口。")
+        }
+        return nil
     }
 
     // MARK: - The tool

@@ -49,12 +49,13 @@ public static class TrayMenu
     public static IReadOnlyList<Entry> Build(
         IReadOnlyList<ReadyBatch> batches,
         bool windowVisible,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        BatchCollection? current = null)
     {
         return
         [
             new Entry(windowVisible ? L10n.Text("隐藏主窗口") : L10n.Text("显示主窗口"), Action: Command.ToggleWindow),
-            new Entry(L10n.Text("分批收集…"), Action: Command.Collections),
+            ..(current is null ? Array.Empty<Entry>() : [new Entry(L10n.Format($"继续收集 · {current.BatchIDs.Count} 批"), Action: Command.Collections)]),
             new Entry(L10n.Text("最近记录"), Children: BuildRecent(batches, now)),
             new Entry(null),
             new Entry(L10n.Text("打开 Inbox"), Action: Command.OpenInbox),
@@ -341,7 +342,7 @@ public sealed class TrayIconService : IDisposable
         _commands.Clear();
         _nextCommandId = 1;
         var windowVisible = _window()?.IsVisible == true;
-        Populate(menu, TrayMenu.Build(_model.Batches, windowVisible, DateTimeOffset.Now));
+        Populate(menu, TrayMenu.Build(_model.Batches, windowVisible, DateTimeOffset.Now, _model.Collections.Ledger.Current));
 
         Native.GetCursorPos(out var point);
         // The foreground trick every tray menu needs: without it the popup does

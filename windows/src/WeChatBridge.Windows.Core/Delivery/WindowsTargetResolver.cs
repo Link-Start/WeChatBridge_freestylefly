@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
 using WeChatBridge.Windows.Core.Interop;
 
 namespace WeChatBridge.Windows.Core.Delivery;
@@ -24,6 +26,16 @@ public static class WindowsTargetResolver
     public static readonly TimeSpan LaunchTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
+    public static bool IsInstalled(WindowsForwardTarget spec)
+    {
+        // An explicit custom path must exist; an unrelated running app with
+        // the same executable name is not evidence that this target exists.
+        if (spec.ExeCandidates.Count > 0 && spec.ExeCandidates.All(candidate =>
+            Path.IsPathRooted(Environment.ExpandEnvironmentVariables(candidate))))
+            return FindExecutable(spec) is not null;
+        return Resolve(spec) is not null;
+    }
+
     /// <summary>Best resolution without launching anything.</summary>
     public static ResolvedTarget? Resolve(WindowsForwardTarget spec)
     {
@@ -33,7 +45,7 @@ public static class WindowsTargetResolver
         var exe = FindExecutable(spec);
         if (exe is not null)
             return new ResolvedTarget(spec, null, 0, exe);
-        if (spec.Aumid is not null)
+        if (spec.Aumid is not null && IsRegisteredApplication(spec.Aumid))
             return new ResolvedTarget(spec, null, 0, null);
         return null;
     }
@@ -116,14 +128,67 @@ public static class WindowsTargetResolver
                     return Path.GetFullPath(expanded);
                 continue;
             }
-            // Bare file name: the shell would resolve it through PATH and
-            // App Paths at launch time; we only scan PATH — App Paths
-            // resolution is delegated to UseShellExecute at launch.
-            var found = SearchPath(expanded);
+            // Verify both PATH and App Paths before advertising availability.
+            var found = SearchPath(expanded) ?? SearchAppPaths(expanded);
             if (found is not null)
                 return found;
         }
         return null;
+    }
+
+    private static string? SearchAppPaths(string fileName)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        foreach (var hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            try
+            {
+                using var root = RegistryKey.OpenBaseKey(hive, view);
+                using var key = root.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths\" + fileName);
+                if (key?.GetValue(null) is string value)
+                {
+                    var path = Environment.ExpandEnvironmentVariables(value).Trim('"');
+                    if (File.Exists(path)) return path;
+                }
+            }
+            catch { /* Inaccessible registration is not installation evidence. */ }
+        }
+        return null;
+    }
+
+    /// <summary>Both MSIX and Win32 AUMIDs must actually appear in AppsFolder.</summary>
+    public static bool IsRegisteredApplication(string aumid)
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        object? shell = null, folder = null, items = null;
+        try
+        {
+            var type = Type.GetTypeFromProgID("Shell.Application");
+            if (type is null) return false;
+            shell = Activator.CreateInstance(type);
+            folder = ((dynamic)shell!).NameSpace("shell:AppsFolder");
+            if (folder is null) return false;
+            items = ((dynamic)folder).Items();
+            for (var i = 0; i < (int)((dynamic)items).Count; i++)
+            {
+                object? item = null;
+                try
+                {
+                    item = ((dynamic)items).Item(i);
+                    string? id = ((dynamic)item!).ExtendedProperty("System.AppUserModel.ID") as string;
+                    if (string.Equals(id, aumid, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+                finally { if (item is not null && Marshal.IsComObject(item)) Marshal.FinalReleaseComObject(item); }
+            }
+        }
+        catch { /* Do not enable an entry whose registration cannot be verified. */ }
+        finally
+        {
+            foreach (var value in new[] { items, folder, shell })
+                if (value is not null && Marshal.IsComObject(value)) Marshal.FinalReleaseComObject(value);
+        }
+        return false;
     }
 
     private static string? SearchPath(string fileName)

@@ -7,6 +7,137 @@ namespace WeChatBridge.Windows.Tests;
 
 public sealed class CollectionTests
 {
+    [Theory]
+    [InlineData(ShareAction.Hub, ShareAction.Collect, false)]
+    [InlineData(ShareAction.Collect, ShareAction.Collect, false)]
+    [InlineData(ShareAction.Hub, ShareAction.Clipboard, true)]
+    [InlineData(ShareAction.Hub, ShareAction.Codex, true)]
+    public void ClipboardReceiptPolicyUsesFinalChoice(ShareAction entry, ShareAction picked, bool writes)
+        => Assert.Equal(writes, ShareActions.WritesClipboardOnReceipt(entry, new BatchIntent { Action = picked }));
+
+    [Fact]
+    public async Task DirectShareWithCommittedTitleStillAnnouncesOnceAndKeepsItsIntent()
+    {
+        using var fixture = new TempInbox();
+        var source = fixture.WriteSource("one.zip", "bytes");
+        var staged = await InboxWriter.StageAsync(fixture.Paths, [new InboxSourceFile(source, "one.zip", "application/zip", 0, 0)], action: ShareAction.Hub);
+        await InboxWriter.CommitAsync(fixture.Paths, staged, new BatchIntent { Action = ShareAction.Codex, RequestedAt = DateTimeOffset.UtcNow }, chatName: "快照群");
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var first = Assert.Single(reader.LoadBatches());
+        Assert.True(first.IsFirstSeen);
+        Assert.False(Assert.Single(reader.LoadBatches()).IsFirstSeen);
+        Assert.Equal(ShareAction.Codex, reader.ConsumeIntent(first.Id).Intent?.Action);
+        Assert.Equal(ConsumedIntentKind.None, reader.ConsumeIntent(first.Id).Kind);
+        Assert.Equal("快照群", reader.StateFor(first.Id)?.ChatName);
+    }
+
+    [Fact]
+    public async Task FailedDeletionAfterBackupRestoresPartialFilesystemChanges()
+    {
+        using var fixture = new TempInbox();
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var service = new CollectionService(fixture.Paths, reader);
+        var batch = await AddBatch(fixture, reader);
+        var group = service.Append(batch, "甲群");
+        using (File.Open(batch.Items[0].FullPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.ThrowsAny<IOException>(() => service.Remove(group, batch.Id));
+        var restarted = new CollectionService(fixture.Paths, reader);
+        Assert.Equal([batch.Id], restarted.Ledger.Editable(group).BatchIDs);
+        Assert.Equal("甲群", Assert.Single(reader.LoadBatches()).ChatName);
+        Assert.Equal("original-archive-bytes", File.ReadAllText(batch.Items[0].FullPath));
+        Assert.False(restarted.CanUndo);
+    }
+    [Fact]
+    public async Task ConsecutiveRemovalAndWholeGroupUndoPreserveBytesNamesAndOrderAcrossRestart()
+    {
+        using var fixture = new TempInbox();
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var service = new CollectionService(fixture.Paths, reader);
+        var first = await AddBatch(fixture, reader, "one.zip");
+        var second = await AddBatch(fixture, reader, "two.zip");
+        var group = service.Append(first, "甲群");
+        service.Append(second, "乙群");
+        service.Remove(group, first.Id);
+        service.Remove(group, second.Id);
+        service = new CollectionService(fixture.Paths, reader);
+        service.Undo();
+        service.Undo();
+        Assert.Equal([first.Id, second.Id], service.Ledger.Editable(group).BatchIDs);
+        Assert.Equal("甲群", reader.StateFor(first.Id)?.ChatName);
+        Assert.Equal("乙群", reader.StateFor(second.Id)?.ChatName);
+        service.DeleteCollection(group);
+        Assert.Empty(service.Ledger.Editable(group).BatchIDs);
+        service = new CollectionService(fixture.Paths, reader);
+        service.Undo();
+        Assert.Equal([first.Id, second.Id], service.Ledger.Editable(group).BatchIDs);
+        Assert.Equal(CollectionStatus.Collecting, service.Ledger.Editable(group).Status);
+        Assert.All(new[] { first, second }, b => Assert.Equal("original-archive-bytes", File.ReadAllText(b.Items[0].FullPath)));
+        Assert.False(service.CanUndo);
+    }
+
+    [Fact]
+    public async Task DetachLeavesBatchInHistoryAndUndoDoesNotReplaceNewCurrentCollection()
+    {
+        using var fixture = new TempInbox();
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var service = new CollectionService(fixture.Paths, reader);
+        var first = await AddBatch(fixture, reader);
+        var group = service.Append(first, "甲群");
+        service.Detach(group, first.Id);
+        Assert.Single(reader.LoadBatches());
+        Assert.True(File.Exists(first.Items[0].FullPath));
+        var second = await AddBatch(fixture, reader, "second.zip");
+        var nextGroup = service.Append(second, "乙群");
+        service.Undo();
+        Assert.Equal(nextGroup, service.Ledger.Current?.Id);
+        Assert.Equal(CollectionStatus.Draft, service.Ledger.Editable(group).Status);
+        Assert.Equal([first.Id], service.Ledger.Editable(group).BatchIDs);
+    }
+
+    [Fact]
+    public async Task RemovalWithLockedArchiveLeavesOriginalMembershipAndNoBrokenUndo()
+    {
+        using var fixture = new TempInbox();
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var service = new CollectionService(fixture.Paths, reader);
+        var batch = await AddBatch(fixture, reader);
+        var group = service.Append(batch, "甲群");
+        using (File.Open(batch.Items[0].FullPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.ThrowsAny<IOException>(() => service.Remove(group, batch.Id));
+        service = new CollectionService(fixture.Paths, reader);
+        Assert.Equal([batch.Id], service.Ledger.Editable(group).BatchIDs);
+        Assert.Equal(CollectionStatus.Collecting, service.Ledger.Current?.Status);
+        Assert.Equal("original-archive-bytes", File.ReadAllText(batch.Items[0].FullPath));
+        Assert.False(service.CanUndo);
+    }
+
+    [Fact]
+    public void PartialStatisticsAndTwoBoundaryReferencesDoNotClaimUniqueMessageCounts()
+    {
+        using var fixture = new TempInbox();
+        var path = CreateZip(fixture, "messages.zip", "·甲\n2026年9月20日 09:10\n一\n\n·乙\n2026年9月20日 09:10\n二\n\n·丙\n2026年9月20日 09:11\n三\n");
+        var metadata = CollectionBatchMetadata.Read([path]);
+        Assert.Equal(["一", "二"], metadata.FirstRecords.Select(r => r.Text));
+        Assert.Equal(["二", "三"], metadata.LastRecords.Select(r => r.Text));
+        Assert.Contains("已识别约 3 条 · 1 批条数未知", CollectionSummary.Format([metadata, new(null, null, null)], "1 MB"));
+    }
+
+    [Fact]
+    public async Task ConversationSnapshotCommitsTogetherWithOriginalsAndFinalCollectionIntent()
+    {
+        using var fixture = new TempInbox();
+        var source = fixture.WriteSource("one.zip", "bytes");
+        var staged = await InboxWriter.StageAsync(fixture.Paths, [new InboxSourceFile(source, "one.zip", "application/zip", 0, 0)], action: ShareAction.Hub);
+        var committed = await InboxWriter.CommitAsync(fixture.Paths, staged,
+            new BatchIntent { Action = ShareAction.Collect }, chatName: "导入时的群名");
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var batch = Assert.Single(reader.LoadBatches());
+        Assert.Equal(committed.BatchId, batch.Id);
+        Assert.Equal("导入时的群名", batch.ChatName);
+        Assert.Equal(ShareAction.Collect, batch.Action);
+        Assert.True(batch.IsFirstSeen);
+        Assert.False(Assert.Single(reader.LoadBatches()).IsFirstSeen);
+    }
     private static async Task<ReadyBatch> AddBatch(TempInbox fixture, InboxReader reader, string name = "聊天记录.zip")
     {
         var source = fixture.WriteSource(name, "original-archive-bytes");

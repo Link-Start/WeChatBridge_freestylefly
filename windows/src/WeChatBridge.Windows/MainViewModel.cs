@@ -37,6 +37,39 @@ public enum StatusTone
 public sealed class BatchRow : INotifyPropertyChanged
 {
     private bool _isExpanded;
+    private bool _readingBoundaries;
+    private CollectionBatchMetadata? _metadata;
+    public string Range
+    {
+        get
+        {
+            if (_metadata is null && !_readingBoundaries) _ = ReadBoundaries();
+            return _metadata?.First is { } first && _metadata.Last is { } last
+                ? $"{first.Date.LocalDateTime:yyyy-MM-dd HH:mm} — {last.Date.LocalDateTime:yyyy-MM-dd HH:mm}"
+                : L10n.Text(_readingBoundaries ? "正在读取…" : "未能读取位置参考，原始文件已保存");
+        }
+    }
+    public string BoundaryText { get; private set; } = "";
+
+    private async Task ReadBoundaries()
+    {
+        _readingBoundaries = true;
+        try
+        {
+            _metadata = await Task.Run(() => CollectionBatchMetadata.Read(Batch.Items.Select(i => i.FullPath)));
+            var references = _metadata.FirstRecords.Select(r => (Label: L10n.Text("较早"), Record: r))
+                .Concat(_metadata.LastRecords.Select(r => (Label: L10n.Text("较晚"), Record: r)));
+            BoundaryText = CollectionSummary.Format([_metadata], SizeText) + "\n"
+                + string.Join("\n\n", references.Select(r => $"{r.Label} · {r.Record.Date.LocalDateTime:yyyy-MM-dd HH:mm} · {r.Record.Sender}\n{r.Record.Text}"));
+        }
+        catch { _metadata = new(null, null, null); BoundaryText = L10n.Text("未能读取位置参考，原始文件已保存"); }
+        finally
+        {
+            _readingBoundaries = false;
+            PropertyChanged?.Invoke(this, new(nameof(Range)));
+            PropertyChanged?.Invoke(this, new(nameof(BoundaryText)));
+        }
+    }
 
     public required ReadyBatch Batch { get; init; }
 
@@ -49,6 +82,7 @@ public sealed class BatchRow : INotifyPropertyChanged
             if (_isExpanded == value)
                 return;
             _isExpanded = value;
+            if (value && _metadata is null && !_readingBoundaries) _ = ReadBoundaries();
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
         }
     }
@@ -180,7 +214,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string? _inboxFailure;
 
     public MainViewModel(InboxPaths paths, string? configDirectory = null, bool manageLogin = true,
-        DeliveryEngine? delivery = null, SceneService? scenes = null, Action<PastePayload>? copyPayload = null)
+        DeliveryEngine? delivery = null, SceneService? scenes = null, Action<PastePayload>? copyPayload = null,
+        Func<WindowsForwardTarget, bool>? isAppInstalled = null)
     {
         _paths = paths;
         _reader = new InboxReader(paths);
@@ -190,6 +225,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _copyPayload = copyPayload;
         _scenes = scenes;
         _settings = _settingsStore.Load();
+        _isAppInstalled = isAppInstalled;
         // Residency is the whole point of the background instance: reconcile
         // the stored preference with the Run key at every start so a fresh
         // install self-registers and a user deletion stays deleted.
@@ -220,9 +256,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     internal SceneService Scenes => _scenes ??= new SceneService(
         // UIA reads the live chat name out of mmui::MainWindow; the window
         // title only ever says 「微信」 and stays as the fallback.
-        titleReader: ct => Task.Run(
-            () => Services.WeChatUiTitleReader.TryRead()
-                ?? new WeChatWindowTitleReader().TryRead(), ct),
+        titleReader: _ => Services.WeChatUiTitleReader.ReadWithFallbackAsync(),
         picker: (scenes, ct) => System.Windows.Application.Current?.Dispatcher
                 .InvokeAsync(() => ScenePickerWindow.ChooseAsync(
                     scenes, ct, System.Windows.Application.Current.MainWindow))
@@ -381,9 +415,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             InboxFailure = null;
             _ = Collections;
             Publish(_reader.LoadBatches());
-            foreach (var collected in _batches.Where(b => b.Action == ShareAction.Collect
-                         && !Collections.Ledger.SeenBatchIDs.Contains(b.Id)).OrderBy(b => b.CreatedAt))
+            var uncollected = _batches.Where(b => b.Action == ShareAction.Collect
+                         && !Collections.Ledger.SeenBatchIDs.Contains(b.Id)).OrderBy(b => b.CreatedAt).ToList();
+            foreach (var collected in uncollected)
                 Collections.Append(collected, null);
+            if (uncollected.Count > 0) Publish(_batches.Select(b => b with
+                { ChatName = _reader.StateFor(b.Id)?.ChatName ?? b.ChatName }).ToList());
 
             // IsFirstSeen comes from state.json having had to be written, so it
             // is true exactly once for a given batch — across relaunches, rescans
@@ -420,7 +457,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         if (batch.Action == ShareAction.Collect)
         {
             _reader.ConsumeIntent(batch.Id);
-            EnqueueForward(batch, new BatchIntent { Action = ShareAction.Collect, RequestedAt = DateTimeOffset.UtcNow });
+            // Collection receipt owns no clipboard work and must not wait behind a paste.
+            // The helper committed the title snapshot together with these files.
+            var id = Collections.Append(batch, null);
+            ShowCollection(id, activate: false);
             return false;
         }
         switch (_reader.ConsumeIntent(batch.Id))
@@ -623,7 +663,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 return;
             }
             var context = await Scenes.ResolveForShareAsync(batch.Items.Select(i => i.FullPath).ToList(),
-                groupName: batch.ChatName, captureTitle: freshShare, prefetch: prefetch, resolveScenes: false);
+                groupName: batch.ChatName, captureTitle: false, prefetch: prefetch, resolveScenes: false);
             var id = Collections.Append(batch, context?.GroupName);
             Reload();
             ShowCollection(id, activate: false);
@@ -694,7 +734,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         var choice = await Scenes.ResolveForShareAsync(
             batch.Items.Select(i => i.FullPath).ToList(),
             groupName: batch.ChatName,
-            captureTitle: freshShare,
+            captureTitle: freshShare && batch.ChatName is null,
             prefetch: prefetch,
             resolveScenes: resolveScenes);
         if (choice is null)
@@ -1022,8 +1062,26 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public bool IsEntryEnabled(ShareAction action) => _settings.IsEntryEnabled(action);
 
+    internal bool IsDestinationInstalled(ShareAction action, ForwardTarget? target)
+        => action != ShareAction.Custom
+            ? ShareEntryAvailability.CanEnable(action, [], _isAppInstalled)
+            : target is not null && ShareEntryAvailability.CanEnable(action, [target], _isAppInstalled);
+
+    private readonly Func<WindowsForwardTarget, bool>? _isAppInstalled;
+
     public void SetEntryEnabled(ShareAction action, bool enabled)
     {
+        if (enabled && !ShareEntryAvailability.CanEnable(action, _targetStore.Load(), _isAppInstalled))
+        {
+            _settings.SetEntryEnabled(action, false);
+            SaveSettings();
+            RebuildEntries();
+            var message = action == ShareAction.Custom
+                ? L10n.Text("请先添加至少一个已安装的应用，再开启自定义入口。")
+                : L10n.Format($"请先安装 {action.TargetDisplayName()}，再开启此入口。");
+            ToastRequested?.Invoke(message, null, null, true);
+            return;
+        }
         _settings.SetEntryEnabled(action, enabled);
         SaveSettings();
         RebuildEntries();

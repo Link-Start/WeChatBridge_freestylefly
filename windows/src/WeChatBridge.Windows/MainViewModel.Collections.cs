@@ -7,19 +7,26 @@ namespace WeChatBridge.Windows;
 
 public sealed partial class MainViewModel
 {
-    public sealed record CollectionHistoryRow(Guid Id, string Title, string Detail);
+    public sealed record CollectionHistoryRow(Guid Id, string Title, string Detail, IReadOnlyList<BatchRow> Batches)
+    {
+        public BatchRow? Latest => Batches.LastOrDefault();
+    }
     public ObservableCollection<CollectionHistoryRow> CollectionRows { get; } = [];
     private void RefreshCollectionRows()
     {
         CollectionRows.Clear();
-        foreach (var c in Collections.Ledger.Collections.AsEnumerable().Reverse())
+        foreach (var c in Collections.Ledger.Collections.Where(c => c.BatchIDs.Count > 0)
+                     .OrderByDescending(c => c.Status == CollectionStatus.Collecting).ThenByDescending(c => c.CreatedAt))
         {
             var title = c.Name.Length > 0 ? c.Name : L10n.Format($"收集 · {c.CreatedAt.LocalDateTime:MM-dd HH:mm}");
             var status = L10n.Text(c.Status switch { CollectionStatus.Collecting => "收集中", CollectionStatus.Draft => "待发送", CollectionStatus.Delivering => "正在交付", CollectionStatus.Delivered => "已交付", _ => "可重试" });
-            var detail = L10n.Format($"{c.BatchIDs.Count} 批 · {status} · {c.TargetName} {c.Detail}");
+            var members = _batches.Where(b => c.BatchIDs.Contains(b.Id)).ToList();
+            var detail = L10n.Format($"{c.BatchIDs.Count} 批 · {ByteText.Format(members.Sum(b => b.ByteCount))} · {status} · {c.TargetName} {c.SceneName} {c.Detail}");
             if (_query.Length == 0 || (title + detail).Contains(_query, StringComparison.OrdinalIgnoreCase)
                 || _batches.Where(b => c.BatchIDs.Contains(b.Id)).Any(b => HistoryLabels.Matches(b, _query)))
-                CollectionRows.Add(new(c.Id, title, detail));
+                CollectionRows.Add(new(c.Id, title, detail, c.BatchIDs
+                    .Select(id => members.FirstOrDefault(b => b.Id == id)).OfType<ReadyBatch>()
+                    .Select(b => new BatchRow { Batch = b }).ToList()));
         }
         OnPropertyChanged(nameof(CollectionRows));
     }
@@ -27,6 +34,18 @@ public sealed partial class MainViewModel
     internal CollectionService Collections => _collections ??= new CollectionService(_paths, _reader);
     private CollectionWindow? _collectionWindow;
     public event Action? CollectionsChanged;
+    internal CollectionImportProgress? ImportProgress { get; private set; }
+    internal void RefreshImportProgress()
+    {
+        var state = CollectionImportProgress.Read(_paths);
+        if (state is not null && !state.IsFresh(DateTimeOffset.UtcNow)) state = null;
+        if (state == ImportProgress) return;
+        ImportProgress = state;
+        CollectionsChanged?.Invoke();
+        if (state?.Phase is "saving" or "failed")
+            ShowCollection(Collections.Ledger.Current?.Id ?? Guid.Empty, activate: false);
+    }
+
     public event Action<string, string, Action>? DeliveryNotificationRequested;
 
     public string? DeliveryFolderPath
@@ -102,11 +121,44 @@ public sealed partial class MainViewModel
         catch (Exception error) { ShowToast(error.Message, warning: true); return false; }
     }
 
-    public Task DeliverCollection(Guid id, ShareAction action, ForwardTarget? target)
+    public void ShowCollectionDelivery(Guid id)
+    {
+        ShowCollection(id);
+        _collectionWindow?.BeginDelivery();
+    }
+
+    internal string? LastCollectionTarget => _settings.LastCollectionTarget;
+    internal string? LastCollectionScene => _settings.LastCollectionScene;
+    internal IReadOnlyList<string> RecentCollectionFolders => _settings.RecentCollectionFolders;
+    internal void RememberCollectionFolder(string folder)
+    {
+        _settings.RecentCollectionFolders.RemoveAll(p => string.Equals(p, folder, StringComparison.OrdinalIgnoreCase));
+        _settings.RecentCollectionFolders.Insert(0, folder);
+        _settings.RecentCollectionFolders = _settings.RecentCollectionFolders.Take(8).ToList();
+        SaveSettings();
+    }
+    internal Task<WeChatBridge.Windows.Core.Delivery.ResolvedTarget?>? ResolveCollectionTarget(ReadyBatch batch, ShareAction action, ForwardTarget? target)
+        => Delivery.BeginResolve(batch with { Action = action }, target);
+
+    internal void RememberCollectionChoice(ShareAction action, ForwardTarget? target, WeChatScene? scene)
+    {
+        _settings.LastCollectionTarget = target?.BundleIdentifier ?? action.RawValue();
+        _settings.LastCollectionScene = scene?.Id;
+        SaveSettings();
+    }
+
+    public Task DeliverCollection(Guid id, ShareAction action, ForwardTarget? target,
+        WeChatScene? selectedScene = null, string? folderPath = null)
     {
         if (action is ShareAction.Collect or ShareAction.Hub) throw new InvalidOperationException(L10n.Text("请选择交付目标。"));
         if (!_settings.IsEntryEnabled(action)) throw new InvalidOperationException(L10n.Text("该交付入口已停用。"));
-        var batches = Collections.Freeze(id);
+        if (action is ShareAction.Clipboard or ShareAction.Folder or ShareAction.Obsidian) selectedScene = null;
+        if (selectedScene is { } selected && (!selected.Enabled ||
+            (AgentIds.Matching(action) ?? AgentIds.MatchingBundleId(target?.BundleIdentifier)) is { } validationAgent && !selected.CompatibleAgents.Contains(validationAgent)))
+            throw new InvalidOperationException(L10n.Text("该场景不适用于所选目标。"));
+        // Conversation names are optional labels; original files can be delivered intact without them.
+        var batches = Collections.Freeze(id, requireChatNames: false);
+        var requestedAt = DateTimeOffset.UtcNow;
         CollectionsChanged?.Invoke();
         var previous = _pendingForward;
         return _pendingForward = Run();
@@ -114,58 +166,76 @@ public sealed partial class MainViewModel
         {
             var succeeded = false;
             var detail = L10n.Text("交付未完成，原始文件已保留。");
-            string? scene = null;
             try
             {
                 try { await previous; } catch { }
-                // A single scene decision and one paste plan for all original archives.
+                if (action is not (ShareAction.Clipboard or ShareAction.Folder or ShareAction.Obsidian)
+                    && DateTimeOffset.UtcNow - requestedAt > BatchIntent.FreshnessWindow)
+                    throw new InvalidOperationException(L10n.Text("交付等待过久，请重新确认目标后重试。"));
+                // Confirmation already chose the scene. Never invoke the single-share picker here.
                 var aggregate = batches[0] with
                 {
                     Action = action,
                     Items = batches.SelectMany(b => b.Items).ToList(),
                     ChatName = batches.Select(b => b.ChatName).Distinct().Count() == 1 ? batches[0].ChatName : null,
                 };
-                if (action is ShareAction.Obsidian or ShareAction.Folder)
+                if (action == ShareAction.Folder)
                 {
-                    var root = action == ShareAction.Obsidian ? _settings.ObsidianVaultPath : _settings.DeliveryFolderPath;
+                    var root = folderPath ?? _settings.DeliveryFolderPath;
+                    if (string.IsNullOrWhiteSpace(root)) throw new InvalidOperationException(L10n.Text("请选择保存原始文件的文件夹。"));
+                    var saved = await Task.Run(() => FolderDelivery.Save(aggregate.Items.Select(i => i.FullPath).ToList(), root));
+                    succeeded = true;
+                    detail = L10n.Format($"已保存 {saved.Count} 个原始文件到文件夹。");
+                    DeliveryNotificationRequested?.Invoke(detail, L10n.Text("查看文件"), () => RevealFile(saved[0]));
+                }
+                else if (action == ShareAction.Obsidian)
+                {
+                    var root = _settings.ObsidianVaultPath;
                     if (string.IsNullOrWhiteSpace(root)) throw new InvalidOperationException(L10n.Text("请先在入口页设置归档文件夹。"));
                     var notes = new List<string>();
                     foreach (var batch in batches)
-                        notes.AddRange(KnowledgeDelivery.Deliver(batch.Items.Select(i => i.FullPath).ToList(), root,
-                            action == ShareAction.Obsidian ? _settings.ObsidianSubfolder : _settings.DeliverySubfolder,
-                            batch.ChatName, null));
+                        notes.AddRange(await Task.Run(() => KnowledgeDelivery.Deliver(batch.Items.Select(i => i.FullPath).ToList(), root,
+                            _settings.ObsidianSubfolder, batch.ChatName, null)));
                     succeeded = true;
                     detail = L10n.Format($"已保存 {notes.Distinct().Count()} 篇笔记，原始 ZIP 已保留。");
                     if (action == ShareAction.Obsidian && _settings.OpenObsidianAfterDelivery) OpenInObsidian(root, notes);
                     DeliveryNotificationRequested?.Invoke(detail, action == ShareAction.Obsidian ? L10n.Text("打开笔记") : L10n.Text("查看文件"),
                         () => { if (action == ShareAction.Obsidian) OpenInObsidian(root, notes); else RevealFile(notes[0]); });
                 }
+                else if (action == ShareAction.Clipboard)
+                {
+                    succeeded = CopyItems(aggregate.Items, false);
+                    detail = succeeded ? L10n.Format($"已复制 {aggregate.Items.Count} 个原始文件。") : L10n.Text("复制失败，原始文件已保留。");
+                }
                 else
                 {
-                    // Collection delivery is user-initiated: it has no 90-second share expiration.
-                    await PerformForwardCore(aggregate, action, target);
-                    var outcome = _reader.StateFor(aggregate.Id)?.Outcome;
-                    succeeded = outcome?.Kind is BatchOutcomeKind.Delivered or BatchOutcomeKind.Copied;
-                    detail = succeeded ? L10n.Text("原始 ZIP 已交付，请确认目标中的附件数量。") : outcome?.Detail ?? detail;
-                    scene = _reader.StateFor(aggregate.Id)?.SceneName;
-                }
-                foreach (var batch in batches)
-                {
-                    _reader.RecordAction(batch.Id, action);
-                    if (action is ShareAction.Obsidian or ShareAction.Folder) _reader.ClearSceneContext(batch.Id);
-                    Record(succeeded ? (action == ShareAction.Clipboard ? BatchOutcomeKind.Copied : BatchOutcomeKind.Delivered)
-                        : BatchOutcomeKind.Failed, batch.Id, detail, target?.DisplayName ?? action.TargetDisplayName());
+                    var choices = await Task.WhenAll(batches.Select(batch => Scenes.ExplicitCollectionChoiceAsync(batch, selectedScene)));
+                    var choice = await Scenes.ExplicitCollectionChoiceAsync(aggregate, selectedScene);
+                    var agent = AgentIds.Matching(action) ?? AgentIds.MatchingBundleId(target?.BundleIdentifier);
+                    var prompt = Scenes.RenderPrompt(choice, agent,
+                        selectedScene?.EffectiveSkillIDs().Count > 0 ? Skills.PromptContext(agent) : null);
+                    var result = await Delivery.DeliverAsync(aggregate, target, prompt);
+                    succeeded = result.Delivered;
+                    detail = succeeded ? L10n.Text("已执行粘贴，请在目标确认附件。") : result.Outcome.Detail ?? detail;
+                    if (succeeded) foreach (var memberChoice in choices) Scenes.CompleteForward(memberChoice);
                 }
             }
             catch (Exception error)
             {
                 detail = error.Message;
-                CopyItems(batches.SelectMany(b => b.Items).ToList(), false);
                 ShowToast(L10n.Format($"{detail}；原始文件已保留，可重试。"), warning: true);
             }
             finally
             {
-                Collections.Finish(id, succeeded, target?.DisplayName ?? action.TargetDisplayName(), detail, scene);
+                foreach (var batch in batches)
+                {
+                    _reader.RecordAction(batch.Id, action);
+                    _reader.ClearSceneContext(batch.Id);
+                    if (selectedScene is not null) _reader.RecordContext(batch.Id, sceneId: selectedScene.Id, sceneName: selectedScene.Name);
+                    Record(succeeded ? (action == ShareAction.Clipboard ? BatchOutcomeKind.Copied : BatchOutcomeKind.Delivered)
+                        : BatchOutcomeKind.Failed, batch.Id, detail, target?.DisplayName ?? action.TargetDisplayName());
+                }
+                Collections.Finish(id, succeeded, target?.DisplayName ?? action.TargetDisplayName(), detail, selectedScene?.Name);
                 Reload();
             }
         }
