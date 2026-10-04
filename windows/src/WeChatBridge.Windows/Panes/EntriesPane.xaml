@@ -19,7 +19,7 @@
             <StackPanel>
                 <TextBlock Style="{StaticResource SectionLabel}" Text="{loc:Loc Key='分享入口'}" />
                 <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{StaticResource InkSecondaryColor}"
-                           Text="{loc:Loc Key='微信菜单里只有「微信流」一行；下面开启的入口会出现在它的选择器里。'}" />
+                           Text="{loc:Loc Key='微信菜单里只有「微⁠信流」一行；下面开启的入口会出现在它的选择器里。'}" />
                 <Border Height="1" Background="{StaticResource StrokeColor}" Margin="0,8,0,10" />
                 <Border Style="{StaticResource Card}" Padding="0">
                     <ItemsControl ItemsSource="{Binding Entries}" AlternationCount="100000">

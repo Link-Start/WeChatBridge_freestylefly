@@ -75,7 +75,7 @@ public sealed class UiSmokeTests
                         }
                     }
                     var wizardModel = new MainViewModel(fixture.Paths, Path.Combine(config, "wizard-" + language),
-                        false, isAppInstalled: _ => false);
+                        false);
                     var wizardStore = new OnboardingStateStore(Path.Combine(config, "wizard-state-" + language));
                     var wizard = new OnboardingWindow(wizardModel, wizardStore, () => Task.FromResult(false));
                     wizard.Show();
@@ -104,12 +104,7 @@ public sealed class UiSmokeTests
                         if (step == 1)
                         {
                             var rows = ((ItemsControl)wizard.FindName("EntriesList")).Items.Cast<OnboardingWindow.WizardEntry>().ToArray();
-                            Assert.Contains(rows, row => !row.Available);
-                            Assert.All(rows.Where(row => !row.Available), row =>
-                            {
-                                row.Enabled = true;
-                                Assert.False(row.Enabled);
-                            });
+                            Assert.All(rows, row => Assert.True(row.Available));
                             var clipboard = rows.Single(row => row.Action == ShareAction.Clipboard);
                             clipboard.Enabled = false;
                             Assert.False(wizardModel.IsEntryEnabled(ShareAction.Clipboard));
@@ -119,8 +114,8 @@ public sealed class UiSmokeTests
                         next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }
                     Assert.True(wizardStore.Load().Completed);
-                    Assert.All(((ItemsControl)wizard.FindName("EntriesList")).Items.Cast<OnboardingWindow.WizardEntry>().Where(row => !row.Available),
-                        row => Assert.False(wizardModel.IsEntryEnabled(row.Action)));
+                    Assert.All(((ItemsControl)wizard.FindName("EntriesList")).Items.Cast<OnboardingWindow.WizardEntry>(),
+                        row => Assert.Equal(row.Enabled, wizardModel.IsEntryEnabled(row.Action)));
                     wizardStore.Save(new OnboardingState { Step = 2 });
                     var resumed = new OnboardingWindow(wizardModel, wizardStore, () => Task.FromResult(true));
                     resumed.Show();
@@ -207,6 +202,18 @@ public sealed class UiSmokeTests
             if (child is T match) yield return match;
             foreach (var descendant in Descendants<T>(child)) yield return descendant;
         }
+    }
+
+    private static void WaitFor(Func<bool> ready)
+    {
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+        timer.Tick += (_, _) => { if (ready() || DateTime.UtcNow > deadline) frame.Continue = false; };
+        timer.Start();
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+        timer.Stop();
+        Assert.True(ready(), "The collection metadata did not reach the UI.");
     }
 
     private static double Render(FrameworkElement content, string name, string language, string? directory, double width = 710)

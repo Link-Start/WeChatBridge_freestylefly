@@ -123,9 +123,11 @@ public partial class OnboardingWindow : Window
         public WizardEntry(EntryRow row, MainViewModel model, Action changed)
         {
             _model = model; _changed = changed; Action = row.Action; Title = row.Title;
-            Available = model.IsDestinationInstalled(Action, null);
+            // Installed-app gating arrives with the destination-aware entry catalog;
+            // until then every built-in entry is offerable, matching the Entries pane.
+            Available = true;
             _enabled = Available && row.IsEnabled;
-            Detail = Available ? row.Detail : L10n.Text("请先安装目标应用，再开启此入口。");
+            Detail = row.Detail;
         }
     }
 }
