@@ -1,4 +1,4 @@
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -55,6 +55,12 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // Installer probe must not create an inbox, launch the keeper or open a picker.
+        if (args.Contains("--registration-check", StringComparer.Ordinal))
+        {
+            Environment.Exit(ShareIdentityCheck.Run());
+            return;
+        }
         var paths = new InboxPaths();
 
         // Dev/self-test hook: `WeChatBridge.ShareTarget.exe --picker-preview`
@@ -510,7 +516,7 @@ internal static class Program
 
     /// <summary>
     /// Which share-menu entry invoked us. The sparse package now declares a
-    /// single <c>&lt;Application&gt;</c> — Share.Hub, shown to WeChat as 「微信流」 —
+    /// single <c>&lt;Application&gt;</c> — Share.Hub, shown to WeChat as 「聊天桥」 —
     /// whose <c>{PackageFamilyName}!Share.Hub</c> AUMID is what
     /// <c>AppInfo.Current</c> reports here. The legacy per-entry ids are still
     /// recognised so a batch written by the old nine-application package keeps

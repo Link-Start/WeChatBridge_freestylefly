@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$InstallRoot,
@@ -51,7 +51,7 @@ $certificate = Get-ChildItem Cert:\CurrentUser\My\$CertificateThumbprint -ErrorA
 if (-not $certificate) { throw "Development certificate not found: $CertificateThumbprint" }
 
 $packScript = Join-Path $PSScriptRoot 'pack-msix.ps1'
-& $packScript -Publisher 'CN=WeChatBridge Windows Dev' -OutputPath $packagePath
+& $packScript -Publisher 'CN=WeChatBridge Windows Dev' -OutputPath $packagePath -ExternalContentDirectory $installRoot
 $signTool = Get-Command signtool.exe -ErrorAction SilentlyContinue
 if (-not $signTool) {
     $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
@@ -67,7 +67,7 @@ if ($signature.Status -ne 'Valid') {
     throw "The MSIX signature is not trusted ($($signature.Status): $($signature.StatusMessage)). Trust the development certificate in Cert:\CurrentUser\Root and retry."
 }
 
-Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue |
+Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue |
     Remove-AppxPackage -ErrorAction SilentlyContinue
 try {
     Add-AppxPackage -Path $packagePath -ExternalLocation $installRoot
@@ -76,7 +76,7 @@ catch {
     $hresult = ('0x{0:X8}' -f ($_.Exception.HResult -band 0xffffffff))
     throw "Add-AppxPackage failed ($hresult): $($_.Exception.Message)"
 }
-$registered = Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
+$registered = Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
 if (-not $registered) { throw 'Add-AppxPackage returned but the package is not registered.' }
 Write-RegistrationLog "成功 $($registered.PackageFullName)"
 Write-Output "Registered: $($registered.PackageFullName)"

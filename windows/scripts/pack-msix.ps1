@@ -1,7 +1,8 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Publisher = 'CN=WeChatBridge Windows Dev',
-    [string]$Version = '0.1.0.0',
+    [string]$Version = '1.0.7.0',
+    [string]$ExternalContentDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputPath
 )
@@ -9,6 +10,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $output = [IO.Path]::GetFullPath($OutputPath)
 $outputDirectory = [IO.Path]::GetDirectoryName($output)
+if (-not $ExternalContentDirectory) { $ExternalContentDirectory = $outputDirectory }
+$ExternalContentDirectory = [IO.Path]::GetFullPath($ExternalContentDirectory)
 $sourceDirectory = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\packaging\SparsePackage'))
 $stageDirectory = Join-Path ([IO.Path]::GetTempPath()) "WeChatBridge-SparsePackage-$([Guid]::NewGuid().ToString('N'))"
 
@@ -55,10 +58,21 @@ try {
     $makeAppx = Resolve-SdkTool 'makeappx.exe'
     & $makeAppx pack /d $stageDirectory /p $output /nv /o
     if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed with exit code $LASTEXITCODE." }
+    # Sparse-package resource lookup uses the external location too. The generated
+    # PRI must match the one in this MSIX; copying assets alone is insufficient.
+    New-Item -ItemType Directory -Force -Path $ExternalContentDirectory | Out-Null
+    Copy-Item -LiteralPath $priPath -Destination (Join-Path $ExternalContentDirectory 'resources.pri') -Force
 }
 finally {
     if (Test-Path $stageDirectory) {
-        Remove-Item -LiteralPath $stageDirectory -Recurse -Force -ErrorAction SilentlyContinue
+        # Resolve and constrain the recursive cleanup to this task's temporary folder.
+        $resolvedStage = [IO.Path]::GetFullPath($stageDirectory)
+        $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)
+        if (-not [IO.Path]::GetDirectoryName($resolvedStage).Equals($temporaryRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not [IO.Path]::GetFileName($resolvedStage).StartsWith('WeChatBridge-SparsePackage-', [StringComparison]::Ordinal)) {
+            throw 'Refusing to clean an unexpected package staging directory.'
+        }
+        Remove-Item -LiteralPath $resolvedStage -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 

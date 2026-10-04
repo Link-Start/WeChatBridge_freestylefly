@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
   Per-user MSI for the sparse-package install. The real payload lives outside
   the MSIX (AllowExternalContent), so the MSI just drops files under
@@ -10,14 +10,15 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="WeChatBridge" Language="1033" Version="$(var.MsiVersion)"
-           Manufacturer="WeChatBridge" UpgradeCode="{9D8B6223-A1B3-4E46-95C9-9C500833E4CA}"
+  <Package Name="聊天桥" Language="1033" Codepage="936" Version="$(var.MsiVersion)"
+           Manufacturer="聊天桥" UpgradeCode="{9D8B6223-A1B3-4E46-95C9-9C500833E4CA}"
            Scope="perUser" InstallerVersion="500" Compressed="yes">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of WeChatBridge is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="已安装更新版本的聊天桥。" />
     <MediaTemplate EmbedCab="yes" />
 
     <ui:WixUI Id="WixUI_InstallDir" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.PayloadDir)\LICENSE.rtf" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
     <Icon Id="AppIcon.ico" SourceFile="$(var.PayloadDir)\Assets\AppIcon.ico" />
@@ -28,11 +29,11 @@
     <SetProperty Id="KillRunningInstances" Sequence="execute" Before="KillRunningInstances"
         Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -WindowStyle Hidden -Command &quot;Get-Process -Name 'WeChatBridge.ShareTarget','WeChatBridge.Windows' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue&quot;" />
     <SetProperty Id="RegisterShareTarget" Sequence="execute" Before="RegisterShareTarget"
-        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File &quot;[INSTALLFOLDER]Register-ShareTarget.ps1&quot;" />
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File &quot;[INSTALLFOLDER]Register-ShareTarget.ps1&quot; -CertificateTrustPrepared" />
     <SetProperty Id="UnregisterShareTarget" Sequence="execute" Before="UnregisterShareTarget"
         Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File &quot;[INSTALLFOLDER]Unregister-ShareTarget.ps1&quot;" />
 
-    <Feature Id="Main" Title="WeChatBridge" Level="1" AllowAdvertise="no">
+    <Feature Id="Main" Title="聊天桥" Level="1" AllowAdvertise="no">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="StartMenuShortcut" />
     </Feature>
@@ -45,7 +46,7 @@
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="WeChatBridgeProgramsFolder" Name="WeChatBridge" />
+      <Directory Id="WeChatBridgeProgramsFolder" Name="聊天桥" />
     </StandardDirectory>
   </Fragment>
 
@@ -58,7 +59,7 @@
   <Fragment>
     <DirectoryRef Id="WeChatBridgeProgramsFolder">
       <Component Id="StartMenuShortcut" Guid="{27836C97-D2EB-4891-AB2B-88F388DE7FA7}">
-        <Shortcut Id="WeChatBridgeShortcut" Name="WeChatBridge"
+        <Shortcut Id="WeChatBridgeShortcut" Name="聊天桥"
                   Target="[INSTALLFOLDER]WeChatBridge.Windows.exe"
                   WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.ico" />
         <RegistryValue Root="HKCU" Key="Software\WeChatBridge" Name="installed" Type="integer" Value="1" KeyPath="yes" />
