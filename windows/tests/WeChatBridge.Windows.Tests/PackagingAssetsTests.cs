@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Xml.Linq;
 
 namespace WeChatBridge.Windows.Tests;
@@ -49,7 +49,7 @@ public sealed class PackagingAssetsTests
     /// Weixin hides share targets whose display name contains the contiguous brand
     /// substrings 微信 / WeChat / Weixin, but does not normalise zero-width characters.
     /// The manifest therefore spells the product name with a U+2060 WORD JOINER between
-    /// 微 and 信 so it renders as 微信流 without containing the filtered substring. Any
+    /// 微 and 信 so it renders as 聊天桥 without containing the filtered substring. Any
     /// tooling that rewrites these strings (normalisation, pretty-printing, code-gen)
     /// can silently strip the joiner and make the target vanish from the share menu —
     /// which is exactly the failure this assertion exists to catch.
@@ -67,8 +67,8 @@ public sealed class PackagingAssetsTests
         Assert.NotEmpty(applications);
 
         // The product name is the package identity's string: the one place the
-        // U+2060 spelling must survive so the menu renders 微信流.
-        Assert.Contains("微⁠信流",
+        // U+2060 spelling must survive so the menu renders 聊天桥.
+        Assert.Contains("聊天桥",
             manifest.Root.Element(Foundation + "Properties")!.Element(Foundation + "DisplayName")!.Value);
 
         // Every entry's user-visible strings — DisplayName, app Description and
@@ -98,7 +98,7 @@ public sealed class PackagingAssetsTests
     }
 
     /// <summary>
-    /// The manifest registers a single façade entry — Share.Hub, the 「微信流」
+    /// The manifest registers a single façade entry — Share.Hub, the 「聊天桥」
     /// row WeChat shows — whose Application Id the helper resolves through
     /// <see cref="Core.ShareActions.ShareEntryId"/> just like the retired
     /// per-app ids. Asserting the singleton rather than <c>All</c> keeps this

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace WeChatBridge.Windows.Core;
 
@@ -63,7 +63,7 @@ public static class KnowledgeDelivery
         FolderDelivery.ValidateFolder(vaultPath);
 
         var folderName = DisplayName.SubfolderPath(subfolder);
-        if (folderName.Length == 0) folderName = "微信流";
+        if (folderName.Length == 0) folderName = "聊天桥";
         var root = Path.Combine(vaultPath, folderName);
         var attachments = Path.Combine(root, "附件");
         Directory.CreateDirectory(root);
