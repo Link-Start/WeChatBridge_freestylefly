@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using WeChatBridge.Windows.Core;
 
@@ -599,7 +599,7 @@ public sealed class SceneService : IDisposable
     private static void ValidatePackage(ScenePackage package)
     {
         if (package.SchemaVersion is < 1 or > ScenePackage.CurrentSchemaVersion)
-            throw new ScenePackageException(L10n.Text("这个场景包由更新版本生成，当前微信流无法导入。"));
+            throw new ScenePackageException(L10n.Text("这个场景包由更新版本生成，当前聊天桥无法导入。"));
         if (string.IsNullOrWhiteSpace(package.Id)
             || string.IsNullOrWhiteSpace(package.Name)
             || string.IsNullOrWhiteSpace(package.Instruction)

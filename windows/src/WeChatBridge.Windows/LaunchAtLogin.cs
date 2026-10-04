@@ -27,7 +27,7 @@ internal static class LaunchAtLogin
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
             if (key is null)
                 return;
             if (enabled)
