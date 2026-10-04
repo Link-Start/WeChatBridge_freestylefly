@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -54,7 +54,7 @@ public partial class OnboardingWindow : Window
         try { _registered = await _registrationProbe(); } catch { _registered = false; }
         finally { _checking = false; RefreshButton.IsEnabled = true; }
         RegistrationTitle.Text = L10n.Text(_registered ? "Windows 分享入口已注册" : "未检测到 Windows 分享入口");
-        RegistrationDetail.Text = L10n.Text(_registered ? "请重启微信，在「转发到其他应用」里确认「聊天桥」。"
+        RegistrationDetail.Text = L10n.Text(_registered ? "请重启微信，在「转发到其他应用」里确认「微信流」。"
             : "请使用完整安装包重新安装并允许管理员授权，也可以先完成目标配置。");
         RegistrationMark.Text = _registered ? "✓" : "!";
         RegistrationMark.Foreground = (System.Windows.Media.Brush)FindResource(_registered ? "BrandColor" : "WarnInkColor");
@@ -89,7 +89,7 @@ public partial class OnboardingWindow : Window
             StartupToggle.IsChecked = _model.AutoStartEnabled;
             StartupFeedback.Text = L10n.Text(requested != _model.AutoStartEnabled
                 ? "系统未允许修改启动设置，请稍后在「通用」页重试。"
-                : _model.AutoStartEnabled ? "已开启，登录 Windows 后自动在后台运行。" : "已关闭，需要时再启动聊天桥。");
+                : _model.AutoStartEnabled ? "已开启，登录 Windows 后自动在后台运行。" : "已关闭，需要时再启动微信流。");
         }
         catch
         {

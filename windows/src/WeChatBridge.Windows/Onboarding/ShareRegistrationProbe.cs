@@ -1,4 +1,4 @@
-﻿namespace WeChatBridge.Windows.Onboarding;
+namespace WeChatBridge.Windows.Onboarding;
 
 internal static class ShareRegistrationProbe
 {
@@ -8,7 +8,7 @@ internal static class ShareRegistrationProbe
         {
             var manager = new global::Windows.Management.Deployment.PackageManager();
             return manager.FindPackagesForUser("")
-                .Any(package => package.Id.Name == "ChatBridge.Windows.ShareTarget"
+                .Any(package => package.Id.Name == "WeChatBridge.Windows.ShareTarget"
                     && package.Status.VerifyIsOK());
         }
         catch { return false; }

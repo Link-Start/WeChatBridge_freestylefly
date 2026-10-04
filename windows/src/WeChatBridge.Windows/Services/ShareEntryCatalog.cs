@@ -1,10 +1,10 @@
-﻿using System.IO;
+using System.IO;
 using WeChatBridge.Windows.Core;
 
 namespace WeChatBridge.Windows.Services;
 
 /// <summary>
-/// Builds the rows a 「聊天桥」 share can be answered with — the enabled
+/// Builds the rows a 「微信流」 share can be answered with — the enabled
 /// built-in entries plus every custom target, in the same order the macOS
 /// 发给 ▸ menu inlines them. Used by both the main app's fallback picker and
 /// the share-target helper, which asks the same question inside its own

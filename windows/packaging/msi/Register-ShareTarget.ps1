@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param([string]$InstallRoot, [switch]$TrustCertificateOnly, [switch]$CertificateTrustPrepared)
 
 $ErrorActionPreference = 'Stop'
@@ -82,10 +82,13 @@ try {
     Get-Process -Name 'WeChatBridge.ShareTarget', 'WeChatBridge.Windows' -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
 
-    Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue |
+    # Also sweep the short-lived 1.0.7 ChatBridge.* registration — same
+    # publisher, so its share-menu row would linger next to 微信流's.
+    Get-AppxPackage -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in 'WeChatBridge.Windows.ShareTarget', 'ChatBridge.Windows.ShareTarget' } |
         Remove-AppxPackage -ErrorAction SilentlyContinue
     Add-AppxPackage -Path $msix -ExternalLocation $InstallRoot
-    $registered = Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
+    $registered = Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
     if (-not $registered) { throw 'Package registration did not stick.' }
     if ($registered.Status -ne 'Ok') { throw "Registered package is unhealthy: $($registered.Status)" }
     # A registration record alone does not grant identity to an incorrectly built

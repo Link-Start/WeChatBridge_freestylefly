@@ -1,6 +1,6 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
-    [string]$Version = '1.0.7',
+    [string]$Version = '1.0.8',
     [string]$DistDirectory = (Join-Path $PSScriptRoot '..\artifacts\dist'),
     [string]$WixExtensionDirectory = 'D:\WeChatB-Hub\_scratch\tools\wixext',
     [string]$SigningThumbprint = '40ED85A6287A88A950D0FEE9EA3C9DBC032358CD',

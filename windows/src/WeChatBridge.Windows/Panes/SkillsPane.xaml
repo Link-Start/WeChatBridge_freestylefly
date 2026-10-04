@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="WeChatBridge.Windows.Panes.SkillsPane"
+<UserControl x:Class="WeChatBridge.Windows.Panes.SkillsPane"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:WeChatBridge.Windows">
@@ -220,7 +220,7 @@
                         Click="Import_Click"><Button.Content><loc:Loc Key="导入 ZIP…"/></Button.Content></Button>
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource InkTertiaryColor}"
-                           Text="{loc:Loc Key='技能由聊天桥统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。'}" />
+                           Text="{loc:Loc Key='技能由微信流统一管理，场景用 {{skill:id}} 引用，转发时由目标 Agent 直接读取。'}" />
             </StackPanel>
 
             <!-- Skill cards. -->

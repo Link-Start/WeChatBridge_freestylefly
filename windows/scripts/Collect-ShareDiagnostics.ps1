@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param([string]$OutputDirectory = $PSScriptRoot)
 $ErrorActionPreference = 'Stop'
 $report = New-Object System.Collections.Generic.List[string]
@@ -74,7 +74,7 @@ Section 'Running WeChat and WeChatBridge processes' {
     }
 }
 Section 'Current user ShareTarget registration' {
-    $packages=@(Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget')
+    $packages=@(Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget')
     Record "RegisteredPackageCount=$($packages.Count)"
     foreach($package in $packages) {
         Record "Package=$($package.PackageFullName) Status=$($package.Status) Location=$($package.InstallLocation)"
@@ -101,7 +101,7 @@ Section 'Recent registration diagnostics' {
 }
 Section 'Recent Appx deployment events for this application' {
     Get-WinEvent -LogName 'Microsoft-Windows-AppXDeploymentServer/Operational' -MaxEvents 150 -ErrorAction Stop |
-        Where-Object { $_.Message -match 'ChatBridge.Windows.ShareTarget' } | Select-Object -First 15 |
+        Where-Object { $_.Message -match 'WeChatBridge.Windows.ShareTarget' } | Select-Object -First 15 |
         ForEach-Object { Record "Time=$($_.TimeCreated) ID=$($_.Id) Level=$($_.LevelDisplayName) $($_.Message)" }
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null

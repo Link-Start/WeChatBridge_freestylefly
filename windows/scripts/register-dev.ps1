@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$InstallRoot,
@@ -67,7 +67,8 @@ if ($signature.Status -ne 'Valid') {
     throw "The MSIX signature is not trusted ($($signature.Status): $($signature.StatusMessage)). Trust the development certificate in Cert:\CurrentUser\Root and retry."
 }
 
-Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue |
+Get-AppxPackage -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in 'WeChatBridge.Windows.ShareTarget', 'ChatBridge.Windows.ShareTarget' } |
     Remove-AppxPackage -ErrorAction SilentlyContinue
 try {
     Add-AppxPackage -Path $packagePath -ExternalLocation $installRoot
@@ -76,7 +77,7 @@ catch {
     $hresult = ('0x{0:X8}' -f ($_.Exception.HResult -band 0xffffffff))
     throw "Add-AppxPackage failed ($hresult): $($_.Exception.Message)"
 }
-$registered = Get-AppxPackage -Name 'ChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
+$registered = Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue
 if (-not $registered) { throw 'Add-AppxPackage returned but the package is not registered.' }
 Write-RegistrationLog "成功 $($registered.PackageFullName)"
 Write-Output "Registered: $($registered.PackageFullName)"

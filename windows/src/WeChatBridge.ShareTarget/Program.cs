@@ -1,4 +1,4 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -516,7 +516,7 @@ internal static class Program
 
     /// <summary>
     /// Which share-menu entry invoked us. The sparse package now declares a
-    /// single <c>&lt;Application&gt;</c> — Share.Hub, shown to WeChat as 「聊天桥」 —
+    /// single <c>&lt;Application&gt;</c> — Share.Hub, shown to WeChat as 「微信流」 —
     /// whose <c>{PackageFamilyName}!Share.Hub</c> AUMID is what
     /// <c>AppInfo.Current</c> reports here. The legacy per-entry ids are still
     /// recognised so a batch written by the old nine-application package keeps

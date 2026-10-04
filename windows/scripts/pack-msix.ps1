@@ -1,7 +1,7 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$Publisher = 'CN=WeChatBridge Windows Dev',
-    [string]$Version = '1.0.7.0',
+    [string]$Version = '1.0.8.0',
     [string]$ExternalContentDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputPath

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
   Per-user MSI for the sparse-package install. The real payload lives outside
   the MSIX (AllowExternalContent), so the MSI just drops files under
@@ -10,11 +10,11 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="聊天桥" Language="1033" Codepage="936" Version="$(var.MsiVersion)"
-           Manufacturer="聊天桥" UpgradeCode="{9D8B6223-A1B3-4E46-95C9-9C500833E4CA}"
+  <Package Name="微信流" Language="1033" Codepage="936" Version="$(var.MsiVersion)"
+           Manufacturer="微信流" UpgradeCode="{9D8B6223-A1B3-4E46-95C9-9C500833E4CA}"
            Scope="perUser" InstallerVersion="500" Compressed="yes">
 
-    <MajorUpgrade DowngradeErrorMessage="已安装更新版本的聊天桥。" />
+    <MajorUpgrade DowngradeErrorMessage="已安装更新版本的微信流。" />
     <MediaTemplate EmbedCab="yes" />
 
     <ui:WixUI Id="WixUI_InstallDir" />
@@ -33,7 +33,7 @@
     <SetProperty Id="UnregisterShareTarget" Sequence="execute" Before="UnregisterShareTarget"
         Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File &quot;[INSTALLFOLDER]Unregister-ShareTarget.ps1&quot;" />
 
-    <Feature Id="Main" Title="聊天桥" Level="1" AllowAdvertise="no">
+    <Feature Id="Main" Title="微信流" Level="1" AllowAdvertise="no">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="StartMenuShortcut" />
     </Feature>
@@ -46,7 +46,7 @@
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="WeChatBridgeProgramsFolder" Name="聊天桥" />
+      <Directory Id="WeChatBridgeProgramsFolder" Name="微信流" />
     </StandardDirectory>
   </Fragment>
 
@@ -59,7 +59,7 @@
   <Fragment>
     <DirectoryRef Id="WeChatBridgeProgramsFolder">
       <Component Id="StartMenuShortcut" Guid="{27836C97-D2EB-4891-AB2B-88F388DE7FA7}">
-        <Shortcut Id="WeChatBridgeShortcut" Name="聊天桥"
+        <Shortcut Id="WeChatBridgeShortcut" Name="微信流"
                   Target="[INSTALLFOLDER]WeChatBridge.Windows.exe"
                   WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.ico" />
         <RegistryValue Root="HKCU" Key="Software\WeChatBridge" Name="installed" Type="integer" Value="1" KeyPath="yes" />

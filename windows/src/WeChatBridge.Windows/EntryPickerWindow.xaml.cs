@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -22,7 +22,7 @@ public enum EntryPickerAnswerKind
 }
 
 /// <summary>
-/// One row of the 「聊天桥」 picker: a built-in destination (action, no target)
+/// One row of the 「微信流」 picker: a built-in destination (action, no target)
 /// or one of the user's own apps (action = Custom, target set).
 /// </summary>
 public sealed record EntryPickerOption(ShareAction Action, ForwardTarget? Target, string? Detail);
@@ -38,7 +38,7 @@ public sealed record EntryPickerAnswer(EntryPickerAnswerKind Kind, ShareAction? 
 }
 
 /// <summary>
-/// The panel 「聊天桥」 opens: the single share-sheet entry the sparse package
+/// The panel 「微信流」 opens: the single share-sheet entry the sparse package
 /// registers forwards here, and this is where the 入口 pane's switches become
 /// visible in the share flow — only enabled rows are listed.
 ///

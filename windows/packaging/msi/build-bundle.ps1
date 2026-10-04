@@ -1,4 +1,4 @@
-﻿# Build the Burn bootstrapper Setup.exe (runtime check + on-demand download + MSI).
+# Build the Burn bootstrapper Setup.exe (runtime check + on-demand download + MSI).
 # Requires: WiX 6, Util + BootstrapperApplications extension dlls, built MSIs.
 #
 #   .\build-bundle.ps1 -Arch x64
@@ -10,7 +10,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][ValidateSet('x64','arm64')][string]$Arch,
-  [string]$Version = '1.0.7',
+  [string]$Version = '1.0.8',
   [switch]$SelfContained,
   [string]$CertificateTrustMsiPath,
   [string]$WixExtensionDirectory = 'D:\WeChatB-Hub\_scratch\tools\wixext',
