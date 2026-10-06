@@ -83,7 +83,7 @@ public partial class App : Application
         {
             window.Show();
             if (new OnboardingStateStore().NeedsOnboarding())
-                new OnboardingWindow { Owner = window }.Show();
+                new OnboardingWindow(model) { Owner = window }.Show();
         }
         // MainWindow's inbox load rides the Loaded event — a hidden window
         // never raises it, so a background launch must load explicitly or it
@@ -116,7 +116,8 @@ public partial class App : Application
             state.Step = 0;
             store.Save(state);
         }
-        new OnboardingWindow(store) { Owner = MainWindow }.Show();
+        if (_model is not null)
+            new OnboardingWindow(_model, store) { Owner = MainWindow }.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)

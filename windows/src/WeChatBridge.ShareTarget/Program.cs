@@ -55,6 +55,12 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // Installer probe must not create an inbox, launch the keeper or open a picker.
+        if (args.Contains("--registration-check", StringComparer.Ordinal))
+        {
+            Environment.Exit(ShareIdentityCheck.Run());
+            return;
+        }
         var paths = new InboxPaths();
 
         // Dev/self-test hook: `WeChatBridge.ShareTarget.exe --picker-preview`

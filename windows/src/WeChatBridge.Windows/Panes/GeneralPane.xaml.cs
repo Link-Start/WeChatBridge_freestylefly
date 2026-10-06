@@ -14,7 +14,7 @@ public partial class GeneralPane : UserControl
         InitializeComponent();
         var informational = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        VersionText.Text = L10n.Format($"当前版本 {ShortVersion(informational)}（Windows 移植版）");
+        VersionText.Text = L10n.Format($"当前版本 {ShortVersion(informational)}");
     }
 
     /// <summary>1.0.0+commithash → 1.0.0 (short hash) — same rule as AboutPane.</summary>

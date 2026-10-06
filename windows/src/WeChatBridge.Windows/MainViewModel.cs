@@ -315,7 +315,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         set
         {
             WeChatBridge.Windows.LaunchAtLogin.Apply(value);
-            _settings.LaunchAtLogin = value;
+            _settings.LaunchAtLogin = WeChatBridge.Windows.LaunchAtLogin.IsRegistered();
             SaveSettings();
             OnPropertyChanged(nameof(AutoStartEnabled));
         }

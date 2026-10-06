@@ -3,5 +3,6 @@ param()
 $ErrorActionPreference = 'Stop'
 Get-Process -Name 'WeChatBridge.ShareTarget', 'WeChatBridge.Windows' -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
-Get-AppxPackage -Name 'WeChatBridge.Windows.ShareTarget' -ErrorAction SilentlyContinue |
+Get-AppxPackage -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in 'WeChatBridge.Windows.ShareTarget', 'ChatBridge.Windows.ShareTarget' } |
     Remove-AppxPackage -ErrorAction SilentlyContinue

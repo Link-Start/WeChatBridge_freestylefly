@@ -10,13 +10,16 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][ValidateSet('x64','arm64')][string]$Arch,
-  [string]$Version = '0.1.0',
+  [string]$Version = '1.0.8',
+  [switch]$SelfContained,
+  [string]$CertificateTrustMsiPath,
+  [string]$WixExtensionDirectory = 'D:\WeChatB-Hub\_scratch\tools\wixext',
   [string]$DistDir = (Join-Path $PSScriptRoot '..\..\artifacts\dist')
 )
 
 $ErrorActionPreference = 'Stop'
 
-$extDir = 'D:\WeChatB-Hub\_scratch\tools\wixext'
+$extDir = $WixExtensionDirectory
 $exts = @(
   "$extDir\wixtoolset.util.wixext\wixext6\WixToolset.Util.wixext.dll",
   "$extDir\wixtoolset.bal.wixext\wixext6\WixToolset.BootstrapperApplications.wixext.dll",
@@ -50,18 +53,26 @@ if ($Arch -eq 'x64') {
   $out = Join-Path $DistDir "WeChatBridge-$Version-Windows-arm64-Setup.exe"
 }
 $icon = Join-Path $DistDir "payload\$Arch\Assets\AppIcon.ico"
+if (-not $CertificateTrustMsiPath) {
+  $CertificateTrustMsiPath = Join-Path $DistDir "WeChatBridge-$Version-CertificateTrust.msi"
+}
 
-foreach ($f in @($msi, $icon) + $exts) {
+foreach ($f in @($msi, $icon, $CertificateTrustMsiPath) + $exts) {
   if (-not (Test-Path $f)) { throw "Missing: $f" }
 }
 
 wix build (Join-Path $PSScriptRoot 'Bundle.wxs') `
   -ext $exts[0] -ext $exts[1] -ext $exts[2] `
   -arch $Arch `
+  -d "SelfContained=$(if ($SelfContained) { 'yes' } else { 'no' })" `
   -d "RuntimePlatform=$Arch" `
   -d "BundleVersion=$Version.0" `
   -d "IconFile=$icon" `
+  -d "LogoFile=$(Join-Path $DistDir "payload\$Arch\Assets\Square150x150Logo.png")" `
+  -d "ThemeFile=$(Join-Path $PSScriptRoot 'InstallerTheme.xml')" `
+  -d "LocalizationFile=$(Join-Path $PSScriptRoot 'Installer.zh-CN.wxl')" `
   -d "MsiPath=$msi" `
+  -d "CertificateTrustMsiPath=$CertificateTrustMsiPath" `
   -d "RuntimeName=$($Runtime.Name)" `
   -d "RuntimeUrl=$($Runtime.Url)" `
   -d "RuntimeHash=$($Runtime.Hash)" `
@@ -69,4 +80,5 @@ wix build (Join-Path $PSScriptRoot 'Bundle.wxs') `
   -d "RuntimeVersion=$($Runtime.Ver)" `
   -o $out
 
+if ($LASTEXITCODE -ne 0) { throw "WiX bundle build failed: $LASTEXITCODE" }
 Write-Host "Built $out"
