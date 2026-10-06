@@ -63,12 +63,43 @@ public partial class HistoryPane : UserControl
         EmptyAll.Visibility = !any && !searching ? Visibility.Visible : Visibility.Collapsed;
         EmptyFilter.Visibility = !any && searching ? Visibility.Visible : Visibility.Collapsed;
         RecordList.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
-        ClearButton.IsEnabled = Model.HasHistory;
+        ClearButton.IsEnabled = Model.HasHistory || Model.Collections.CanUndo;
     }
 
     private void OpenCollection_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MainViewModel.CollectionHistoryRow row) Model?.ShowCollection(row.Id);
+    }
+
+    private void CollectionDeliver_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is MainViewModel.CollectionHistoryRow row) Model?.ShowCollectionDelivery(row.Id);
+    }
+
+    private void CollectionMore_Click(object sender, RoutedEventArgs e)
+    {
+        if (Model is not { } model || (sender as FrameworkElement)?.DataContext is not MainViewModel.CollectionHistoryRow row) return;
+        var menu = new ContextMenu();
+        void Add(string title, Action action)
+        {
+            var item = new MenuItem { Header = L10n.Text(title) };
+            item.Click += (_, _) =>
+            {
+                try { action(); model.Reload(); }
+                catch (Exception error) { model.ShowToast(error.Message, warning: true); }
+            };
+            menu.Items.Add(item);
+        }
+        Add("保存为待发送", () => { model.Collections.Ledger.Editable(row.Id).Status = CollectionStatus.Draft; model.Collections.Save(); });
+        Add("开始新的收集", () => { model.Collections.Ledger.ParkCurrent(); model.Collections.Save(); model.ShowToast(L10n.Text("旧收集已保存为待发送，下次分批分享将建立新收集。")); });
+        Add("删除整组收集", () =>
+        {
+            var group = model.Collections.Ledger.Editable(row.Id);
+            if (MessageBox.Show(Window.GetWindow(this), L10n.Format($"将本组 {group.BatchIDs.Count} 批原始文件移到系统回收站，可撤销。"),
+                L10n.Text("删除整组收集"), MessageBoxButton.OKCancel) == MessageBoxResult.OK) model.Collections.DeleteCollection(row.Id);
+        });
+        Add("撤销", () => model.Collections.Undo());
+        OpenMenu(sender, menu);
     }
 
     private static StackPanel? CollectionRenamePanel(object sender)
@@ -201,9 +232,19 @@ public partial class HistoryPane : UserControl
         if (Model is null)
             return;
         var menu = new ContextMenu();
-        var clear = new MenuItem { Header = L10n.Text("清空记录…") };
+        var clear = new MenuItem { Header = L10n.Text("清空记录…"), IsEnabled = Model.HasHistory };
         clear.Click += Clear_Click;
         menu.Items.Add(clear);
+        if (Model.Collections.CanUndo)
+        {
+            var undo = new MenuItem { Header = L10n.Text("撤销收集删除或移出") };
+            undo.Click += (_, _) =>
+            {
+                try { Model.Collections.Undo(); Model.Reload(); }
+                catch (Exception error) { Model.ShowToast(error.Message, warning: true); }
+            };
+            menu.Items.Add(undo);
+        }
         OpenMenu(sender, menu);
     }
 

@@ -35,6 +35,8 @@
     <Compile Include="..\WeChatBridge.Windows\HistoryLabels.cs" Link="Shared\HistoryLabels.cs" />
     <Compile Include="..\WeChatBridge.Windows\EntryPickerWindow.xaml.cs" Link="Shared\EntryPickerWindow.xaml.cs" />
     <Compile Include="..\WeChatBridge.Windows\Services\ShareEntryCatalog.cs" Link="Shared\ShareEntryCatalog.cs" />
+    <Compile Include="..\WeChatBridge.Windows\Services\WeChatUiTitleReader.cs" Link="Shared\WeChatUiTitleReader.cs" />
+    <Compile Include="..\WeChatBridge.Windows\Services\WeChatOcrTitleReader.cs" Link="Shared\WeChatOcrTitleReader.cs" />
     <Page Include="..\WeChatBridge.Windows\EntryPickerWindow.xaml" Link="EntryPickerWindow.xaml" />
     <Page Include="..\WeChatBridge.Windows\Themes\AppTheme.xaml" Link="Themes\AppTheme.xaml" />
   </ItemGroup>

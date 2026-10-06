@@ -30,8 +30,17 @@ struct InstalledApp {
         return resolved
     }
 
+    /// Enabling an entry must not trust a cached app that has since been removed.
+    static func isInstalledNow(_ bundleIdentifier: String) -> Bool {
+        let resolved = resolve(bundleIdentifier)
+        cache[bundleIdentifier] = resolved.isInstalled ? resolved : nil
+        return resolved.isInstalled
+    }
+
     private static func resolve(_ bundleIdentifier: String) -> InstalledApp {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
+              FileManager.default.fileExists(atPath: url.path),
+              Bundle(url: url)?.bundleIdentifier == bundleIdentifier else {
             return InstalledApp(
                 bundleIdentifier: bundleIdentifier,
                 name: nil,

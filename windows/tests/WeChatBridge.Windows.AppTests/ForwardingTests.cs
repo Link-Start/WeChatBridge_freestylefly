@@ -10,6 +10,85 @@ namespace WeChatBridge.Windows.AppTests;
 
 public sealed class ForwardingTests
 {
+    [Fact]
+    public async Task OriginalFilesCanBeDeliveredWithoutConversationNotes()
+    {
+        using var fixture = new TempInbox();
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var batch = await Add(fixture, reader, "unnamed.zip", "");
+        var pasted = new List<PastePayload>();
+        var model = new MainViewModel(fixture.Paths, Path.Combine(fixture.Root, "config"), false, copyPayload: pasted.Add);
+        model.Reload();
+        var id = model.Collections.Append(model.Batches.Single(), null);
+        model.Reload();
+        await model.DeliverCollection(id, ShareAction.Clipboard, null);
+        Assert.Equal(CollectionStatus.Delivered, model.Collections.Ledger.Editable(id).Status);
+        Assert.True(string.IsNullOrWhiteSpace(reader.StateFor(batch.Id)?.ChatName));
+        Assert.Equal(BatchOutcomeKind.Copied, reader.StateFor(batch.Id)?.Outcome?.Kind);
+        Assert.Single(pasted);
+        Assert.True(File.Exists(batch.Items[0].FullPath));
+    }
+
+    [Fact]
+    public void MissingAppEnableIsRejectedAndPersistedOff()
+    {
+        using var fixture = new TempInbox();
+        var config = Path.Combine(fixture.Root, "config");
+        var installed = false;
+        var model = new MainViewModel(fixture.Paths, config, false, isAppInstalled: _ => installed);
+        var warnings = new List<string>();
+        model.ToastRequested += (text, _, _, _) => warnings.Add(text);
+        model.SetEntryEnabled(ShareAction.Codex, true);
+        Assert.False(model.IsEntryEnabled(ShareAction.Codex));
+        Assert.False(model.IsDestinationInstalled(ShareAction.Codex, null));
+        Assert.False(new AppSettingsStore(config).Load().IsEntryEnabled(ShareAction.Codex));
+        Assert.Single(warnings);
+        Assert.Contains("Codex", warnings[0]);
+        Assert.False(model.Entries.Single(e => e.Action == ShareAction.Codex).IsEnabled);
+        installed = true;
+        Assert.True(model.IsDestinationInstalled(ShareAction.Codex, null));
+        model.SetEntryEnabled(ShareAction.Codex, true);
+        Assert.True(model.IsEntryEnabled(ShareAction.Codex));
+        installed = false;
+        model.SetEntryEnabled(ShareAction.Codex, false);
+        Assert.False(model.IsEntryEnabled(ShareAction.Codex));
+        Assert.Single(warnings);
+    }
+
+    [Fact]
+    public async Task MixedCollectionUsesOnlyExplicitSceneAndRecordsItForEveryMember()
+    {
+        using var fixture = new TempInbox();
+        var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
+        var first = await Add(fixture, reader, "one.zip", "甲群");
+        var second = await Add(fixture, reader, "two.zip", "乙群");
+        var config = Path.Combine(fixture.Root, "config");
+        var pickerCalls = 0;
+        using var scenes = new SceneService(config,
+            picker: (_, _) => { pickerCalls++; return Task.FromResult(ScenePickerAnswer.Cancelled); },
+            titleReader: _ => Task.FromResult<GroupTitleParser.Title?>(new("无关的当前群", null)));
+        var scene = scenes.AddScene();
+        scene.Instruction = "本次明确选择的提示词";
+        scene.CompatibleAgents = [AgentId.ChatGptCodex];
+        scenes.UpdateScene(scene);
+        var payloads = new List<PastePayload>();
+        var model = new MainViewModel(fixture.Paths, config, false, Engine(reader, payloads.Add), scenes, payloads.Add);
+        var group = model.Collections.Append(first, null);
+        model.Collections.Append(second, null);
+        await model.DeliverCollection(group, ShareAction.Codex, null, scene);
+        Assert.Equal(0, pickerCalls);
+        Assert.Contains(payloads.OfType<PastePayload.Text>(), p => p.Value.Contains("本次明确选择的提示词"));
+        Assert.All(new[] { first, second }, b => Assert.Equal(scene.Id, reader.StateFor(b.Id)?.SceneID));
+        Assert.Equal("甲群", reader.StateFor(first.Id)?.ChatName);
+        Assert.Equal("乙群", reader.StateFor(second.Id)?.ChatName);
+        model.Query = scene.Name;
+        Assert.Single(model.CollectionRows);
+        payloads.Clear();
+        await model.DeliverCollection(group, ShareAction.Codex, null);
+        Assert.Empty(payloads.OfType<PastePayload.Text>());
+        Assert.All(new[] { first, second }, b => Assert.Null(reader.StateFor(b.Id)?.SceneID));
+        Assert.Equal(0, pickerCalls);
+    }
     private static async Task<ReadyBatch> Add(TempInbox fixture, InboxReader reader, string name, string chatName)
     {
         var source = fixture.WriteSource(name, "");
@@ -106,7 +185,7 @@ public sealed class ForwardingTests
     }
 
     [Fact]
-    public async Task CollectionArchivingPreservesDistinctConversationNamesAndMissingFolderIsRetryable()
+    public async Task CollectionFolderDeliverySavesOnlyOriginalsAndMissingFolderIsRetryable()
     {
         using var fixture = new TempInbox();
         var reader = new InboxReader(fixture.Paths, InboxReader.Removal.Delete);
@@ -125,9 +204,11 @@ public sealed class ForwardingTests
         model.DeliveryFolderPath = notes;
         model.DeliverySubfolder = "项目/周报";
         await model.DeliverCollection(group, ShareAction.Folder, null);
-        var names = Directory.GetFiles(notes, "*.md", SearchOption.AllDirectories).Select(Path.GetFileName).ToList();
-        Assert.Contains("甲群的聊天.md", names);
-        Assert.Contains("乙群的聊天.md", names);
+        Assert.Empty(Directory.GetFiles(notes, "*.md", SearchOption.AllDirectories));
+        var saved = Directory.GetFiles(notes, "*.zip");
+        Assert.Equal(2, saved.Length);
+        Assert.Equal(File.ReadAllBytes(first.Items[0].FullPath), File.ReadAllBytes(Path.Combine(notes, "one.zip")));
+        Assert.Equal(File.ReadAllBytes(second.Items[0].FullPath), File.ReadAllBytes(Path.Combine(notes, "two.zip")));
         Assert.Equal(CollectionStatus.Delivered, model.Collections.Ledger.Editable(group).Status);
     }
 }

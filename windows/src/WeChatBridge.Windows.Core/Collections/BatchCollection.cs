@@ -150,6 +150,8 @@ public sealed class BatchCollectionLedger
 
 public sealed record CollectionBatchMetadata(int? Count, WeChatTranscriptRecord? First, WeChatTranscriptRecord? Last)
 {
+    public IReadOnlyList<WeChatTranscriptRecord> FirstRecords { get; init; } = [];
+    public IReadOnlyList<WeChatTranscriptRecord> LastRecords { get; init; } = [];
     public static CollectionBatchMetadata Read(IEnumerable<string> paths)
     {
         var records = new List<WeChatTranscriptRecord>();
@@ -164,7 +166,10 @@ public sealed record CollectionBatchMetadata(int? Count, WeChatTranscriptRecord?
         }
         // OrderBy is stable, preserving exported order among minute-resolution ties.
         var ordered = records.OrderBy(r => r.Date).ToList();
-        return new(complete && archives > 0 ? records.Count : null, ordered.FirstOrDefault(), ordered.LastOrDefault());
+        return new(complete && archives > 0 ? records.Count : null, ordered.FirstOrDefault(), ordered.LastOrDefault())
+        {
+            FirstRecords = ordered.Take(2).ToList(), LastRecords = ordered.TakeLast(2).ToList(),
+        };
     }
 }
 

@@ -328,7 +328,8 @@ public static class InboxWriter
         StagedShare staged,
         BatchIntent? intent,
         BatchOutcome? initialOutcome = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? chatName = null)
     {
         try
         {
@@ -340,11 +341,12 @@ public static class InboxWriter
                     cancellationToken);
             }
 
-            if (initialOutcome is not null)
+            if (initialOutcome is not null || chatName is not null)
             {
-                var state = BatchState
-                    .Initial(staged.Manifest, intent?.Action, intent?.TargetDisplayName)
-                    .WithOutcome(initialOutcome);
+                var state = BatchState.Initial(staged.Manifest, intent?.Action, intent?.TargetDisplayName);
+                if (initialOutcome is not null) state = state.WithOutcome(initialOutcome);
+                state = state with { ChatName = chatName,
+                    UnannouncedShare = initialOutcome is null && state.Action != ShareAction.Clipboard };
                 await File.WriteAllTextAsync(
                     Path.Combine(staged.StagingDirectory, BatchState.FileName),
                     JsonSerializer.Serialize(state, BatchManifest.JsonOptions),

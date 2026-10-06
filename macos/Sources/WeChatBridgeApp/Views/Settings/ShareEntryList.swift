@@ -51,6 +51,14 @@ struct ShareEntryList: View {
                 Notice(L10n.text("WeChatBridge 需要安装在「应用程序」文件夹里，系统才会登记这些入口。"))
             }
         }
+        .alert(L10n.text("未安装"), isPresented: Binding(
+            get: { probe.enablingFailure != nil },
+            set: { if !$0 { probe.enablingFailure = nil } }
+        )) {
+            Button(L10n.text("知道了"), role: .cancel) { probe.enablingFailure = nil }
+        } message: {
+            Text(probe.enablingFailure ?? "")
+        }
     }
 
     private func row(_ action: ShareAction) -> some View {

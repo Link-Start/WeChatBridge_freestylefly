@@ -120,8 +120,12 @@ public sealed class InboxReader
         // from intent.json, still on disk at this point.
         var requested = stored is null ? PeekIntent(directory) : null;
         var state = stored ?? BatchState.Initial(manifest, requested?.Action, requested?.TargetDisplayName);
-        if (stored is null && initializing)
+        var firstSeen = stored is null || state.UnannouncedShare;
+        if (initializing && firstSeen)
+        {
+            state = state with { UnannouncedShare = false };
             TryWriteState(directory, state);
+        }
 
         var action = state.Action
             ?? ShareActions.FromRawValue(manifest.Action)
@@ -153,7 +157,7 @@ public sealed class InboxReader
             state.ChatName,
             state.SceneID,
             state.SceneName,
-            stored is null && initializing);
+            firstSeen && initializing);
     }
 
     /// <summary>Bytes of payload on disk — what settings reports as 占用.</summary>
@@ -178,6 +182,15 @@ public sealed class InboxReader
 
     /// <summary>Moves a whole batch to the Recycle Bin — the archive may be the only copy.</summary>
     public void Discard(Guid batchId) => TrashOrRemove(DirectoryFor(batchId));
+
+    /// <summary>Collection deletion must fail safely on volumes without a recycle bin.</summary>
+    public void RecycleCollectionBatch(Guid batchId)
+    {
+        var path = DirectoryFor(batchId);
+        if (_removal == Removal.Delete) { Directory.Delete(path, recursive: true); return; }
+        VisualBasicFileIO.FileSystem.DeleteDirectory(path, VisualBasicFileIO.UIOption.OnlyErrorDialogs,
+            VisualBasicFileIO.RecycleOption.SendToRecycleBin, VisualBasicFileIO.UICancelOption.ThrowException);
+    }
 
     /// <summary>Removes one item and rewrites the manifest; the batch goes once its last item does.</summary>
     public void Discard(ReadyItem item)

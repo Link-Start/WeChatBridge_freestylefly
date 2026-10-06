@@ -191,6 +191,6 @@ public static class WindowsForwardTargets
             return new WindowsForwardTarget(target.DisplayName, [stem], [id]);
         }
 
-        return new WindowsForwardTarget(target.DisplayName, [id], [$"{id}.exe"]);
+        return new WindowsForwardTarget(target.DisplayName, [id], [$"{id}.exe"], Aumid: id);
     }
 }

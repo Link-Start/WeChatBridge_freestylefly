@@ -78,6 +78,8 @@ public sealed record BatchState
     /// <summary>Scene id + name snapshot; renaming a scene must not rewrite history.</summary>
     public string? SceneID { get; init; }
     public string? SceneName { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool UnannouncedShare { get; init; }
 
     /// <summary>
     /// The state a batch gets the first time the app sees it. A clipboard batch is

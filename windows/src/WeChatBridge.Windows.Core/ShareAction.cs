@@ -41,6 +41,8 @@ public enum ShareAction
 
 public static class ShareActions
 {
+    public static bool WritesClipboardOnReceipt(ShareAction entry, BatchIntent? intent)
+        => (intent?.Action ?? entry) != ShareAction.Collect;
     /// <summary>The string both platforms write into JSON.</summary>
     public static string RawValue(this ShareAction action) => action switch
     {
