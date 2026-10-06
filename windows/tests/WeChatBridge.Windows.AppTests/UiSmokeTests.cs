@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using WeChatBridge.Windows.Core;
 using WeChatBridge.Windows.Panes;
 using WeChatBridge.Windows.Services;
+using WeChatBridge.Windows.Onboarding;
 using WeChatBridge.Windows.Tests;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
@@ -48,6 +49,7 @@ public sealed class UiSmokeTests
                     {
                         ("general", new GeneralPane()), ("entries", new EntriesPane()),
                         ("history", new HistoryPane()), ("scenes", new ScenesPane()), ("skills", new SkillsPane()),
+                        ("about", new AboutPane()),
                     })
                     {
                         pane.DataContext = model;
@@ -72,6 +74,57 @@ public sealed class UiSmokeTests
                             Assert.Equal("示例收集", model.CollectionRows.Single(r => r.Id == collectionId).Title);
                         }
                     }
+                    var wizardModel = new MainViewModel(fixture.Paths, Path.Combine(config, "wizard-" + language),
+                        false);
+                    var wizardStore = new OnboardingStateStore(Path.Combine(config, "wizard-state-" + language));
+                    var wizard = new OnboardingWindow(wizardModel, wizardStore, () => Task.FromResult(false));
+                    wizard.Show();
+                    WaitFor(() => ((TextBlock)wizard.FindName("RegistrationTitle")).Text == L10n.Text("未检测到 Windows 分享入口"));
+                    Assert.False(wizard.AllowsTransparency);
+                    Assert.True(wizard.UseLayoutRounding);
+                    Assert.Equal(TextFormattingMode.Display, TextOptions.GetTextFormattingMode(wizard));
+                    Assert.Contains("Microsoft YaHei UI", wizard.FontFamily.Source);
+                    Assert.Null(((Border)wizard.Content).Effect);
+                    var next = (Button)wizard.FindName("NextButton");
+                    for (var step = 0; step < 4; step++)
+                    {
+                        Assert.Equal(step, wizard.CurrentStep);
+                        if (previewDirectory is not null)
+                            foreach (var scale in new[] { 1.0, 1.25, 1.5, 2.0 })
+                            {
+                                wizard.UpdateLayout();
+                                var bitmap = new RenderTargetBitmap((int)(wizard.ActualWidth * scale), (int)(wizard.ActualHeight * scale),
+                                    96 * scale, 96 * scale, PixelFormats.Pbgra32);
+                                bitmap.Render(wizard);
+                                var encoder = new PngBitmapEncoder();
+                                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                                using var output = File.Create(Path.Combine(previewDirectory, $"onboarding-{step}-{language}-{scale * 100:0}.png"));
+                                encoder.Save(output);
+                            }
+                        if (step == 1)
+                        {
+                            var rows = ((ItemsControl)wizard.FindName("EntriesList")).Items.Cast<OnboardingWindow.WizardEntry>().ToArray();
+                            Assert.All(rows, row => Assert.True(row.Available));
+                            var clipboard = rows.Single(row => row.Action == ShareAction.Clipboard);
+                            clipboard.Enabled = false;
+                            Assert.False(wizardModel.IsEntryEnabled(ShareAction.Clipboard));
+                            clipboard.Enabled = true;
+                            Assert.True(wizardModel.IsEntryEnabled(ShareAction.Clipboard));
+                        }
+                        next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    Assert.True(wizardStore.Load().Completed);
+                    Assert.All(((ItemsControl)wizard.FindName("EntriesList")).Items.Cast<OnboardingWindow.WizardEntry>(),
+                        row => Assert.Equal(row.Enabled, wizardModel.IsEntryEnabled(row.Action)));
+                    wizardStore.Save(new OnboardingState { Step = 2 });
+                    var resumed = new OnboardingWindow(wizardModel, wizardStore, () => Task.FromResult(true));
+                    resumed.Show();
+                    Assert.Equal(2, resumed.CurrentStep);
+                    WaitFor(() => ((TextBlock)resumed.FindName("RegistrationTitle")).Text == L10n.Text("Windows 分享入口已注册"));
+                    resumed.Close();
+                    Assert.False(wizardStore.Load().Completed);
+                    Assert.Equal(2, wizardStore.Load().Step);
+                    wizardModel.DisposeServices();
                     var window = new CollectionWindow(model, collectionId);
                     window.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
                     Assert.Null(window.FindName("CollectionList"));
@@ -149,6 +202,18 @@ public sealed class UiSmokeTests
             if (child is T match) yield return match;
             foreach (var descendant in Descendants<T>(child)) yield return descendant;
         }
+    }
+
+    private static void WaitFor(Func<bool> ready)
+    {
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+        timer.Tick += (_, _) => { if (ready() || DateTime.UtcNow > deadline) frame.Continue = false; };
+        timer.Start();
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+        timer.Stop();
+        Assert.True(ready(), "The collection metadata did not reach the UI.");
     }
 
     private static double Render(FrameworkElement content, string name, string language, string? directory, double width = 710)

@@ -1,10 +1,8 @@
 using WeChatBridge.Windows.Core;
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 
 namespace WeChatBridge.Windows.Panes;
 
@@ -17,14 +15,6 @@ public partial class AboutPane : UserControl
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         VersionText.Text = L10n.Format($"版本 {ShortVersion(informational)} · Windows");
 
-        // The sparse package ships Assets\Square150x150Logo.png in the install
-        // root; a bare dotnet build output does not, so the brand tile stays.
-        var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "Square150x150Logo.png");
-        if (File.Exists(icon))
-        {
-            AppIconImage.Source = new BitmapImage(new Uri(icon, UriKind.Absolute));
-            AppIconImage.Visibility = Visibility.Visible;
-        }
     }
 
     /// <summary>1.0.0+commithash → 1.0.0 (short hash): the NuGet metadata stays, the label stays readable.</summary>

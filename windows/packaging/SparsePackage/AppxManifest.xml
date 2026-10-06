@@ -5,7 +5,7 @@
   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap10 rescap">
-  <Identity Name="WeChatBridge.Windows.ShareTarget" Publisher="CN=WeChatBridge Windows Dev" Version="0.1.0.0" ProcessorArchitecture="neutral" />
+  <Identity Name="WeChatBridge.Windows.ShareTarget" Publisher="CN=WeChatBridge Windows Dev" Version="1.0.8.0" ProcessorArchitecture="neutral" />
   <Properties>
     <DisplayName>微⁠信流 Windows</DisplayName>
     <PublisherDisplayName>WeChatBridge</PublisherDisplayName>
@@ -45,8 +45,18 @@
       <Extensions>
         <uap:Extension Category="windows.shareTarget">
           <uap:ShareTarget Description="微⁠信流">
+            <!--
+              Broad declaration is enumeration-visibility only: the Weixin share
+              host drops targets whose SupportedFileTypes is narrow (e.g. only
+              ".zip") or that declare a single DataFormat — the same shape
+              Tencent's own WeixinShare/WorkBuddyShareTarget manifests use.
+              The helper still validates the real payload at runtime.
+            -->
             <uap:SupportedFileTypes><uap:SupportsAnyFileType /></uap:SupportedFileTypes>
             <uap:DataFormat>StorageItems</uap:DataFormat>
+            <uap:DataFormat>Text</uap:DataFormat>
+            <uap:DataFormat>URI</uap:DataFormat>
+            <uap:DataFormat>Bitmap</uap:DataFormat>
           </uap:ShareTarget>
         </uap:Extension>
       </Extensions>

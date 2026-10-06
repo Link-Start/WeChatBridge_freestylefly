@@ -59,9 +59,9 @@ public static class TrayMenu
             new Entry(null),
             new Entry(L10n.Text("打开 Inbox"), Action: Command.OpenInbox),
             new Entry(L10n.Text("设置…"), Action: Command.Settings),
-            new Entry(L10n.Text("关于 WeChatBridge…"), Action: Command.About),
+            new Entry(L10n.Text("关于微信流…"), Action: Command.About),
             new Entry(null),
-            new Entry(L10n.Text("退出 WeChatBridge"), Action: Command.Quit),
+            new Entry(L10n.Text("退出微信流"), Action: Command.Quit),
         ];
     }
 

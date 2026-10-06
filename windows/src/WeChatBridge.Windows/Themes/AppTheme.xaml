@@ -13,6 +13,14 @@
     <local:ExpandGlyphConverter x:Key="ExpandGlyph" />
     <local:ByteCountTextConverter x:Key="ByteCountText" />
 
+    <Style TargetType="{x:Type Window}">
+        <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
+        <Setter Property="UseLayoutRounding" Value="True" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+    </Style>
+
     <!-- ============== Palette: the light branch of macOS Theme.swift ==============
          Keys ending in Color are the macOS token names, verbatim values. -->
     <SolidColorBrush x:Key="BrandColor" Color="#FF14C653" />
